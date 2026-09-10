@@ -1,75 +1,39 @@
-# Nuxt Minimal Starter
+# New26InterThing
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+面向物联网应用创新比赛的水循环监控与控制系统。本仓库正在从旧项目分阶段重构，当前完成第一阶段设备列表纵向闭环。
 
-## Setup
+## 目录
 
-Make sure to install dependencies:
+```text
+apps/web          Nuxt 前端
+apps/server       Express 后端
+packages/shared   前后端共享类型
+docs              重构与接口文档
+```
 
-```bash
-# npm
-npm install
+## 首次运行
 
-# pnpm
+1. 复制 `.env.example` 为 `.env`，填写本机 MySQL 配置。
+2. 确保 `DB_NAME` 与 `contest_admin` 使用的数据库相同。
+3. 安装并检查：
+
+```powershell
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
+pnpm check:env
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+前端默认地址为 `http://localhost:3000`，后端默认地址为 `http://localhost:3001`。
 
-Build the application for production:
+## 常用命令
 
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+```powershell
+pnpm dev          # 同时启动前后端
+pnpm dev:web      # 只启动前端
+pnpm dev:server   # 只启动后端
+pnpm test         # 运行测试
+pnpm typecheck    # 检查 TypeScript
+pnpm build        # 生产构建
 ```
 
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+当前迁移范围和后续顺序见 `docs/重构计划.md`。

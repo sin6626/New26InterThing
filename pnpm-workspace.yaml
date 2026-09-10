@@ -1,4 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
 allowBuilds:
-  esbuild: set this to true or false
+  '@tailwindcss/oxide': true
+  esbuild: true
 minimumReleaseAgeExclude:
   - '@rolldown/binding-openharmony-arm64@1.2.8'

@@ -8,17 +8,17 @@ dist
 
 # Node dependencies
 node_modules
+.env
+.env.*
+!.env.example
 
 # Logs
 logs
 *.log
+output/playwright/
+.playwright-cli/
 
 # Misc
 .DS_Store
 .fleet
 .idea
-
-# Local env files
-.env
-.env.*
-!.env.example
