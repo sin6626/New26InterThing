@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { Device } from '@new26interthing/shared'
-import { ElMessage } from 'element-plus'
-
 import { useDeviceApi } from '~/features/device/api'
 
 const api = useDeviceApi()
 const loading = ref(false)
 const devices = ref<Device[]>([])
 const total = ref(0)
+const errorMessage = ref('')
 const filters = reactive({ number: '', deviceName: '' })
 const query = reactive({ page: 1, pageSize: 20 })
 
 const loadDevices = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const result = await api.listDevices({
       ...query,
@@ -22,7 +22,9 @@ const loadDevices = async () => {
     devices.value = result.items
     total.value = result.total
   } catch {
-    ElMessage.error('设备列表加载失败，请检查后端和数据库连接')
+    devices.value = []
+    total.value = 0
+    errorMessage.value = '设备列表加载失败，请检查后端和数据库连接。'
   } finally {
     loading.value = false
   }
@@ -74,6 +76,19 @@ onMounted(() => {
           <span class="text-sm text-slate-500">共 {{ total }} 台</span>
         </div>
       </template>
+
+      <el-alert
+        v-if="errorMessage"
+        :title="errorMessage"
+        type="error"
+        show-icon
+        :closable="false"
+        class="mb-4"
+      >
+        <template #default>
+          <el-button size="small" @click="loadDevices">重新加载</el-button>
+        </template>
+      </el-alert>
 
       <el-table v-loading="loading" :data="devices" stripe table-layout="fixed">
         <el-table-column prop="number" label="设备编号" min-width="160" />

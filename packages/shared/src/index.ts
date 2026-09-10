@@ -20,8 +20,16 @@ export interface PaginatedDevices {
   pageSize: number
 }
 
-export interface ApiResponse<T> {
-  code: number
+export interface ApiSuccessResponse<T> {
+  code: 0
   message: string
   data: T
 }
+
+export interface ApiErrorResponse {
+  code: number
+  message: string
+  data: null
+}
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse
