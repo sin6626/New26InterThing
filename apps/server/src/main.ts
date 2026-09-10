@@ -7,7 +7,6 @@ const env = readEnv()
 const pool = createDatabasePool(env)
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
-  webOrigin: env.WEB_ORIGIN,
 })
 
 const server = app.listen(env.SERVER_PORT, env.SERVER_HOST, () => {
@@ -22,4 +21,3 @@ const stop = () => {
 
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
-

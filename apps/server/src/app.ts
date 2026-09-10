@@ -6,13 +6,12 @@ import { createDeviceRouter } from './modules/device/device.routes.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository
-  webOrigin?: string
 }
 
-export const createApp = ({ deviceRepository, webOrigin = 'http://localhost:5174' }: AppDependencies): Express => {
+export const createApp = ({ deviceRepository }: AppDependencies): Express => {
   const app = express()
 
-  app.use(cors({ origin: webOrigin }))
+  app.use(cors())
   app.use(express.json())
   app.use('/api/devices', createDeviceRouter(deviceRepository))
   app.use((_request, response) => {

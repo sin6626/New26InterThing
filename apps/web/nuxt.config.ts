@@ -5,10 +5,16 @@ import dotenv from 'dotenv'
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) })
 
+const webPort = Number(process.env.WEB_PORT || 5174)
+
+if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) {
+  throw new Error('WEB_PORT 必须是 1 到 65535 之间的整数')
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devServer: {
-    port: 5174,
+    port: webPort,
   },
   devtools: { enabled: true },
   modules: ['@element-plus/nuxt', '@pinia/nuxt'],

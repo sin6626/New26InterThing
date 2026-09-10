@@ -24,6 +24,7 @@ pnpm dev
 ```
 
 前端默认地址为 `http://localhost:5174`，后端默认地址为 `http://localhost:3001`。
+可通过根目录 `.env` 中的 `WEB_PORT` 修改前端开发端口。后端 API 的 CORS 默认允许所有来源。
 
 ## 常用命令
 

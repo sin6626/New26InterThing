@@ -10,6 +10,21 @@ afterEach(() => {
 })
 
 describe('GET /api/devices', () => {
+  it('allows cross-origin requests from any origin', async () => {
+    const repository: DeviceRepository = { list: vi.fn() }
+    const server = createApp({ deviceRepository: repository }).listen(0)
+    servers.push(server)
+    await new Promise<void>((resolve) => server.once('listening', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('测试服务启动失败')
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/devices`, {
+      headers: { Origin: 'https://example.com' },
+    })
+
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+  })
+
   it('returns a filtered page of devices through the public HTTP API', async () => {
     const repository: DeviceRepository = {
       list: vi.fn().mockResolvedValue({
