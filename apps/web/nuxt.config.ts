@@ -7,6 +7,9 @@ dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) })
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
+  devServer: {
+    port: 5174,
+  },
   devtools: { enabled: true },
   modules: ['@element-plus/nuxt', '@pinia/nuxt'],
   css: ['~/assets/css/main.css'],

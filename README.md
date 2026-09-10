@@ -23,7 +23,7 @@ pnpm check:env
 pnpm dev
 ```
 
-前端默认地址为 `http://localhost:3000`，后端默认地址为 `http://localhost:3001`。
+前端默认地址为 `http://localhost:5174`，后端默认地址为 `http://localhost:3001`。
 
 ## 常用命令
 

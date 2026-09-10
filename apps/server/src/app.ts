@@ -9,7 +9,7 @@ interface AppDependencies {
   webOrigin?: string
 }
 
-export const createApp = ({ deviceRepository, webOrigin = 'http://localhost:3000' }: AppDependencies): Express => {
+export const createApp = ({ deviceRepository, webOrigin = 'http://localhost:5174' }: AppDependencies): Express => {
   const app = express()
 
   app.use(cors({ origin: webOrigin }))
