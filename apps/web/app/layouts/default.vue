@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+
 const route = useRoute()
 
 const menuGroups = [
@@ -6,7 +8,7 @@ const menuGroups = [
     title: '监控中心',
     items: [
       { label: '实时监控', to: '/' },
-      { label: '历史数据' },
+      { label: '历史数据', to: '/history' },
       { label: '行为数据' },
       { label: '故障信息' },
     ],
@@ -27,6 +29,7 @@ function isActive(to: string) {
 </script>
 
 <template>
+  <el-config-provider :locale="zhCn">
   <el-container class="min-h-screen bg-[#f3f5f8]">
     <el-aside width="220px" class="border-r border-slate-200 bg-slate-950 text-white">
       <div class="flex h-16 items-center border-b border-slate-800 px-5">
@@ -61,11 +64,12 @@ function isActive(to: string) {
     <el-container>
       <el-header height="64px" class="flex items-center justify-between border-b border-slate-200 bg-white px-6">
         <span class="text-sm text-slate-500">水循环物联网应用系统</span>
-        <el-tag type="info" effect="plain">第二里程碑</el-tag>
+        <el-tag type="info" effect="plain">第三里程碑</el-tag>
       </el-header>
       <el-main class="p-6">
         <slot />
       </el-main>
     </el-container>
   </el-container>
+  </el-config-provider>
 </template>

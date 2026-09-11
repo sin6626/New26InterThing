@@ -9,11 +9,13 @@ import { createDeviceRepository } from './modules/device/device.repository.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
+import { createSensorHistoryRepository } from './modules/sensor-history/sensor-history.mysql.js'
 
 const env = readEnv()
 const pool = createDatabasePool(env)
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
+  sensorHistoryRepository: createSensorHistoryRepository(pool),
 })
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)

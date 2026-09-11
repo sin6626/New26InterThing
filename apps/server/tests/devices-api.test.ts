@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DeviceRepository } from '../src/modules/device/device.repository.js'
 import { createApp } from '../src/app.js'
 
+const sensorHistoryRepository = { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn() }
+
 const servers: Array<{ close: () => void }> = []
 
 afterEach(() => {
@@ -12,7 +14,7 @@ afterEach(() => {
 describe('GET /api/devices', () => {
   it('allows cross-origin requests from any origin', async () => {
     const repository: DeviceRepository = { list: vi.fn() }
-    const server = createApp({ deviceRepository: repository }).listen(0)
+    const server = createApp({ deviceRepository: repository, sensorHistoryRepository }).listen(0)
     servers.push(server)
     await new Promise<void>((resolve) => server.once('listening', resolve))
     const address = server.address()
@@ -40,7 +42,7 @@ describe('GET /api/devices', () => {
         total: 1,
       }),
     }
-    const server = createApp({ deviceRepository: repository }).listen(0)
+    const server = createApp({ deviceRepository: repository, sensorHistoryRepository }).listen(0)
     servers.push(server)
     await new Promise<void>((resolve) => server.once('listening', resolve))
     const address = server.address()
@@ -79,7 +81,7 @@ describe('GET /api/devices', () => {
 
   it('rejects invalid pagination without calling the database', async () => {
     const repository: DeviceRepository = { list: vi.fn() }
-    const server = createApp({ deviceRepository: repository }).listen(0)
+    const server = createApp({ deviceRepository: repository, sensorHistoryRepository }).listen(0)
     servers.push(server)
     await new Promise<void>((resolve) => server.once('listening', resolve))
     const address = server.address()
