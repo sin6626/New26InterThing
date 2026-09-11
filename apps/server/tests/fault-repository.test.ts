@@ -43,12 +43,19 @@ describe('fault repository', () => {
 
   it('looks up mappings and saves with parameterized SQL', async () => {
     const query = vi.fn().mockResolvedValueOnce([[{ e_msg: '中文映射' }]])
-    const execute = vi.fn().mockResolvedValueOnce([{ affectedRows: 1 }])
+    const execute = vi.fn().mockResolvedValueOnce([{ affectedRows: 1, insertId: 88 }])
     const repository = createFaultRepository({ query, execute } as never)
 
     await expect(repository.findMappedMessage('E001', '3')).resolves.toBe('中文映射')
-    await repository.save({
+    await expect(repository.save({
       deviceNumber: '202111', errorNumber: 'E001', type: '3', message: '中文映射', occurredAt: '2026-09-11 10:00:00',
+    })).resolves.toEqual({
+      id: 88,
+      deviceNumber: '202111',
+      errorNumber: 'E001',
+      type: '3',
+      message: '中文映射',
+      occurredAt: '2026-09-11 10:00:00',
     })
     expect(query.mock.calls[0][1]).toEqual(['E001', '3'])
     expect(execute.mock.calls[0][1]).toEqual(['202111', '2026-09-11 10:00:00', '中文映射', 'E001', '3'])

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { useRealtimeSocket } from '~/features/realtime/use-realtime-socket'
 
 const route = useRoute()
+useRealtimeSocket()
 
 const menuGroups = [
   {

@@ -11,6 +11,28 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()))
 })
 
+const createConnectedPair = async () => {
+  const server = createServer()
+  const realtime = createRealtimeWebSocket(server)
+  server.listen(0, '127.0.0.1')
+  await new Promise<void>((resolve) => server.once('listening', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('测试服务启动失败')
+  const client = new WebSocket(`ws://127.0.0.1:${address.port}/ws`)
+  await new Promise<void>((resolve, reject) => {
+    client.once('open', resolve)
+    client.once('error', reject)
+  })
+  cleanups.push(
+    () =>
+      new Promise((resolve) => {
+        client.close()
+        realtime.close(() => server.close(() => resolve()))
+      }),
+  )
+  return { client, realtime }
+}
+
 describe('realtime WebSocket', () => {
   it('sends the current MQTT connection status to a newly connected client', async () => {
     const server = createServer()
@@ -38,30 +60,35 @@ describe('realtime WebSocket', () => {
   })
 
   it('broadcasts sensor realtime messages to a connected browser client', async () => {
-    const server = createServer()
-    const realtime = createRealtimeWebSocket(server)
-    server.listen(0, '127.0.0.1')
-    await new Promise<void>((resolve) => server.once('listening', resolve))
-    const address = server.address()
-    if (!address || typeof address === 'string') throw new Error('测试服务启动失败')
-    const client = new WebSocket(`ws://127.0.0.1:${address.port}/ws`)
-    await new Promise<void>((resolve, reject) => {
-      client.once('open', resolve)
-      client.once('error', reject)
-    })
-    cleanups.push(
-      () =>
-        new Promise((resolve) => {
-          client.close()
-          realtime.close(() => server.close(() => resolve()))
-        }),
-    )
+    const { client, realtime } = await createConnectedPair()
     const message = {
       type: 'sensor.realtime' as const,
       data: {
         deviceNumber: '202111',
         recordedAt: '2026-09-11 09:30:00',
         fields: { 出水温度: 28.7 },
+      },
+    }
+    const received = new Promise<string>((resolve) =>
+      client.once('message', (data) => resolve(data.toString())),
+    )
+
+    realtime.broadcast(message)
+
+    await expect(received).resolves.toBe(JSON.stringify(message))
+  })
+
+  it('broadcasts fault alerts to a connected browser client', async () => {
+    const { client, realtime } = await createConnectedPair()
+    const message = {
+      type: 'fault.alert' as const,
+      data: {
+        id: 88,
+        deviceNumber: '202111',
+        errorNumber: 'E001',
+        type: '3',
+        message: '传感器故障',
+        occurredAt: '2026-09-11 10:00:00',
       },
     }
     const received = new Promise<string>((resolve) =>

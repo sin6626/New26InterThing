@@ -43,6 +43,12 @@ const mapItem = (row: RowDataPacket): FaultItem => ({
 
 const typeLabel = (type: string | null) => type ? `类型 ${type}` : '未知类型'
 
+const formatDateTime = (value: string | Date) => {
+  if (typeof value === 'string') return value
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`
+}
+
 export const createFaultRepository = (pool: Pool): FaultRepository => ({
   async findMappedMessage(errorNumber, type) {
     const [rows] = await pool.query<MessageRow[]>(
@@ -55,11 +61,19 @@ export const createFaultRepository = (pool: Pool): FaultRepository => ({
   },
 
   async save(record) {
-    await pool.execute<ResultSetHeader>(
+    const [result] = await pool.execute<ResultSetHeader>(
       `insert into t_error_msg (d_no, c_time, e_msg, e_no, type)
        values (?, ?, ?, ?, ?)`,
       [record.deviceNumber, record.occurredAt, record.message, record.errorNumber, record.type],
     )
+    return {
+      id: result.insertId,
+      deviceNumber: record.deviceNumber,
+      errorNumber: record.errorNumber,
+      type: record.type,
+      message: record.message,
+      occurredAt: formatDateTime(record.occurredAt),
+    }
   },
 
   async getOptions() {

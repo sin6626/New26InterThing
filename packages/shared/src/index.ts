@@ -52,7 +52,12 @@ export interface SystemStatusMessage {
   }
 }
 
-export type RealtimeMessage = SensorRealtimeMessage | SystemStatusMessage
+export interface FaultAlertMessage {
+  type: 'fault.alert'
+  data: FaultItem
+}
+
+export type RealtimeMessage = SensorRealtimeMessage | SystemStatusMessage | FaultAlertMessage
 
 export interface SensorHistoryField {
   key: string

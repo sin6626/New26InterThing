@@ -1,4 +1,5 @@
 import type {
+  FaultItem,
   FaultOptions,
   FaultQuery,
   FaultStatisticsItem,
@@ -15,7 +16,7 @@ export interface NewFaultRecord {
 
 export interface FaultRepository {
   findMappedMessage(errorNumber: string, type: string): Promise<string | null>
-  save(record: NewFaultRecord): Promise<void>
+  save(record: NewFaultRecord): Promise<FaultItem>
   getOptions(): Promise<FaultOptions>
   list(query: FaultQuery): Promise<Pick<PaginatedFaults, 'items' | 'total'>>
   getStatistics(query: Omit<FaultQuery, 'page' | 'pageSize'>): Promise<FaultStatisticsItem[]>

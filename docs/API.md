@@ -124,6 +124,17 @@ GET /faults/statistics?deviceNumber=202111&type=3
 
 三个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
 
-## MQTT 故障上报
+## 本地故障报告
 
-后端订阅 `device/error`，兼容字段 `d_no`、`e_no`、`type`、可选 `e_msg`、可选 `c_time` 或 `time`。应用按 `e_no + type` 优先读取 `t_error_code_mapper` 的中文信息，未命中时依次使用设备 `e_msg` 和包含原始编号、类型的默认文本，最终写入 `t_error_msg`。
+设备不会主动发布故障消息，后端不订阅 `device/error`。本地判断模块通过 `createFaultReporter()` 提供的 `reportFault()` 报告故障：
+
+```ts
+await reporter.reportFault({
+  deviceNumber,
+  errorNumber: 'LOW_FLOW',
+  type: '6',
+  detail: '运行中流量 0.10L/min，低于配置阈值',
+})
+```
+
+报告器按 `errorNumber + type` 查询 `t_error_code_mapper`，将标准中文信息和具体原因写入 `t_error_msg`。写入成功后通过现有 `/ws` 广播 `{ type: 'fault.alert', data: FaultItem }`，供应用布局显示右上角警告；故障页面仍由 HTTP 主动查询。

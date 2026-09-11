@@ -3,12 +3,10 @@ import { createServer } from 'node:http'
 import { createApp } from './app.js'
 import { readEnv } from './config/env.js'
 import { createDatabasePool } from './infrastructure/database.js'
-import { createApplicationMqtt } from './infrastructure/mqtt/application-mqtt.js'
+import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
 import { createDeviceRepository } from './modules/device/device.repository.js'
-import { createFaultHandler } from './modules/fault/fault-handler.js'
 import { createFaultRepository } from './modules/fault/fault.mysql.js'
-import { FAULT_TOPIC, parseFaultMessage } from './modules/fault/fault-message.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
@@ -28,20 +26,10 @@ const handleSensorReading = createSensorRealtimeHandler({
   repository: createSensorRepository(pool),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
 })
-const handleFault = createFaultHandler(faultRepository)
-const applicationMqtt = createApplicationMqtt({
+const sensorMqtt = createSensorMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
-    if (topic === FAULT_TOPIC) {
-      const result = parseFaultMessage(topic, payload)
-      if (!result.accepted) {
-        console.warn(`忽略 MQTT 消息：${result.reason}`)
-        return
-      }
-      await handleFault(result.message)
-      return
-    }
     const result = parseSensorMessage(topic, payload)
     if (!result.accepted) {
       console.warn(`忽略 MQTT 消息：${result.reason}`)
@@ -59,7 +47,7 @@ let stopping = false
 const stop = async () => {
   if (stopping) return
   stopping = true
-  await applicationMqtt.close()
+  await sensorMqtt.close()
   realtimeWebSocket.close(() => server.close())
   await pool.end()
 }
