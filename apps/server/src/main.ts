@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { createApp } from './app.js'
 import { readEnv } from './config/env.js'
 import { createDatabasePool } from './infrastructure/database.js'
-import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
+import { createApplicationMqtt } from './infrastructure/mqtt/application-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
 import { createDeviceRepository } from './modules/device/device.repository.js'
 import { createFaultHandler } from './modules/fault/fault-handler.js'
@@ -29,7 +29,7 @@ const handleSensorReading = createSensorRealtimeHandler({
   broadcast: (message) => realtimeWebSocket.broadcast(message),
 })
 const handleFault = createFaultHandler(faultRepository)
-const sensorMqtt = createSensorMqtt({
+const applicationMqtt = createApplicationMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
@@ -59,7 +59,7 @@ let stopping = false
 const stop = async () => {
   if (stopping) return
   stopping = true
-  await sensorMqtt.close()
+  await applicationMqtt.close()
   realtimeWebSocket.close(() => server.close())
   await pool.end()
 }

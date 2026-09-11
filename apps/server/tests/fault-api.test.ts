@@ -36,9 +36,17 @@ describe('fault HTTP API', () => {
     const pageResponse = await fetch(`${baseUrl}/api/faults?page=2&pageSize=10&deviceNumber=202111&type=3`)
     const statisticsResponse = await fetch(`${baseUrl}/api/faults/statistics?deviceNumber=202111&type=3`)
 
-    expect((await optionsResponse.json()).code).toBe(0)
+    expect(await optionsResponse.json()).toEqual({
+      code: 0,
+      message: '查询成功',
+      data: { deviceNumbers: ['202111'], types: [{ value: '3', label: '类型 3' }] },
+    })
     expect(await pageResponse.json()).toEqual({ code: 0, message: '查询成功', data: { items: [], total: 0, page: 2, pageSize: 10 } })
-    expect((await statisticsResponse.json()).data).toEqual([{ type: '3', label: '类型 3', count: 2 }])
+    expect(await statisticsResponse.json()).toEqual({
+      code: 0,
+      message: '查询成功',
+      data: [{ type: '3', label: '类型 3', count: 2 }],
+    })
     expect(list).toHaveBeenCalledWith({ page: 2, pageSize: 10, deviceNumber: '202111', type: '3' })
     expect(getStatistics).toHaveBeenCalledWith({ deviceNumber: '202111', type: '3' })
   })
@@ -52,5 +60,22 @@ describe('fault HTTP API', () => {
     expect(invalid.status).toBe(400)
     expect(failed.status).toBe(500)
     expect(await failed.json()).toEqual({ code: 500, message: '服务器内部错误', data: null })
+  })
+
+  it('rejects calendar-invalid dates before querying the repository', async () => {
+    const list = vi.fn()
+    const baseUrl = await startServer(repository({ list }))
+    const response = await fetch(`${baseUrl}/api/faults?startTime=2026-99-99%2088%3A00%3A00`)
+    expect(response.status).toBe(400)
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  it.each(['getOptions', 'getStatistics'] as const)('returns 500 when %s fails', async (method) => {
+    const failing = vi.fn().mockRejectedValue(new Error('database unavailable'))
+    const baseUrl = await startServer(repository({ [method]: failing }))
+    const path = method === 'getOptions' ? '/api/faults/options' : '/api/faults/statistics'
+    const response = await fetch(`${baseUrl}${path}`)
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ code: 500, message: '服务器内部错误', data: null })
   })
 })

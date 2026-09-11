@@ -13,6 +13,7 @@ describe('fault handler', () => {
     }
     await createFaultHandler(repository)(message)
     expect(repository.save).toHaveBeenCalledWith({ ...message, message: '映射中文' })
+    expect(repository.save).toHaveBeenCalledTimes(1)
   })
 
   it('falls back to device text and then an explicit default', async () => {
@@ -32,5 +33,15 @@ describe('fault handler', () => {
     }
     await expect(createFaultHandler(repository)(message)).rejects.toThrow('mapping failed')
     expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a save failure without retrying the insert', async () => {
+    const repository = {
+      findMappedMessage: vi.fn().mockResolvedValue('映射中文'),
+      save: vi.fn().mockRejectedValue(new Error('insert failed')),
+      getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn(),
+    }
+    await expect(createFaultHandler(repository)(message)).rejects.toThrow('insert failed')
+    expect(repository.save).toHaveBeenCalledTimes(1)
   })
 })

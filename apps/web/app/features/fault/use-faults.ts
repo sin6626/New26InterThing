@@ -23,22 +23,18 @@ export const useFaults = () => {
     endTime: endTime.value ? dayjs(endTime.value).format('YYYY-MM-DD HH:mm:ss') : undefined,
   }))
 
-  const loadPage = async () => {
-    const result = await api.getPage({ ...requestFilters.value, page: page.current, pageSize: page.size })
-    rows.value = result.items
-    total.value = result.total
-  }
-
-  const loadStatistics = async () => {
-    statistics.value = await api.getStatistics(requestFilters.value)
-  }
+  const fetchPage = () => api.getPage({ ...requestFilters.value, page: page.current, pageSize: page.size })
+  const fetchStatistics = () => api.getStatistics(requestFilters.value)
 
   const search = async () => {
     page.current = 1
     loading.value = true
     errorMessage.value = ''
     try {
-      await Promise.all([loadPage(), loadStatistics()])
+      const [pageResult, statisticsResult] = await Promise.all([fetchPage(), fetchStatistics()])
+      rows.value = pageResult.items
+      total.value = pageResult.total
+      statistics.value = statisticsResult
     } catch {
       rows.value = []
       statistics.value = []
@@ -53,7 +49,9 @@ export const useFaults = () => {
     loading.value = true
     errorMessage.value = ''
     try {
-      await loadPage()
+      const result = await fetchPage()
+      rows.value = result.items
+      total.value = result.total
     } catch {
       rows.value = []
       total.value = 0
@@ -76,7 +74,10 @@ export const useFaults = () => {
     errorMessage.value = ''
     try {
       options.value = await api.getOptions()
-      await Promise.all([loadPage(), loadStatistics()])
+      const [pageResult, statisticsResult] = await Promise.all([fetchPage(), fetchStatistics()])
+      rows.value = pageResult.items
+      total.value = pageResult.total
+      statistics.value = statisticsResult
     } catch {
       rows.value = []
       statistics.value = []

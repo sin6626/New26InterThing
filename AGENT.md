@@ -12,7 +12,7 @@
 - 第一里程碑：设备列表纵向闭环已完成。
 - 第二里程碑：MQTT `device/sensor` → 动态字段映射 → `t_sensor_data` → WebSocket `/ws` → 实时监控页。
 - 第三里程碑：独立 `sensor-history` 页面模块，提供动态历史表格、筛选分页和按分钟趋势图；不迁移识别按钮。已完成。
-- 第四里程碑：计划迁移 `device/error`、`t_error_code_mapper`、`t_error_msg` 和纯 HTTP 查询的故障信息页面；只处理设备主动上报，不包含 WebSocket 推送、安全控制与智能判定。
+- 第四里程碑：`device/error` → `t_error_code_mapper` 中文映射 → `t_error_msg` → 纯 HTTP 查询的故障信息页面。已完成，不包含 WebSocket 推送、安全控制与智能判定。
 - 后续模块继续按页面纵向切片迁移，删除无用旧接口，不提前搭建通用框架。
 
 ## 开发约定

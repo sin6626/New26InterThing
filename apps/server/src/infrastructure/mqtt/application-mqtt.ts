@@ -2,23 +2,23 @@ import mqtt from 'mqtt'
 
 import type { AppEnv } from '../../config/env.js'
 
-interface SensorMqttDependencies {
+interface ApplicationMqttDependencies {
   env: AppEnv
   onMessage(topic: string, payload: Buffer): Promise<void>
   onConnectionChange(connected: boolean): void
 }
 
-export interface SensorMqtt {
+export interface ApplicationMqtt {
   close(): Promise<void>
 }
 
 const topics = ['device/sensor', 'device/error'] as const
 
-export const createSensorMqtt = ({
+export const createApplicationMqtt = ({
   env,
   onMessage,
   onConnectionChange,
-}: SensorMqttDependencies): SensorMqtt => {
+}: ApplicationMqttDependencies): ApplicationMqtt => {
   const client = mqtt.connect(`mqtt://${env.MQTT_HOST}:${env.MQTT_PORT}`, {
     clientId: `${env.MQTT_CLIENT_ID}-new26`,
     username: env.MQTT_USERNAME || undefined,

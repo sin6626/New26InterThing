@@ -4,7 +4,15 @@ import { z } from 'zod'
 
 import type { FaultRepository } from './fault.repository.js'
 
-const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+const isValidDateTime = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return false
+  const [, year, month, day, hour, minute, second] = match.map(Number)
+  const date = new Date(year, month - 1, day, hour, minute, second)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+    && date.getHours() === hour && date.getMinutes() === minute && date.getSeconds() === second
+}
+const dateTime = z.string().refine(isValidDateTime)
 const filters = {
   deviceNumber: z.string().trim().min(1).optional(),
   type: z.string().trim().min(1).optional(),
