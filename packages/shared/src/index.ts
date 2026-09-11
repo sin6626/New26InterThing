@@ -65,7 +65,8 @@ export interface SensorHistoryItem {
   id: number
   deviceNumber: string | null
   fields: Record<string, string | number | null>
-  status: number
+  status: 'normal' | 'alarm'
+  statusCode: number
   online: string | null
   recordedAt: string | null
 }

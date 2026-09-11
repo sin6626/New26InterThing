@@ -19,6 +19,29 @@ const startServer = async (sensorHistoryRepository: SensorHistoryRepository) => 
 }
 
 describe('sensor history HTTP API', () => {
+  it('returns options and trend using the common response envelope', async () => {
+    const repository = {
+      getOptions: vi.fn().mockResolvedValue({ deviceNumbers: ['202111'], fields: [] }),
+      list: vi.fn(),
+      getTrend: vi.fn().mockResolvedValue({ times: [], series: [] }),
+    }
+    const baseUrl = await startServer(repository)
+
+    const optionsResponse = await fetch(`${baseUrl}/api/sensor-history/options`)
+    const trendResponse = await fetch(`${baseUrl}/api/sensor-history/trend?limit=10`)
+
+    expect(await optionsResponse.json()).toEqual({
+      code: 0,
+      message: '查询成功',
+      data: { deviceNumbers: ['202111'], fields: [] },
+    })
+    expect(await trendResponse.json()).toEqual({
+      code: 0,
+      message: '查询成功',
+      data: { times: [], series: [] },
+    })
+  })
+
   it('returns a filtered history page through the public API', async () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
     const repository = { getOptions: vi.fn(), list, getTrend: vi.fn() }
@@ -62,5 +85,19 @@ describe('sensor history HTTP API', () => {
 
     expect(response.status).toBe(400)
     expect(getTrend).not.toHaveBeenCalled()
+  })
+
+  it('returns HTTP 500 when the repository fails', async () => {
+    const repository = {
+      getOptions: vi.fn(),
+      list: vi.fn().mockRejectedValue(new Error('database unavailable')),
+      getTrend: vi.fn(),
+    }
+    const baseUrl = await startServer(repository)
+
+    const response = await fetch(`${baseUrl}/api/sensor-history`)
+
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ code: 500, message: '服务器内部错误', data: null })
   })
 })

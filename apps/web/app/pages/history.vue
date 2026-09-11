@@ -1,99 +1,14 @@
 <script setup lang="ts">
-import type {
-  SensorHistoryField,
-  SensorHistoryItem,
-  SensorHistoryOptions,
-  SensorHistoryTrend,
-} from '@new26interthing/shared'
-import dayjs from 'dayjs'
-
 import HistoryTrendChart from '~/features/sensor-history/HistoryTrendChart.vue'
-import { useSensorHistoryApi } from '~/features/sensor-history/api'
+import { useSensorHistory } from '~/features/sensor-history/use-sensor-history'
 
-const api = useSensorHistoryApi()
-const loading = ref(false)
-const errorMessage = ref('')
-const rows = ref<SensorHistoryItem[]>([])
-const options = ref<SensorHistoryOptions>({ deviceNumbers: [], fields: [] })
-const trend = ref<SensorHistoryTrend>({ times: [], series: [] })
-const total = ref(0)
-const filters = reactive({ deviceNumber: '', status: 'all' as 'all' | 'normal' | 'abnormal' })
-const timeRange = ref<[Date, Date] | null>(null)
-const page = reactive({ current: 1, size: 20 })
-const trendLimit = ref(10)
-const chartType = ref<'line' | 'bar' | 'scatter'>('line')
+const {
+  chartType, changeTrendLimit, errorMessage, fieldValue, filters, initialize,
+  loadCurrentPage, loading, options, page, reset, rows, search, timeRange,
+  total, trend, trendLimit,
+} = useSensorHistory()
 
-const requestFilters = computed(() => ({
-  deviceNumber: filters.deviceNumber || undefined,
-  status: filters.status,
-  startTime: timeRange.value ? dayjs(timeRange.value[0]).format('YYYY-MM-DD HH:mm:ss') : undefined,
-  endTime: timeRange.value ? dayjs(timeRange.value[1]).format('YYYY-MM-DD HH:mm:ss') : undefined,
-}))
-
-const loadPage = async () => {
-  const result = await api.getPage({
-    ...requestFilters.value,
-    page: page.current,
-    pageSize: page.size,
-  })
-  rows.value = result.items
-  total.value = result.total
-}
-
-const loadTrend = async () => {
-  trend.value = await api.getTrend({ ...requestFilters.value, limit: trendLimit.value })
-}
-
-const search = async () => {
-  page.current = 1
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    await Promise.all([loadPage(), loadTrend()])
-  } catch {
-    rows.value = []
-    total.value = 0
-    trend.value = { times: [], series: [] }
-    errorMessage.value = '历史数据加载失败，请检查查询条件和后端连接。'
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadCurrentPage = async () => {
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    await loadPage()
-  } catch {
-    rows.value = []
-    total.value = 0
-    errorMessage.value = '历史列表加载失败。'
-  } finally {
-    loading.value = false
-  }
-}
-
-const reset = () => {
-  filters.deviceNumber = ''
-  filters.status = 'all'
-  timeRange.value = null
-  void search()
-}
-
-const fieldValue = (row: unknown, field: SensorHistoryField) => (row as SensorHistoryItem).fields[field.key] ?? '--'
-
-onMounted(async () => {
-  loading.value = true
-  try {
-    options.value = await api.getOptions()
-    await Promise.all([loadPage(), loadTrend()])
-  } catch {
-    errorMessage.value = '历史数据初始化失败，请检查后端和数据库连接。'
-  } finally {
-    loading.value = false
-  }
-})
+onMounted(() => void initialize())
 </script>
 
 <template>
@@ -105,11 +20,13 @@ onMounted(async () => {
 
     <el-card shadow="never" class="rounded-xl border-slate-200">
       <el-form :inline="true" class="flex flex-wrap items-center gap-y-3">
-        <el-form-item label="设备" class="mb-0">
+        <!-- 因为现在应该只有一个设备所以隐藏掉 -->
+        <el-form-item v-if="false" label="设备" class="mb-0">
           <el-select v-model="filters.deviceNumber" clearable placeholder="全部设备" style="width: 210px">
             <el-option v-for="number in options.deviceNumbers" :key="number" :label="number" :value="number" />
           </el-select>
         </el-form-item>
+        <!-- todo: 这里不应该使用时间日期选择器, 他这个组件必须选择开始和结束时间, 但是实际上应该只选一个时间也要支持, 这里得要换个组件 -->
         <el-form-item label="时间范围" class="mb-0">
           <el-date-picker
             v-model="timeRange"
@@ -151,8 +68,8 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 0 ? 'success' : 'danger'" size="small">
-              {{ scope.row.status === 0 ? '正常' : '告警' }}
+            <el-tag :type="scope.row.status === 'normal' ? 'success' : 'danger'" size="small">
+              {{ scope.row.status === 'normal' ? '正常' : '告警' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -178,7 +95,7 @@ onMounted(async () => {
         <div class="flex items-center justify-between gap-4">
           <span class="font-medium text-slate-800">传感器历史趋势</span>
           <div class="flex gap-3">
-            <el-select v-model="trendLimit" style="width: 130px" @change="loadTrend">
+            <el-select v-model="trendLimit" style="width: 130px" @change="changeTrendLimit">
               <el-option label="最近 10 点" :value="10" />
               <el-option label="最近 30 点" :value="30" />
               <el-option label="最近 60 点" :value="60" />

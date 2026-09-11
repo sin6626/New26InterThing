@@ -27,13 +27,14 @@ let chart: echarts.ECharts | undefined
 
 const render = () => {
   if (!chartElement.value) return
+  // 下面这里等价于 if(!a) a = b, 也就是说a没有值的话, 才把b的值传递给a
   chart ||= echarts.init(chartElement.value)
   chart.setOption({
     animationDuration: 300,
     color: ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'],
     tooltip: { trigger: 'axis' },
     legend: { top: 0 },
-    grid: { left: 42, right: 24, top: 48, bottom: 42, containLabel: true },
+    grid: { left: 64, right: 24, top: 48, bottom: 42 },
     xAxis: {
       type: 'category',
       data: props.times,

@@ -67,7 +67,8 @@ const mapItem = (row: RowDataPacket, mappings: FieldMapping[]): SensorHistoryIte
     const numericValue = Number(value)
     return [mapping.p_name, Number.isFinite(numericValue) ? numericValue : value]
   })),
-  status: Number(row.vstatus ?? 0),
+  status: Number(row.vstatus ?? 0) === 0 ? 'normal' : 'alarm',
+  statusCode: Number(row.vstatus ?? 0),
   online: row.online ?? null,
   recordedAt: row.c_time ?? null,
 })
