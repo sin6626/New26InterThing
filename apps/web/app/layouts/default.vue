@@ -4,13 +4,26 @@ const route = useRoute()
 const menuGroups = [
   {
     title: '监控中心',
-    items: ['实时监控', '历史数据', '行为数据', '故障信息'],
+    items: [
+      { label: '实时监控', to: '/' },
+      { label: '历史数据' },
+      { label: '行为数据' },
+      { label: '故障信息' },
+    ],
   },
   {
     title: '设备与控制',
-    items: ['设备管理', '指令控制', '操作日志'],
+    items: [
+      { label: '设备管理', to: '/device' },
+      { label: '指令控制' },
+      { label: '操作日志' },
+    ],
   },
 ]
+
+function isActive(to: string) {
+  return to === '/' ? route.path === '/' : route.path.startsWith(to)
+}
 </script>
 
 <template>
@@ -28,17 +41,17 @@ const menuGroups = [
           <p class="mb-2 px-3 text-xs font-medium tracking-widest text-slate-500">
             {{ group.title }}
           </p>
-          <template v-for="item in group.items" :key="item">
+          <template v-for="item in group.items" :key="item.label">
             <NuxtLink
-              v-if="item === '设备管理'"
-              to="/device"
+              v-if="item.to"
+              :to="item.to"
               class="mb-1 block rounded-lg px-3 py-2.5 text-sm no-underline transition-colors"
-              :class="route.path.startsWith('/device') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-900'"
+              :class="isActive(item.to) ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-900'"
             >
-              {{ item }}
+              {{ item.label }}
             </NuxtLink>
             <div v-else class="mb-1 rounded-lg px-3 py-2.5 text-sm text-slate-600">
-              {{ item }}
+              {{ item.label }}
             </div>
           </template>
         </section>
@@ -48,7 +61,7 @@ const menuGroups = [
     <el-container>
       <el-header height="64px" class="flex items-center justify-between border-b border-slate-200 bg-white px-6">
         <span class="text-sm text-slate-500">水循环物联网应用系统</span>
-        <el-tag type="info" effect="plain">第一阶段</el-tag>
+        <el-tag type="info" effect="plain">第二里程碑</el-tag>
       </el-header>
       <el-main class="p-6">
         <slot />

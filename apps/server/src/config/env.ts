@@ -15,6 +15,11 @@ const envSchema = z.object({
   DB_USER: z.string().min(1, 'DB_USER 不能为空'),
   DB_PASSWORD: z.string().default(''),
   DB_NAME: z.string().min(1, 'DB_NAME 不能为空'),
+  MQTT_HOST: z.string().min(1, 'MQTT_HOST 不能为空').default('127.0.0.1'),
+  MQTT_PORT: z.coerce.number().int().min(1).max(65535).default(1883),
+  MQTT_CLIENT_ID: z.string().min(1).default('new26interthing'),
+  MQTT_USERNAME: z.string().default(''),
+  MQTT_PASSWORD: z.string().default(''),
 })
 
 export type AppEnv = z.infer<typeof envSchema>
