@@ -48,6 +48,8 @@ export const createSensorMqtt = ({
   client.on('close', () => updateConnection(false))
   client.on('error', (error) => console.error('MQTT 连接错误:', error.message))
 
+  // 把MQTT的close方法自己做一层封装, 返回更加现在的Promise, 原本是回调函数的写法, 很容易回调地狱
+  // 第 1 个参数 false（是否强制断开）：设置为 false 表示优雅关闭（Graceful Shutdown）：如果当前还有正在排队发送的消息，等它发完再断开，而不是粗暴地瞬间切断 TCP 网络连接。第 2 个参数 {}（可选配置参数）：传空对象，使用默认配置即可。第 3 个参数 () => resolve()（完成回调函数）：当底层网络连接真正断开、所有清理工作完全结束时，mqtt.js 才会调用这个回调函数。在这里调用 resolve()，将 Promise 标记为完成。
   return {
     close: () =>
       new Promise<void>((resolve) => {

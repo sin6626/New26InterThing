@@ -49,5 +49,8 @@ const stop = async () => {
   await pool.end()
 }
 
+// 优化的停止进程的写法, 防止进程残留(确实遇到过这样的问题....)
+// Singal Interrupt, 就是在终端按ctrl + c, Singal Terminate, 是docker容器停止, kill <pid>, PM2重启或者系统关机时发送
+// 这里的stop是一个异步函数, 这里使用void去做装饰, 是去告诉Ts检查器这里不用返回值
 process.on('SIGINT', () => void stop())
 process.on('SIGTERM', () => void stop())

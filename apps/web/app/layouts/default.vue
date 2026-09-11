@@ -16,7 +16,8 @@ const menuGroups = [
   {
     title: '设备与控制',
     items: [
-      { label: '设备管理', to: '/device' },
+      // todo 设备管理应该不用, 因为比赛的时候应该只有一个设备, 这里先隐藏
+      // { label: '设备管理', to: '/device' },
       { label: '指令控制' },
       { label: '操作日志' },
     ],

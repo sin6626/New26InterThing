@@ -1,4 +1,5 @@
 import cors from 'cors'
+// 本质上是两行代码的合并 import express from 'express'; import type { Express } from 'express' // 只导入 TS 类型约束
 import express, { type Express } from 'express'
 
 import type { DeviceRepository } from './modules/device/device.repository.js'

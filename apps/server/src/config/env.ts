@@ -22,6 +22,8 @@ const envSchema = z.object({
   MQTT_PASSWORD: z.string().default(''),
 })
 
+// infer: 暗示, 也就是让zod通过envSchema反推类型
 export type AppEnv = z.infer<typeof envSchema>
 
+// 一般配置做校验使用parse, parse如果校验错误了, 会直接抛出ZodError的异常, 然后直接让服务停止
 export const readEnv = (): AppEnv => envSchema.parse(process.env)

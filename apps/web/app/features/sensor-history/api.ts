@@ -8,6 +8,7 @@ import type {
 
 import { createHttpClient } from '~/utils/http'
 
+// Omit -> 省略, 从一个已有的接口或者对象类型中剔除掉指定字段, 这里是剔除掉page和pageSize(也就是所谓的黑名单模式, Pick则是白名单模式, 使用跟Omit一样)
 type HistoryFilters = Omit<SensorHistoryQuery, 'page' | 'pageSize'>
 
 const unwrap = <T>(response: ApiResponse<T>) => {

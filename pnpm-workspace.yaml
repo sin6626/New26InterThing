@@ -1,9 +1,13 @@
 packages:
+# 工作区子项目的声明, 声明独立工作的子包, 声明后可以使用workspace.*互相引用依赖 
   - apps/*
   - packages/*
 
 allowBuilds:
+# 配置允许在直接pnpm i 下执行构建的包, 防止投毒的
+# 在yaml语法下, @符号最为保留字符, 必须使用引号, 下面的esbuild没有@打不打引号都没事
   '@tailwindcss/oxide': true
   esbuild: true
 minimumReleaseAgeExclude:
+# 排除最小发布时间的包, 也就是跟上面是一样的, 是一个白名单, 也是防止投毒的(也就是允许开发者下载这些短时间发布的包)
   - '@rolldown/binding-openharmony-arm64@1.2.8'

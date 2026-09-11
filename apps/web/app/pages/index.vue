@@ -21,6 +21,7 @@ const socketLabels = {
 </script>
 
 <template>
+  <!-- 首页就是实时监控页面 -->
   <div class="mx-auto max-w-[1500px] space-y-5">
     <div class="flex items-end justify-between gap-4">
       <div>
