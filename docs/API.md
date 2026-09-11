@@ -84,3 +84,46 @@ GET /sensor-history/trend?deviceNumber=202111&status=all&limit=10
 设备、时间和状态参数与历史分页一致；`limit` 默认为 10，范围为 10 至 500。响应 `data` 包含正序的 `times`，以及带字段键、名称、单位和数值数组的动态 `series`。
 
 三个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
+
+## 故障信息页面
+
+故障页面只使用以下 HTTP 接口，不通过 WebSocket 推送或自动轮询。接口固定读取 `t_error_msg`、`t_error_code_mapper` 和 `t_device`。
+
+### 页面选项
+
+```http
+GET /faults/options
+```
+
+返回 `deviceNumbers` 设备编号数组，以及数据库现有类型组成的 `types` 筛选项。类型码不在应用中写死含义。
+
+### 故障分页
+
+```http
+GET /faults?page=1&pageSize=20&deviceNumber=202111&type=3&startTime=2026-09-10%2008:00:00&endTime=2026-09-10%2010:00:00
+```
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `page` | 否 | 页码，默认 1 |
+| `pageSize` | 否 | 每页数量，默认 20，最大 100 |
+| `deviceNumber` | 否 | 精确匹配设备编号 |
+| `type` | 否 | 精确匹配设备上报的原始类型码 |
+| `startTime` | 否 | `YYYY-MM-DD HH:mm:ss`，包含边界 |
+| `endTime` | 否 | `YYYY-MM-DD HH:mm:ss`，包含边界且不得早于开始时间 |
+
+成功响应的 `data` 为 `{ items, total, page, pageSize }`。每条记录包含 `id`、`deviceNumber`、`errorNumber`、`type`、`message` 和 `occurredAt`。
+
+### 故障类型统计
+
+```http
+GET /faults/statistics?deviceNumber=202111&type=3
+```
+
+支持与分页接口相同的设备、类型和时间筛选，但不接受分页参数。响应 `data` 为 `{ type, label, count }[]`，统计范围是全部匹配记录而非当前页。
+
+三个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
+
+## MQTT 故障上报
+
+后端订阅 `device/error`，兼容字段 `d_no`、`e_no`、`type`、可选 `e_msg`、可选 `c_time` 或 `time`。应用按 `e_no + type` 优先读取 `t_error_code_mapper` 的中文信息，未命中时依次使用设备 `e_msg` 和包含原始编号、类型的默认文本，最终写入 `t_error_msg`。

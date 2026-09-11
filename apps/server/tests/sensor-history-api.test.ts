@@ -6,11 +6,12 @@ import type { SensorHistoryRepository } from '../src/modules/sensor-history/sens
 
 const servers: Array<{ close: () => void }> = []
 const deviceRepository: DeviceRepository = { list: vi.fn() }
+const faultRepository = { findMappedMessage: vi.fn(), save: vi.fn(), getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn() }
 
 afterEach(() => servers.splice(0).forEach((server) => server.close()))
 
 const startServer = async (sensorHistoryRepository: SensorHistoryRepository) => {
-  const server = createApp({ deviceRepository, sensorHistoryRepository }).listen(0)
+  const server = createApp({ deviceRepository, faultRepository, sensorHistoryRepository }).listen(0)
   servers.push(server)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()

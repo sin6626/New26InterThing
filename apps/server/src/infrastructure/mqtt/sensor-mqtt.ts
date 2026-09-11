@@ -12,6 +12,8 @@ export interface SensorMqtt {
   close(): Promise<void>
 }
 
+const topics = ['device/sensor', 'device/error'] as const
+
 export const createSensorMqtt = ({
   env,
   onMessage,
@@ -34,14 +36,14 @@ export const createSensorMqtt = ({
 
   client.on('connect', () => {
     updateConnection(true)
-    client.subscribe('device/sensor', { qos: 0 }, (error) => {
-      if (error) console.error('MQTT 订阅 device/sensor 失败:', error.message)
-      else console.log('MQTT 已订阅 device/sensor')
+    client.subscribe([...topics], { qos: 0 }, (error) => {
+      if (error) console.error('MQTT 订阅失败:', error.message)
+      else console.log(`MQTT 已订阅 ${topics.join('、')}`)
     })
   })
   client.on('message', (topic, payload) => {
     void onMessage(topic, payload).catch((error: unknown) => {
-      console.error('处理 MQTT 传感器消息失败:', error)
+      console.error(`处理 MQTT 消息 ${topic} 失败:`, error)
     })
   })
   client.on('offline', () => updateConnection(false))

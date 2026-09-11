@@ -10,7 +10,7 @@ const menuGroups = [
       { label: '实时监控', to: '/' },
       { label: '历史数据', to: '/history' },
       { label: '行为数据' },
-      { label: '故障信息' },
+      { label: '故障信息', to: '/faults' },
     ],
   },
   {
@@ -65,7 +65,7 @@ function isActive(to: string) {
     <el-container>
       <el-header height="64px" class="flex items-center justify-between border-b border-slate-200 bg-white px-6">
         <span class="text-sm text-slate-500">水循环物联网应用系统</span>
-        <el-tag type="info" effect="plain">第三里程碑</el-tag>
+        <el-tag type="info" effect="plain">第四里程碑</el-tag>
       </el-header>
       <el-main class="p-6">
         <slot />

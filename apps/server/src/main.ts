@@ -6,6 +6,9 @@ import { createDatabasePool } from './infrastructure/database.js'
 import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
 import { createDeviceRepository } from './modules/device/device.repository.js'
+import { createFaultHandler } from './modules/fault/fault-handler.js'
+import { createFaultRepository } from './modules/fault/fault.mysql.js'
+import { FAULT_TOPIC, parseFaultMessage } from './modules/fault/fault-message.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
@@ -13,8 +16,10 @@ import { createSensorHistoryRepository } from './modules/sensor-history/sensor-h
 
 const env = readEnv()
 const pool = createDatabasePool(env)
+const faultRepository = createFaultRepository(pool)
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
+  faultRepository,
   sensorHistoryRepository: createSensorHistoryRepository(pool),
 })
 const server = createServer(app)
@@ -23,10 +28,20 @@ const handleSensorReading = createSensorRealtimeHandler({
   repository: createSensorRepository(pool),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
 })
+const handleFault = createFaultHandler(faultRepository)
 const sensorMqtt = createSensorMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
+    if (topic === FAULT_TOPIC) {
+      const result = parseFaultMessage(topic, payload)
+      if (!result.accepted) {
+        console.warn(`忽略 MQTT 消息：${result.reason}`)
+        return
+      }
+      await handleFault(result.message)
+      return
+    }
     const result = parseSensorMessage(topic, payload)
     if (!result.accepted) {
       console.warn(`忽略 MQTT 消息：${result.reason}`)

@@ -1,6 +1,6 @@
 # New26InterThing
 
-面向物联网应用创新比赛的水循环监控与控制系统。本仓库正在从旧项目分阶段重构，当前完成设备列表、实时数据通信和传感器历史数据三个纵向闭环。
+面向物联网应用创新比赛的水循环监控与控制系统。本仓库正在从旧项目分阶段重构，当前正在迁移第四个纵向闭环：设备故障信息。
 
 ## 目录
 
@@ -25,7 +25,7 @@ pnpm dev
 
 前端默认地址为 `http://localhost:5174`，后端默认地址为 `http://localhost:3001`。
 可通过根目录 `.env` 中的 `WEB_PORT` 修改前端开发端口。后端 API 的 CORS 默认允许所有来源。
-实时页面通过 `ws://localhost:3001/ws` 接收数据，后端订阅本机 EMQX 的 `device/sensor` 主题。
+实时页面通过 `ws://localhost:3001/ws` 接收传感器数据；后端订阅本机 EMQX 的 `device/sensor` 与 `device/error`。故障页面只使用 HTTP 查询，不使用 WebSocket。
 
 ## 常用命令
 
