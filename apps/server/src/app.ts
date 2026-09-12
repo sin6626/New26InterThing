@@ -12,6 +12,9 @@ import type { FaultRepository } from './modules/fault/fault.repository.js'
 import { createFaultRouter } from './modules/fault/fault.routes.js'
 import type { SensorHistoryRepository } from './modules/sensor-history/sensor-history.repository.js'
 import { createSensorHistoryRouter } from './modules/sensor-history/sensor-history.routes.js'
+import type { ControlRepository } from './modules/control/control.repository.js'
+import { createControlRouter, createOperationLogRouter } from './modules/control/control.routes.js'
+import type { ControlService } from './modules/control/control.service.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository
@@ -19,9 +22,19 @@ interface AppDependencies {
   sensorHistoryRepository: SensorHistoryRepository
   behaviorRepository?: BehaviorRepository
   recognitionService?: RecognitionService
+  controlRepository?: ControlRepository
+  controlService?: ControlService
 }
 
-export const createApp = ({ deviceRepository, faultRepository, sensorHistoryRepository, behaviorRepository, recognitionService }: AppDependencies): Express => {
+export const createApp = ({
+  deviceRepository,
+  faultRepository,
+  sensorHistoryRepository,
+  behaviorRepository,
+  recognitionService,
+  controlRepository,
+  controlService,
+}: AppDependencies): Express => {
   const app = express()
 
   app.use(cors())
@@ -30,6 +43,10 @@ export const createApp = ({ deviceRepository, faultRepository, sensorHistoryRepo
   app.use('/api/faults', createFaultRouter(faultRepository))
   app.use('/api/sensor-history', createSensorHistoryRouter(sensorHistoryRepository))
   if (behaviorRepository && recognitionService) app.use('/api/behaviors', createBehaviorRouter(behaviorRepository, recognitionService))
+  if (controlRepository && controlService) {
+    app.use('/api/controls', createControlRouter(controlRepository, controlService))
+    app.use('/api/operation-logs', createOperationLogRouter(controlRepository))
+  }
   app.use((_request, response) => {
     response.status(404).json({ code: 404, message: '接口不存在', data: null })
   })

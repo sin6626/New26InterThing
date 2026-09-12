@@ -171,3 +171,53 @@ GET /behaviors?page=1&pageSize=20&startTime=2026-09-12%2008:00:00&endTime=2026-0
 ```
 
 页码默认 1，每页默认 20、最大 100；开始和结束时间格式为 `YYYY-MM-DD HH:mm:ss`，可单独提供，结束时间不得早于开始时间。成功响应的 `data` 为 `{ items, total, page, pageSize }`，每条记录包含动态 `fields` 和 `recordedAt`。
+
+## 手动控制与操作日志
+
+比赛系统最多只有一台设备。控制定义读取 `t_direct_config`，当前控制状态统一保存在 `t_direct_global`；请求中的设备编号用于生成 MQTT 报文和记录操作日志。
+
+### 查询控制快照
+
+```http
+GET /controls/e46488d793245429
+```
+
+返回动态控制字段、父子显示条件、控件类型、范围、选项和当前值，不返回 MQTT 模板等协议细节。
+
+### 执行人工指令
+
+```http
+POST /controls/commands
+Content-Type: application/json
+
+{
+  "deviceNumber": "e46488d793245429",
+  "configId": 21,
+  "value": "on"
+}
+```
+
+后端重新读取配置、校验值和安全边界，按配置生成 MQTT 报文。MQTT 使用 QoS 1 单次发布，不离线排队、不重试。成功只代表 Broker 已确认接收；发布成功后才更新 `t_direct_global` 并写成功日志。发布失败不修改当前状态，但会写失败日志。
+
+### 时间同步
+
+```http
+POST /controls/time-sync
+Content-Type: application/json
+
+{
+  "deviceNumber": "e46488d793245429",
+  "time": "2026-09-12 14:30:00"
+}
+```
+
+`time` 可省略，省略时使用后端当前本地时间。后端负责生成 `device/updateTime` 报文。
+
+### 操作日志
+
+```http
+GET /operation-logs/options
+GET /operation-logs?page=1&pageSize=20&deviceNumber=e46488d793245429&result=success
+```
+
+日志支持按设备编号、指令类型、结果及起止时间筛选，按操作时间和记录编号倒序分页。参数错误返回 HTTP 400，配置不存在返回 HTTP 404，MQTT 不可用返回 HTTP 503，数据库异常返回 HTTP 500。

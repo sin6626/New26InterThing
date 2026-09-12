@@ -1,5 +1,6 @@
 export type * from './api.js'
 export type * from './behavior.js'
+export type * from './control.js'
 export type * from './device.js'
 export type * from './fault.js'
 export type * from './realtime.js'

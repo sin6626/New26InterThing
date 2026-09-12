@@ -13,17 +13,27 @@ import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
 import { createSensorHistoryRepository } from './modules/sensor-history/sensor-history.mysql.js'
+import { createControlRepository } from './modules/control/control.mysql.js'
+import { createControlService } from './modules/control/control.service.js'
+import { parseDeviceReport } from './modules/control/device-report.js'
 
 const env = readEnv()
 const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
+const controlRepository = createControlRepository(pool)
+let sensorMqtt: ReturnType<typeof createSensorMqtt>
+const controlService = createControlService(controlRepository, {
+  publish: (topic, payload) => sensorMqtt.publish(topic, payload),
+})
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
   faultRepository,
   sensorHistoryRepository: createSensorHistoryRepository(pool),
   behaviorRepository,
   recognitionService: createRecognitionService(behaviorRepository),
+  controlRepository,
+  controlService,
 })
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)
@@ -31,10 +41,19 @@ const handleSensorReading = createSensorRealtimeHandler({
   repository: createSensorRepository(pool),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
 })
-const sensorMqtt = createSensorMqtt({
+sensorMqtt = createSensorMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
+    if (topic === 'device/direct') {
+      const report = parseDeviceReport(payload)
+      await controlRepository.applyDeviceReport(
+        report.deviceNumber,
+        report.configId,
+        report.value,
+      )
+      return
+    }
     const result = parseSensorMessage(topic, payload)
     if (!result.accepted) {
       console.warn('忽略 MQTT 消息', {
