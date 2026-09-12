@@ -27,6 +27,7 @@ const reading = (
 describe('realtime trend window', () => {
   it('keeps devices isolated and replaces repeated minute points', () => {
     const first = appendRealtimePoint([], reading('A', '2026-09-12 10:00:10', {
+      flow_rate: 1.5,
       temp_in: 20,
     }))
     const replaced = appendRealtimePoint(first, reading('A', '2026-09-12 10:00:50', {
@@ -35,7 +36,10 @@ describe('realtime trend window', () => {
 
     expect(replaced).toEqual([{
       recordedAt: '2026-09-12 10:00:00',
-      fields: { temp_in: 21 },
+      fields: {
+        flow_rate: 1.5,
+        temp_in: 21,
+      },
     }])
   })
 
@@ -58,6 +62,11 @@ describe('realtime trend window', () => {
         name: '入口温度',
         unit: '℃',
         data: [20, 21],
+      }, {
+        key: 'flow_rate',
+        name: '流量',
+        unit: 'L/min',
+        data: [1, 1.2],
       }],
     }
     const result = mergeHistoryTrend(history, [{
@@ -66,6 +75,7 @@ describe('realtime trend window', () => {
     }], 60)
 
     expect(result.points[1]?.fields.temp_in).toBe(22)
+    expect(result.points[1]?.fields.flow_rate).toBe(1.2)
   })
 
   it('builds all, temperature, and flow series without treating text as numbers', () => {

@@ -29,17 +29,26 @@ export const useRealtimeTrends = (
   const chartType = ref<'line' | 'bar' | 'scatter'>('line')
   const loading = ref(false)
   const errorMessage = ref('')
+  let requestGeneration = 0
 
   const loadHistory = async () => {
     const deviceNumber = selectedDevice.value
+    const requestedWindowSize = windowSize.value
+    const currentGeneration = ++requestGeneration
+
     if (!deviceNumber) {
       history.value = {
         times: [],
         series: [],
       }
+      loading.value = false
       return
     }
 
+    history.value = {
+      times: [],
+      series: [],
+    }
     loading.value = true
     errorMessage.value = ''
 
@@ -47,15 +56,15 @@ export const useRealtimeTrends = (
       const result = await api.getTrend({
         deviceNumber,
         status: 'all',
-        limit: windowSize.value,
+        limit: requestedWindowSize,
       })
 
-      if (selectedDevice.value === deviceNumber) {
+      if (currentGeneration === requestGeneration) {
         history.value = result
       }
     }
     catch {
-      if (selectedDevice.value === deviceNumber) {
+      if (currentGeneration === requestGeneration) {
         history.value = {
           times: [],
           series: [],
@@ -64,7 +73,9 @@ export const useRealtimeTrends = (
       }
     }
     finally {
-      loading.value = false
+      if (currentGeneration === requestGeneration) {
+        loading.value = false
+      }
     }
   }
 

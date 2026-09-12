@@ -52,9 +52,13 @@ export const appendRealtimePoint = (
   const recordedAt = toMinuteKey(reading.recordedAt)
   if (!recordedAt) return points
 
+  const existingPoint = points.find(point => point.recordedAt === recordedAt)
   const nextPoint: RealtimeTrendPoint = {
     recordedAt,
-    fields: { ...reading.fields },
+    fields: {
+      ...existingPoint?.fields,
+      ...reading.fields,
+    },
   }
   const withoutSameMinute = points.filter(point => point.recordedAt !== recordedAt)
   return sortAndTrim([...withoutSameMinute, nextPoint], limit)
@@ -76,7 +80,16 @@ export const mergeHistoryTrend = (
   const pointsByTime = new Map<string, RealtimeTrendPoint>()
 
   historyPoints(history).forEach(point => pointsByTime.set(point.recordedAt, point))
-  realtimePoints.forEach(point => pointsByTime.set(point.recordedAt, point))
+  realtimePoints.forEach((point) => {
+    const existingPoint = pointsByTime.get(point.recordedAt)
+    pointsByTime.set(point.recordedAt, {
+      recordedAt: point.recordedAt,
+      fields: {
+        ...existingPoint?.fields,
+        ...point.fields,
+      },
+    })
+  })
 
   return {
     metadata: history.series.map(series => ({
