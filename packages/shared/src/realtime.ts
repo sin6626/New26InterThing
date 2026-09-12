@@ -1,4 +1,8 @@
 import type { FaultItem } from './fault.js'
+import type {
+  AutomationStatusMessage,
+  WaterFlowRealtimeMessage,
+} from './automation.js'
 
 export interface SensorRealtimeData {
   deviceNumber: string
@@ -27,3 +31,5 @@ export type RealtimeMessage =
   | SensorRealtimeMessage
   | SystemStatusMessage
   | FaultAlertMessage
+  | AutomationStatusMessage
+  | WaterFlowRealtimeMessage

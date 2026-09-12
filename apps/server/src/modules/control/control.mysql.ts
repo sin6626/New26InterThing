@@ -155,7 +155,7 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
           : 'parameter',
         value: row.value ?? null,
         heaterStartBlocked: row.topic === 'heater',
-        automaticStartBlocked: row.topic === 'master',
+        automaticStartBlocked: false,
       })),
     }
   },
@@ -169,6 +169,19 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
        left join t_direct_global g on g.config_id = c.id
        where c.id = ? limit 1`,
       [configId],
+    )
+    return rows[0] ? definitionFromRow(rows[0]) : null
+  },
+
+  async getDefinitionByTopic(topic) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `select c.id as config_id, c.t_name, c.f_type, c.topic, c.publish_topic,
+              c.payload_template, c.value_map, c.min, c.max, c.options,
+              g.value
+       from t_direct_config c
+       left join t_direct_global g on g.config_id = c.id
+       where c.topic = ? limit 1`,
+      [topic],
     )
     return rows[0] ? definitionFromRow(rows[0]) : null
   },

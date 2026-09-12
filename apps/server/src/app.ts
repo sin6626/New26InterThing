@@ -15,6 +15,9 @@ import { createSensorHistoryRouter } from './modules/sensor-history/sensor-histo
 import type { ControlRepository } from './modules/control/control.repository.js'
 import { createControlRouter, createOperationLogRouter } from './modules/control/control.routes.js'
 import type { ControlService } from './modules/control/control.service.js'
+import type { AutomationManager } from './modules/automation/automation-manager.js'
+import { createAutomationRouter } from './modules/automation/automation.routes.js'
+import type { WaterFlowService } from './modules/water-flow/water-flow.service.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository
@@ -24,6 +27,8 @@ interface AppDependencies {
   recognitionService?: RecognitionService
   controlRepository?: ControlRepository
   controlService?: ControlService
+  automationManager?: AutomationManager
+  waterFlowService?: WaterFlowService
 }
 
 export const createApp = ({
@@ -34,6 +39,8 @@ export const createApp = ({
   recognitionService,
   controlRepository,
   controlService,
+  automationManager,
+  waterFlowService,
 }: AppDependencies): Express => {
   const app = express()
 
@@ -46,6 +53,22 @@ export const createApp = ({
   if (controlRepository && controlService) {
     app.use('/api/controls', createControlRouter(controlRepository, controlService))
     app.use('/api/operation-logs', createOperationLogRouter(controlRepository))
+  }
+  if (
+    automationManager
+    && waterFlowService
+    && controlRepository
+    && controlService
+  ) {
+    app.use(
+      '/api/automation',
+      createAutomationRouter(
+        automationManager,
+        controlService,
+        controlRepository,
+        waterFlowService,
+      ),
+    )
   }
   app.use((_request, response) => {
     response.status(404).json({ code: 404, message: '接口不存在', data: null })

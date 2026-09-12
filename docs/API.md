@@ -199,6 +199,33 @@ Content-Type: application/json
 
 后端重新读取配置、校验值和安全边界。只有 `pump`、`heater` 两个设备运行指令按配置生成 MQTT 报文；`master` 只负责切换后端自动状态机，目标温度、PID、超时和安全阈值等控制参数也只保存到 `t_direct_global`，不发送 MQTT。MQTT 使用 QoS 1 单次发布，不离线排队、不重试。成功只代表 Broker 已确认接收；发布成功后才更新状态并写成功日志。发布失败不修改当前状态，但会写失败日志。
 
+## 自动水循环
+
+### 获取自动控制快照
+
+```http
+GET /api/automation/:deviceNumber
+```
+
+返回状态机状态、实际与期望执行器状态、PID 诊断以及累计水量快照。页面首次进入必须调用该接口，WebSocket 只补充后续的 `automation.status` 和 `water-flow.realtime` 更新。
+
+### 启停自动模式
+
+```http
+POST /api/automation/:deviceNumber/start
+POST /api/automation/:deviceNumber/stop
+```
+
+启停接口与指令页面的 `master` 开关进入同一个自动控制引擎。`master` 不发布 MQTT；启动时状态机只先发布水泵开启。第八里程碑安全保护完成前，加热开启仍由后端拒绝。
+
+### 清零累计水量
+
+```http
+POST /api/automation/:deviceNumber/water-flow/reset
+```
+
+将 `t_water_flow_accumulator` 中该设备的累计水量清零，并向 `t_direct_history` 写入审计记录，不发送 MQTT。
+
 ### 时间同步
 
 ```http

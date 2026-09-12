@@ -22,6 +22,7 @@ export interface ControlDefinition {
 export interface ControlRepository {
   getSnapshot(deviceNumber: string): Promise<ControlSnapshot>
   getDefinition(deviceNumber: string, configId: number): Promise<ControlDefinition | null>
+  getDefinitionByTopic?(topic: string): Promise<ControlDefinition | null>
   saveSuccess(definition: ControlDefinition, deviceNumber: string, value: string, remark: string): Promise<void>
   saveFailure(definition: ControlDefinition, deviceNumber: string, value: string, remark: string): Promise<void>
   applyDeviceReport(deviceNumber: string, configId: number, value: string): Promise<void>

@@ -6,6 +6,8 @@ import type {
   OperationLogOptions,
   OperationLogQuery,
   PaginatedOperationLogs,
+  AutomationSnapshot,
+  WaterFlowSnapshot,
 } from '@new26interthing/shared'
 
 import { createHttpClient } from '~/utils/http'
@@ -24,6 +26,18 @@ export const useControlApi = () => {
     async getSnapshot(deviceNumber: string) {
       const response = await http.get<ApiResponse<ControlSnapshot>>(
         `/controls/${encodeURIComponent(deviceNumber)}`,
+      )
+      return unwrap(response.data)
+    },
+    async getAutomationSnapshot(deviceNumber: string) {
+      const response = await http.get<ApiResponse<AutomationSnapshot>>(
+        `/automation/${encodeURIComponent(deviceNumber)}`,
+      )
+      return unwrap(response.data)
+    },
+    async resetWaterFlow(deviceNumber: string) {
+      const response = await http.post<ApiResponse<WaterFlowSnapshot>>(
+        `/automation/${encodeURIComponent(deviceNumber)}/water-flow/reset`,
       )
       return unwrap(response.data)
     },

@@ -1,0 +1,197 @@
+import type {
+  ActuatorValue,
+  AutomationSnapshot,
+  AutomationStatusMessage,
+  WaterFlowSnapshot,
+} from '@new26interthing/shared'
+
+import {
+  createTemperatureController,
+  hysteresisDemand,
+  type PidConfig,
+} from './temperature-controller.js'
+
+export interface AutomationConfig {
+  strategy: 'hysteresis' | 'pid'
+  targetTemperature: number
+  temperatureHysteresis: number
+  minSafeFlow: number
+  buildFlowTimeoutSeconds: number
+  coolingDelaySeconds: number
+  dataTimeoutSeconds: number
+  pid: PidConfig
+}
+
+export interface AutomationReading {
+  recordedAt: number
+  flowRate: number | null
+  outletTemperature: number | null
+  actualPump: ActuatorValue | 'unknown'
+  actualHeater: ActuatorValue | 'unknown'
+}
+
+interface Dependencies {
+  deviceNumber: string
+  clock?: () => number
+  loadConfig(): Promise<AutomationConfig>
+  execute(topic: 'pump' | 'heater', value: ActuatorValue): Promise<void>
+  getWaterFlow(): Promise<WaterFlowSnapshot>
+  emit(message: AutomationStatusMessage): void
+}
+
+export const createAutomationEngine = ({
+  deviceNumber,
+  clock = Date.now,
+  loadConfig,
+  execute,
+  getWaterFlow,
+  emit,
+}: Dependencies) => {
+  const temperatureController = createTemperatureController(clock)
+  let enabled = false
+  let state: AutomationSnapshot['state'] = 'stopped'
+  let desiredPump: ActuatorValue = 'off'
+  let desiredHeater: ActuatorValue = 'off'
+  let actualPump: AutomationSnapshot['actualPump'] = 'unknown'
+  let actualHeater: AutomationSnapshot['actualHeater'] = 'unknown'
+  let enteredAt = clock()
+  let config: AutomationConfig | null = null
+  let outletTemperature: number | null = null
+  let pid: AutomationSnapshot['pid'] = null
+  let limitationReason: string | null = null
+  let actionTail = Promise.resolve()
+
+  const runAction = async (
+    topic: 'pump' | 'heater',
+    value: ActuatorValue,
+  ) => {
+    if (topic === 'pump' && desiredPump === value) return
+    if (topic === 'heater' && desiredHeater === value) return
+    actionTail = actionTail.then(() => execute(topic, value))
+    await actionTail
+    if (topic === 'pump') desiredPump = value
+    if (topic === 'heater') desiredHeater = value
+  }
+
+  const getSnapshot = async (): Promise<AutomationSnapshot> => ({
+    deviceNumber,
+    enabled,
+    state,
+    desiredPump,
+    desiredHeater,
+    actualPump,
+    actualHeater,
+    countdownSeconds: state === 'building-flow' && config
+      ? Math.max(0, Math.ceil(
+          config.buildFlowTimeoutSeconds - (clock() - enteredAt) / 1_000,
+        ))
+      : state === 'cooling' && config
+        ? Math.max(0, Math.ceil(
+            config.coolingDelaySeconds - (clock() - enteredAt) / 1_000,
+          ))
+        : null,
+    temperatureStrategy: config?.strategy ?? null,
+    targetTemperature: config?.targetTemperature ?? null,
+    outletTemperature,
+    pid,
+    limitationReason,
+    waterFlow: await getWaterFlow(),
+  })
+
+  const notify = async () => {
+    emit({
+      type: 'automation.status',
+      data: await getSnapshot(),
+    })
+  }
+
+  return {
+    async setEnabled(nextEnabled: boolean) {
+      if (enabled === nextEnabled) return getSnapshot()
+      config = await loadConfig()
+      if (nextEnabled) {
+        await runAction('pump', 'on')
+        enabled = true
+        state = 'building-flow'
+        enteredAt = clock()
+        limitationReason = '等待设备建流'
+      }
+      else {
+        enabled = false
+        await runAction('heater', 'off')
+        state = desiredPump === 'on' ? 'cooling' : 'stopped'
+        enteredAt = clock()
+        limitationReason = state === 'cooling' ? '正在冷却' : null
+      }
+      await notify()
+      return getSnapshot()
+    },
+
+    async handleReading(reading: AutomationReading) {
+      actualPump = reading.actualPump
+      actualHeater = reading.actualHeater
+      outletTemperature = reading.outletTemperature
+      if (
+        state === 'building-flow'
+        && config
+        && actualPump === 'on'
+        && reading.flowRate !== null
+        && reading.flowRate >= config.minSafeFlow
+      ) {
+        state = 'running'
+        enteredAt = clock()
+        limitationReason = null
+      }
+      if (state === 'running' && config && outletTemperature !== null) {
+        if (config.strategy === 'pid') {
+          pid = temperatureController.update(
+            outletTemperature,
+            config.pid,
+            desiredHeater,
+          )
+          limitationReason = pid.limitationReason
+          await runAction('heater', pid.desired)
+        }
+        else {
+          const demand = hysteresisDemand(
+            outletTemperature,
+            config.targetTemperature,
+            config.temperatureHysteresis,
+            desiredHeater,
+          )
+          await runAction('heater', demand)
+        }
+      }
+      await notify()
+    },
+
+    async tick() {
+      if (!config) return
+      const elapsed = (clock() - enteredAt) / 1_000
+      if (state === 'building-flow' && elapsed >= config.buildFlowTimeoutSeconds) {
+        enabled = false
+        await runAction('heater', 'off')
+        await runAction('pump', 'off')
+        state = 'stopped'
+        limitationReason = '启动超时，未建立安全流量'
+      }
+      if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
+        await runAction('pump', 'off')
+        state = 'stopped'
+        limitationReason = null
+      }
+      await notify()
+    },
+
+    getSnapshot,
+
+    async close() {
+      enabled = false
+      await runAction('heater', 'off')
+      await runAction('pump', 'off')
+      state = 'stopped'
+    },
+  }
+}
+
+export type AutomationEngine = ReturnType<typeof createAutomationEngine>

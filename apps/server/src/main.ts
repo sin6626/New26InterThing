@@ -16,6 +16,13 @@ import { createSensorHistoryRepository } from './modules/sensor-history/sensor-h
 import { createControlRepository } from './modules/control/control.mysql.js'
 import { createControlService } from './modules/control/control.service.js'
 import { parseDeviceReport } from './modules/control/device-report.js'
+import { createAutomationConfigLoader } from './modules/automation/control-config.js'
+import { createAutomationManager } from './modules/automation/automation-manager.js'
+import {
+  createPipeDiameterLoader,
+  createWaterFlowRepository,
+} from './modules/water-flow/water-flow.mysql.js'
+import { createWaterFlowService } from './modules/water-flow/water-flow.service.js'
 
 const env = readEnv()
 const pool = createDatabasePool(env)
@@ -23,8 +30,31 @@ const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
 let sensorMqtt: ReturnType<typeof createSensorMqtt>
+let automationManager: ReturnType<typeof createAutomationManager>
 const controlService = createControlService(controlRepository, {
   publish: (topic, payload) => sensorMqtt.publish(topic, payload),
+}, {
+  setEnabled: (deviceNumber, enabled) => (
+    automationManager.setEnabled(deviceNumber, enabled)
+  ),
+})
+const waterFlowService = createWaterFlowService({
+  repository: createWaterFlowRepository(pool),
+  loadPipeDiameter: createPipeDiameterLoader(pool),
+})
+automationManager = createAutomationManager({
+  loadConfig: createAutomationConfigLoader(pool),
+  waterFlow: waterFlowService,
+  emit: message => realtimeWebSocket.broadcast(message),
+  async execute(deviceNumber, topic, value) {
+    const definition = await controlRepository.getDefinitionByTopic?.(topic)
+    if (!definition) throw new Error(`未配置 ${topic} 设备指令`)
+    await controlService.execute({
+      deviceNumber,
+      configId: definition.configId,
+      value,
+    })
+  },
 })
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
@@ -34,12 +64,49 @@ const app = createApp({
   recognitionService: createRecognitionService(behaviorRepository),
   controlRepository,
   controlService,
+  automationManager,
+  waterFlowService,
 })
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)
 const handleSensorReading = createSensorRealtimeHandler({
   repository: createSensorRepository(pool),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
+  afterSave: [
+    async (message) => {
+      const rawFlow = message.values.flow_rate ?? message.values.field5
+      const flow = Number(rawFlow)
+      if (!Number.isFinite(flow) || flow < 0) return
+      const recordedAt = new Date(message.recordedAt.replace(' ', 'T')).getTime()
+      const snapshot = await waterFlowService.handleReading(
+        message.deviceNumber,
+        flow,
+        Number.isFinite(recordedAt) ? recordedAt : Date.now(),
+      )
+      realtimeWebSocket.broadcast({
+        type: 'water-flow.realtime',
+        data: snapshot,
+      })
+    },
+    async (message) => {
+      const actuator = (value: unknown) => {
+        if (value === 'on' || value === 1 || value === '1' || value === true) return 'on' as const
+        if (value === 'off' || value === 0 || value === '0' || value === false) return 'off' as const
+        return 'unknown' as const
+      }
+      const numeric = (value: unknown) => {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+      }
+      await automationManager.handleReading(message.deviceNumber, {
+        recordedAt: Date.now(),
+        flowRate: numeric(message.values.flow_rate ?? message.values.field5),
+        outletTemperature: numeric(message.values.temp_out ?? message.values.field4),
+        actualPump: actuator(message.values.water_Y2),
+        actualHeater: actuator(message.values.heat_Y1),
+      })
+    },
+  ],
 })
 sensorMqtt = createSensorMqtt({
   env,
@@ -71,10 +138,18 @@ server.listen(env.SERVER_PORT, env.SERVER_HOST, () => {
   console.log(`后端已启动：http://${env.SERVER_HOST}:${env.SERVER_PORT}`)
 })
 
+const automationTimer = setInterval(() => {
+  void automationManager.tick().catch((error) => {
+    console.error('自动控制定时推进失败', error)
+  })
+}, 1_000)
+
 let stopping = false
 const stop = async () => {
   if (stopping) return
   stopping = true
+  clearInterval(automationTimer)
+  await automationManager.close()
   await sensorMqtt.close()
   realtimeWebSocket.close(() => server.close())
   await pool.end()

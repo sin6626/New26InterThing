@@ -94,6 +94,32 @@ describe('control service', () => {
     )
   })
 
+  it('delegates master to the automation engine without publishing master MQTT', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      configId: 1,
+      topic: 'master',
+    })
+    const publish = vi.fn()
+    const setEnabled = vi.fn()
+    const service = createControlService(
+      repo,
+      { publish },
+      { setEnabled },
+    )
+
+    await service.execute({
+      deviceNumber: '202111',
+      configId: 1,
+      value: 'on',
+    })
+
+    expect(setEnabled).toHaveBeenCalledWith('202111', true)
+    expect(publish).not.toHaveBeenCalled()
+    expect(repo.saveSuccess).toHaveBeenCalledOnce()
+  })
+
   it('rejects heater start before publishing', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({

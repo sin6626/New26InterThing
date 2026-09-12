@@ -1,4 +1,9 @@
-import type { RealtimeMessage, SensorRealtimeData } from '@new26interthing/shared'
+import type {
+  AutomationSnapshot,
+  RealtimeMessage,
+  SensorRealtimeData,
+  WaterFlowSnapshot,
+} from '@new26interthing/shared'
 import { ElNotification } from 'element-plus'
 
 import {
@@ -16,6 +21,14 @@ export function useRealtimeSocket() {
   const socketStatus = useState<SocketStatus>('realtime-socket-status', () => 'connecting')
   const mqttConnected = useState('realtime-mqtt-connected', () => false)
   const readings = useState<Record<string, SensorRealtimeData>>('realtime-readings', () => ({}))
+  const automationSnapshots = useState<Record<string, AutomationSnapshot>>(
+    'automation-snapshots',
+    () => ({}),
+  )
+  const waterFlowSnapshots = useState<Record<string, WaterFlowSnapshot>>(
+    'water-flow-snapshots',
+    () => ({}),
+  )
   const trendPoints = useState<Record<string, RealtimeTrendPoint[]>>(
     'realtime-trend-points',
     () => ({}),
@@ -50,6 +63,18 @@ export function useRealtimeSocket() {
             ),
           }
         }
+        if (message.type === 'automation.status') {
+          automationSnapshots.value = {
+            ...automationSnapshots.value,
+            [message.data.deviceNumber]: message.data,
+          }
+        }
+        if (message.type === 'water-flow.realtime') {
+          waterFlowSnapshots.value = {
+            ...waterFlowSnapshots.value,
+            [message.data.deviceNumber]: message.data,
+          }
+        }
         if (message.type === 'fault.alert') {
           ElNotification.error({
             title: `设备 ${message.data.deviceNumber || '未知'} 发生故障`,
@@ -74,10 +99,12 @@ export function useRealtimeSocket() {
   onMounted(connect)
 
   return {
+    automationSnapshots,
     connectionGeneration,
     mqttConnected,
     readings,
     socketStatus,
     trendPoints,
+    waterFlowSnapshots,
   }
 }

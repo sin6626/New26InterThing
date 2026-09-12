@@ -2,6 +2,7 @@
 import type { ControlField } from '@new26interthing/shared'
 
 import { useControls } from '~/features/control/use-controls'
+import { useAutomation } from '~/features/control/use-automation'
 
 const {
   controlTree,
@@ -15,6 +16,20 @@ const {
   syncTime,
   update,
 } = useControls()
+
+const {
+  loading: automationLoading,
+  resetting,
+  resetWaterFlow,
+  snapshot: automation,
+} = useAutomation(selectedDevice)
+
+const stateLabels = {
+  stopped: '已停止',
+  'building-flow': '正在建流',
+  running: '自动运行',
+  cooling: '正在冷却',
+}
 
 const switchValue = (field: ControlField) => field.value === 'on'
 
@@ -70,11 +85,66 @@ onMounted(() => void initialize())
       :closable="false"
     />
     <el-alert
-      title="安全保护完成前，禁止人工开启加热和启动自动模式；关闭指令始终可用。"
+      title="自动模式可以进行建流和状态演练；第八里程碑安全保护完成前，系统不会真正开启加热。"
       type="warning"
       show-icon
       :closable="false"
     />
+
+    <el-card
+      v-loading="automationLoading"
+      shadow="never"
+      class="rounded-xl border-slate-200"
+    >
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span class="font-medium">自动水循环状态</span>
+          <el-tag :type="automation?.enabled ? 'success' : 'info'">
+            {{ automation ? stateLabels[automation.state] : '--' }}
+          </el-tag>
+        </div>
+      </template>
+      <el-descriptions :column="4" border>
+        <el-descriptions-item label="水泵状态">
+          实际 {{ automation?.actualPump ?? '--' }} / 期望 {{ automation?.desiredPump ?? '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="加热状态">
+          实际 {{ automation?.actualHeater ?? '--' }} / 期望 {{ automation?.desiredHeater ?? '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="出口温度">
+          {{ automation?.outletTemperature ?? '--' }} ℃
+        </el-descriptions-item>
+        <el-descriptions-item label="倒计时">
+          {{ automation?.countdownSeconds ?? '--' }} 秒
+        </el-descriptions-item>
+        <el-descriptions-item label="瞬时流量">
+          {{ automation?.waterFlow.flowRateLitersPerMinute ?? '--' }} L/min
+        </el-descriptions-item>
+        <el-descriptions-item label="一分钟平均">
+          {{ automation?.waterFlow.averageFlowOneMinute ?? '--' }} L/min
+        </el-descriptions-item>
+        <el-descriptions-item label="管内流速">
+          {{ automation?.waterFlow.flowVelocityMetersPerSecond ?? '未配置管径' }}
+          <span v-if="automation?.waterFlow.flowVelocityMetersPerSecond !== null"> m/s</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="累计水量">
+          <div class="flex items-center justify-between gap-3">
+            <span>{{ automation?.waterFlow.totalVolumeLiters ?? '--' }} L</span>
+            <el-button
+              size="small"
+              :loading="resetting"
+              :disabled="!selectedDevice"
+              @click="resetWaterFlow"
+            >
+              清零
+            </el-button>
+          </div>
+        </el-descriptions-item>
+      </el-descriptions>
+      <p v-if="automation?.limitationReason" class="mb-0 text-sm text-amber-600">
+        当前限制：{{ automation.limitationReason }}
+      </p>
+    </el-card>
 
     <el-card v-loading="loading" shadow="never" class="rounded-xl border-slate-200">
       <template #header>

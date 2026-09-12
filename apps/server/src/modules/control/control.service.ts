@@ -11,6 +11,10 @@ export interface CommandPublisher {
   publish(topic: string, payload: Record<string, unknown>): Promise<void>
 }
 
+export interface AutomationModeController {
+  setEnabled(deviceNumber: string, enabled: boolean): Promise<unknown>
+}
+
 export class ControlError extends Error {
   constructor(message: string, readonly status: number) {
     super(message)
@@ -46,6 +50,7 @@ const optionValues = (options: unknown) => {
 export const createControlService = (
   repository: ControlRepository,
   publisher: CommandPublisher,
+  automation?: AutomationModeController,
 ) => ({
   async syncTime(deviceNumber: string, requestedTime?: string) {
     const date = requestedTime ? new Date(requestedTime.replace(' ', 'T')) : new Date()
@@ -118,8 +123,11 @@ export const createControlService = (
     if (definition.topic === 'heater' && value === 'on') {
       throw new ControlError('安全保护尚未完成，当前禁止人工开启加热', 409)
     }
-    if (definition.topic === 'master' && value === 'on') {
-      throw new ControlError('自动水循环尚未完成，当前禁止启动自动模式', 409)
+    if (definition.topic === 'master') {
+      if (!automation) {
+        throw new ControlError('自动控制服务尚未初始化', 503)
+      }
+      await automation.setEnabled(intent.deviceNumber, value === 'on')
     }
 
     const shouldPublish = isDeviceCommand(definition.topic)
