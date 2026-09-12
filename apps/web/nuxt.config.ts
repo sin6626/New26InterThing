@@ -16,6 +16,8 @@ export default defineNuxtConfig({
   devServer: {
     port: webPort,
   },
+  
+  ssr: false,
   devtools: { enabled: true },
   modules: ['@element-plus/nuxt', '@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
