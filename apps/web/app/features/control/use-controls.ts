@@ -6,6 +6,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { useControlApi } from './api'
 
+export interface ControlTreeNode extends ControlField {
+  children: ControlTreeNode[]
+}
+
 export const useControls = () => {
   const api = useControlApi()
   const snapshot = ref<ControlSnapshot>({ deviceNumber: '', fields: [] })
@@ -16,11 +20,32 @@ export const useControls = () => {
   const errorMessage = ref('')
   const syncingTime = ref(false)
 
-  const visibleFields = computed(() => snapshot.value.fields.filter((field) => {
-    if (field.parentId === null) return true
-    const parent = snapshot.value.fields.find(item => item.configId === field.parentId)
-    return parent?.value === field.parentValue
-  }))
+  const controlTree = computed<ControlTreeNode[]>(() => {
+    const fields = snapshot.value.fields
+
+    const buildChildren = (
+      parent: ControlField,
+      ancestors: Set<number>,
+    ): ControlTreeNode[] => fields
+      .filter(field => field.parentId === parent.configId)
+      .filter(field => field.parentValue === null || field.parentValue === parent.value)
+      .filter(field => !ancestors.has(field.configId))
+      .map((field) => {
+        const nextAncestors = new Set(ancestors)
+        nextAncestors.add(field.configId)
+        return {
+          ...field,
+          children: buildChildren(field, nextAncestors),
+        }
+      })
+
+    return fields
+      .filter(field => field.parentId === null)
+      .map(field => ({
+        ...field,
+        children: buildChildren(field, new Set([field.configId])),
+      }))
+  })
 
   const load = async () => {
     if (!selectedDevice.value) return
@@ -118,6 +143,7 @@ export const useControls = () => {
   watch(selectedDevice, () => void load(), { immediate: false })
 
   return {
+    controlTree,
     deviceNumbers,
     errorMessage,
     initialize,
@@ -127,6 +153,5 @@ export const useControls = () => {
     syncingTime,
     syncTime,
     update,
-    visibleFields,
   }
 }

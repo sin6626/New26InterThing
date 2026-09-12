@@ -4,6 +4,7 @@ import type { ControlField } from '@new26interthing/shared'
 import { useControls } from '~/features/control/use-controls'
 
 const {
+  controlTree,
   deviceNumbers,
   errorMessage,
   initialize,
@@ -13,7 +14,6 @@ const {
   syncingTime,
   syncTime,
   update,
-  visibleFields,
 } = useControls()
 
 const switchValue = (field: ControlField) => field.value === 'on'
@@ -84,13 +84,16 @@ onMounted(() => void initialize())
         </div>
       </template>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div
-          v-for="field in visibleFields"
-          :key="field.configId"
-          class="rounded-lg border border-slate-200 p-4"
-        >
-          <div class="mb-3 flex items-center justify-between gap-3">
+      <el-tree
+        :data="controlTree"
+        node-key="configId"
+        default-expand-all
+        :expand-on-click-node="false"
+        :indent="28"
+        class="control-tree"
+      >
+        <template #default="{ data: field }">
+          <div class="control-node">
             <div>
               <p class="m-0 font-medium text-slate-800">{{ field.name }}</p>
               <p class="mt-1 mb-0 text-xs text-slate-400">
@@ -98,71 +101,117 @@ onMounted(() => void initialize())
               </p>
             </div>
             <el-tag effect="plain">当前：{{ field.value ?? '--' }}</el-tag>
+            <div class="control-node__editor" @click.stop>
+              <el-switch
+                v-if="field.type === 'switch'"
+                :model-value="switchValue(field)"
+                :loading="savingId === field.configId"
+                :disabled="savingId !== undefined
+                  || (field.heaterStartBlocked && field.value !== 'on')
+                  || (field.automaticStartBlocked && field.value !== 'on')"
+                active-text="开启"
+                inactive-text="关闭"
+                @change="value => update(field, Boolean(value))"
+              />
+              <el-input
+                v-else-if="field.type === 'input'"
+                :model-value="field.value ?? ''"
+                placeholder="请输入配置值"
+                @change="value => update(field, value)"
+              />
+              <el-slider
+                v-else-if="field.type === 'slider'"
+                :model-value="Number(field.value || 0)"
+                :min="field.min ?? 0"
+                :max="field.max ?? 100"
+                @change="value => update(field, Number(value))"
+              />
+              <el-select
+                v-else-if="field.type === 'radio'"
+                :model-value="field.value"
+                @change="value => update(field, value)"
+              >
+                <el-option
+                  v-for="option in field.options"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-time-picker
+                v-else-if="field.type === 'time'"
+                :model-value="field.value"
+                value-format="HH:mm:ss"
+                placeholder="选择时间"
+                @change="updateTime(field, $event)"
+              />
+              <el-checkbox-group
+                v-else-if="field.type === 'checkbox'"
+                :model-value="field.value ? field.value.split(',') : []"
+                @change="updateCheckbox(field, $event)"
+              >
+                <el-checkbox
+                  v-for="option in field.options"
+                  :key="option.value"
+                  :label="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </el-checkbox>
+              </el-checkbox-group>
+              <el-alert
+                v-else
+                title="暂不支持的控件类型"
+                type="info"
+                :closable="false"
+              />
+            </div>
           </div>
-
-          <el-switch
-            v-if="field.type === 'switch'"
-            :model-value="switchValue(field)"
-            :loading="savingId === field.configId"
-            :disabled="savingId !== undefined
-              || (field.heaterStartBlocked && field.value !== 'on')
-              || (field.automaticStartBlocked && field.value !== 'on')"
-            active-text="开启"
-            inactive-text="关闭"
-            @change="value => update(field, Boolean(value))"
-          />
-          <div v-else-if="field.type === 'input'" class="flex gap-2">
-            <el-input
-              :model-value="field.value ?? ''"
-              placeholder="请输入配置值"
-              class="flex-1"
-              @change="value => update(field, value)"
-            />
-          </div>
-          <el-slider
-            v-else-if="field.type === 'slider'"
-            :model-value="Number(field.value || 0)"
-            :min="field.min ?? 0"
-            :max="field.max ?? 100"
-            @change="value => update(field, Number(value))"
-          />
-          <el-select
-            v-else-if="field.type === 'radio'"
-            :model-value="field.value"
-            @change="value => update(field, value)"
-          >
-            <el-option
-              v-for="option in field.options"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-          <el-time-picker
-            v-else-if="field.type === 'time'"
-            :model-value="field.value"
-            value-format="HH:mm:ss"
-            placeholder="选择时间"
-            @change="updateTime(field, $event)"
-          />
-          <el-checkbox-group
-            v-else-if="field.type === 'checkbox'"
-            :model-value="field.value ? field.value.split(',') : []"
-            @change="updateCheckbox(field, $event)"
-          >
-            <el-checkbox
-              v-for="option in field.options"
-              :key="option.value"
-              :label="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </el-checkbox>
-          </el-checkbox-group>
-          <el-alert v-else title="暂不支持的控件类型" type="info" :closable="false" />
-        </div>
-      </div>
-      <el-empty v-if="!loading && !visibleFields.length" description="暂无控制配置" />
+        </template>
+      </el-tree>
+      <el-empty
+        v-if="!loading && !controlTree.length"
+        description="暂无控制配置"
+      />
     </el-card>
   </div>
 </template>
+
+<style scoped>
+.control-tree {
+  --el-tree-node-hover-bg-color: transparent;
+}
+
+.control-tree :deep(.el-tree-node__content) {
+  height: auto;
+  min-height: 86px;
+  margin-bottom: 12px;
+  padding-right: 16px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 10px;
+}
+
+.control-tree :deep(.el-tree-node__expand-icon) {
+  margin-left: 10px;
+}
+
+.control-node {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(260px, 420px);
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+  padding: 14px 0;
+}
+
+.control-node__editor {
+  width: 100%;
+}
+
+@media (max-width: 1450px) {
+  .control-node {
+    grid-template-columns: minmax(190px, 1fr) auto minmax(220px, 320px);
+    gap: 12px;
+  }
+}
+</style>
