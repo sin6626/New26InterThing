@@ -1,6 +1,11 @@
 import type { RealtimeMessage, SensorRealtimeData } from '@new26interthing/shared'
 import { ElNotification } from 'element-plus'
 
+import {
+  appendRealtimePoint,
+  type RealtimeTrendPoint,
+} from './realtime-trend'
+
 type SocketStatus = 'connecting' | 'connected' | 'disconnected'
 
 let socket: WebSocket | undefined
@@ -11,6 +16,14 @@ export function useRealtimeSocket() {
   const socketStatus = useState<SocketStatus>('realtime-socket-status', () => 'connecting')
   const mqttConnected = useState('realtime-mqtt-connected', () => false)
   const readings = useState<Record<string, SensorRealtimeData>>('realtime-readings', () => ({}))
+  const trendPoints = useState<Record<string, RealtimeTrendPoint[]>>(
+    'realtime-trend-points',
+    () => ({}),
+  )
+  const connectionGeneration = useState(
+    'realtime-connection-generation',
+    () => 0,
+  )
 
   const connect = () => {
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return
@@ -19,6 +32,7 @@ export function useRealtimeSocket() {
 
     socket.addEventListener('open', () => {
       socketStatus.value = 'connected'
+      connectionGeneration.value += 1
     })
     socket.addEventListener('message', (event) => {
       try {
@@ -28,6 +42,13 @@ export function useRealtimeSocket() {
         }
         if (message.type === 'sensor.realtime') {
           readings.value = { ...readings.value, [message.data.deviceNumber]: message.data }
+          trendPoints.value = {
+            ...trendPoints.value,
+            [message.data.deviceNumber]: appendRealtimePoint(
+              trendPoints.value[message.data.deviceNumber] || [],
+              message.data,
+            ),
+          }
         }
         if (message.type === 'fault.alert') {
           ElNotification.error({
@@ -52,5 +73,11 @@ export function useRealtimeSocket() {
 
   onMounted(connect)
 
-  return { mqttConnected, readings, socketStatus }
+  return {
+    connectionGeneration,
+    mqttConnected,
+    readings,
+    socketStatus,
+    trendPoints,
+  }
 }
