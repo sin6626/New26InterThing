@@ -20,6 +20,7 @@ const {
   flowEmptyDescription,
   flowTrend,
   initialize: initializeTrends,
+  latestReading,
   loading: trendLoading,
   options: trendOptions,
   temperatureTrend,
@@ -35,7 +36,11 @@ const deviceNumbers = computed(() => [...new Set([
   ...trendOptions.value.deviceNumbers,
   ...Object.keys(readings.value),
 ])])
-const currentReading = computed(() => readings.value[selectedDevice.value])
+const realtimeReading = computed(() => readings.value[selectedDevice.value])
+const currentReading = computed(() => (
+  realtimeReading.value
+  || latestReading.value
+))
 const fieldLabels = computed(() => new Map(
   trendOptions.value.fields.map(field => [field.key, field.label]),
 ))
@@ -97,7 +102,9 @@ onMounted(() => {
           <h2 class="m-0 text-lg font-semibold text-slate-900">传感器数据</h2>
           <p class="mt-1 mb-0 text-sm text-slate-500">设备编号：{{ selectedDevice || '--' }}</p>
         </div>
-        <el-tag v-if="currentReading" type="success" effect="light">实时更新</el-tag>
+        <el-tag v-if="currentReading" type="success" effect="light">
+          {{ realtimeReading ? '实时更新' : '最近记录' }}
+        </el-tag>
       </div>
 
       <div v-if="currentReading && Object.keys(currentReading.fields).length" class="grid grid-cols-4 gap-4">

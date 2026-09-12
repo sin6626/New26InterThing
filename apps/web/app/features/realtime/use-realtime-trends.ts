@@ -1,6 +1,7 @@
 import type {
   SensorHistoryOptions,
   SensorHistoryTrend,
+  SensorRealtimeData,
 } from '@new26interthing/shared'
 
 import { useSensorHistoryApi } from '~/features/sensor-history/api'
@@ -29,7 +30,40 @@ export const useRealtimeTrends = (
   const chartType = ref<'line' | 'bar' | 'scatter'>('line')
   const loading = ref(false)
   const errorMessage = ref('')
+  const latestReading = ref<SensorRealtimeData>()
   let requestGeneration = 0
+  let latestRequestGeneration = 0
+
+  const loadLatestReading = async () => {
+    const deviceNumber = selectedDevice.value
+    const currentGeneration = ++latestRequestGeneration
+
+    latestReading.value = undefined
+    if (!deviceNumber) return
+
+    try {
+      const result = await api.getPage({
+        page: 1,
+        pageSize: 1,
+        deviceNumber,
+        status: 'all',
+      })
+      const latestItem = result.items[0]
+
+      if (currentGeneration === latestRequestGeneration && latestItem?.recordedAt) {
+        latestReading.value = {
+          deviceNumber,
+          recordedAt: latestItem.recordedAt,
+          fields: latestItem.fields,
+        }
+      }
+    }
+    catch {
+      if (currentGeneration === latestRequestGeneration) {
+        errorMessage.value = '最新传感器数据加载失败，后续实时数据仍会继续更新。'
+      }
+    }
+  }
 
   const loadHistory = async () => {
     const deviceNumber = selectedDevice.value
@@ -126,6 +160,7 @@ export const useRealtimeTrends = (
 
   watch(selectedDevice, () => {
     void loadHistory()
+    void loadLatestReading()
   })
   watch(connectionGeneration, (current, previous) => {
     if (previous > 0 && current > previous) {
@@ -141,6 +176,7 @@ export const useRealtimeTrends = (
     flowEmptyDescription,
     flowTrend,
     initialize,
+    latestReading,
     loading,
     loadHistory,
     options,
