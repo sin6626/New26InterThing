@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   },
   
   ssr: false,
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@element-plus/nuxt', '@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
