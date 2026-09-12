@@ -138,3 +138,36 @@ await reporter.reportFault({
 ```
 
 报告器按 `errorNumber + type` 查询 `t_error_code_mapper`，将标准中文信息和具体原因写入 `t_error_msg`。写入成功后通过现有 `/ws` 广播 `{ type: 'fault.alert', data: FaultItem }`，供应用布局显示右上角警告；故障页面仍由 HTTP 主动查询。
+
+## 智能识别与行为数据
+
+行为数据不使用 MQTT 或 WebSocket。历史数据页提交记录 ID，后端重查 `t_sensor_data`、调用本地配置的现场识别接口，并按 `t_behavior_field_mapper` 将响应写入 `t_behavior_data`。
+
+### 发起智能识别
+
+```http
+POST /behaviors/recognize
+Content-Type: application/json
+
+{ "rowIds": [101, 102] }
+```
+
+`rowIds` 必须是 1 至 500 个不重复正整数，并且一次只能选择同一设备。成功响应包含 `saved`、`selectedCount` 和新行为记录 `behaviorId`。请求无效返回 HTTP 400；接口未配置、现场接口失败、响应路径错误或字段未命中返回 HTTP 422，并保留可排查的中文原因。
+
+现场接口地址、请求模板和响应路径配置见 `apps/server/config/README.md`；代码只允许字段映射写入 `field1` 至 `field10`。
+
+### 行为字段
+
+```http
+GET /behaviors/options
+```
+
+返回 `t_behavior_field_mapper` 中合法且可见的动态字段，字段包含 `key`、`label`、`unit` 和 `type`。
+
+### 行为数据分页
+
+```http
+GET /behaviors?page=1&pageSize=20&startTime=2026-09-12%2008:00:00&endTime=2026-09-12%2010:00:00
+```
+
+页码默认 1，每页默认 20、最大 100；开始和结束时间格式为 `YYYY-MM-DD HH:mm:ss`，可单独提供，结束时间不得早于开始时间。成功响应的 `data` 为 `{ items, total, page, pageSize }`，每条记录包含动态 `fields` 和 `recordedAt`。

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useBehaviors } from '~/features/behavior/use-behaviors'
 
-const { errorMessage, fieldValue, initialize, load, loading, options, page, reset, rows, search, timeRange, total } = useBehaviors()
+const { errorMessage, fieldValue, initialize, loadCurrentPage, loading, options, page, reset, rows, search, timeRange, total } = useBehaviors()
 onMounted(() => void initialize())
 </script>
 
@@ -23,7 +23,7 @@ onMounted(() => void initialize())
         <el-table-column prop="recordedAt" label="识别时间" width="180" />
         <template #empty><el-empty description="暂无智能识别结果，请先在历史数据页选择记录并发起识别" /></template>
       </el-table>
-      <div class="mt-5 flex justify-end"><el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next, jumper" @current-change="load" @size-change="search" /></div>
+      <div class="mt-5 flex justify-end"><el-pagination v-model:current-page="page.current" v-model:page-size="page.size" :page-sizes="[10, 20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next, jumper" @current-change="loadCurrentPage" @size-change="search" /></div>
     </el-card>
   </div>
 </template>

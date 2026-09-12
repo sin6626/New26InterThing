@@ -16,7 +16,12 @@ const toField = (row: Mapping): BehaviorField => ({ key: row.p_name, label: row.
 const valueAtPath = (source: Record<string, unknown>, path: string) => path.split('.').reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, source)
 const mapItem = (row: RowDataPacket, mappings: Mapping[]): BehaviorItem => ({
   id: Number(row.id), deviceNumber: row.d_no ?? null, recordedAt: row.c_time ?? null,
-  fields: Object.fromEntries(mappings.map(mapping => [mapping.p_name, row[mapping.db_name] ?? null])),
+  fields: Object.fromEntries(mappings.map(mapping => {
+    const value = row[mapping.db_name]
+    if (mapping.type !== '1' || value === null || value === '') return [mapping.p_name, value ?? null]
+    const number = Number(value)
+    return [mapping.p_name, Number.isFinite(number) ? number : value]
+  })),
 })
 
 export const createBehaviorRepository = (pool: Pool): BehaviorRepository => ({
@@ -39,7 +44,7 @@ export const createBehaviorRepository = (pool: Pool): BehaviorRepository => ({
     return { total: Number(counts[0]?.total ?? 0), items: rows.map(row => mapItem(row, mappings)) }
   },
   async getRecognitionRows(rowIds) {
-    const mappings = (await getMappings(pool, 't_sensor_field_mapper')).filter(row => row.visible === '1')
+    const mappings = await getMappings(pool, 't_sensor_field_mapper')
     const placeholders = rowIds.map(() => '?').join(', ')
     const columns = mappings.map(row => row.db_name).join(', ')
     const [rows] = await pool.query<RowDataPacket[]>(
