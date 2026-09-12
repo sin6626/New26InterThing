@@ -2,7 +2,7 @@ import type {
   ControlField,
   ControlSnapshot,
 } from '@new26interthing/shared'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 import { useControlApi } from './api'
 
@@ -92,29 +92,15 @@ export const useControls = () => {
       ElMessage.warning('自动水循环尚未完成，当前禁止启动自动模式')
       return
     }
-    try {
-      await ElMessageBox.confirm(
-        `设备：${selectedDevice.value}\n指令：${field.name}\n原值：${field.value ?? '--'}\n新值：${String(value)}`,
-        '确认下发指令',
-        {
-          confirmButtonText: '确认执行',
-          cancelButtonText: '取消',
-          type: 'warning',
-        },
-      )
-    }
-    catch {
-      return
-    }
-
     savingId.value = field.configId
     try {
-      await api.execute({
+      const result = await api.execute({
         deviceNumber: selectedDevice.value,
         configId: field.configId,
         value,
       })
-      ElMessage.success('操作已处理，页面展示的是设备期望值')
+      field.value = result.value
+      ElMessage.success('修改成功')
     }
     catch (error) {
       ElMessage.error(error instanceof Error ? error.message : '操作失败')

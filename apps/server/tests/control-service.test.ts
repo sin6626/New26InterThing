@@ -60,6 +60,40 @@ describe('control service', () => {
     expect(repo.saveSuccess).not.toHaveBeenCalled()
   })
 
+  it('saves state-machine parameters without publishing MQTT', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      configId: 10,
+      fieldType: '2',
+      topic: 'target_temperature',
+      publishTopic: 'device/direct',
+      payloadTemplate: null,
+      valueMap: null,
+      oldValue: '30',
+    })
+    const publish = vi.fn()
+    const service = createControlService(repo, { publish })
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 10,
+      value: '35',
+    })).resolves.toEqual({
+      configId: 10,
+      value: '35',
+      status: 'saved',
+    })
+
+    expect(publish).not.toHaveBeenCalled()
+    expect(repo.saveSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({ topic: 'target_temperature' }),
+      '202111',
+      '35',
+      '应用层配置保存（无需MQTT下发）',
+    )
+  })
+
   it('rejects heater start before publishing', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({

@@ -4,6 +4,7 @@ import type {
 } from '@new26interthing/shared'
 
 import { buildCommandEnvelope } from './command.adapter.js'
+import { isDeviceCommand } from './control-policy.js'
 import type { ControlRepository } from './control.repository.js'
 
 export interface CommandPublisher {
@@ -121,8 +122,7 @@ export const createControlService = (
       throw new ControlError('自动水循环尚未完成，当前禁止启动自动模式', 409)
     }
 
-    const shouldPublish = Boolean(definition.publishTopic || definition.payloadTemplate)
-      || ['pump', 'heater', 'master'].includes(definition.topic)
+    const shouldPublish = isDeviceCommand(definition.topic)
 
     if (shouldPublish) {
       const envelope = buildCommandEnvelope({

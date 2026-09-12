@@ -15,6 +15,7 @@ export interface ControlField {
   max: number | null
   options: ControlOption[]
   topic: string
+  actionKind: 'command' | 'parameter'
   value: string | null
   heaterStartBlocked: boolean
   automaticStartBlocked: boolean

@@ -45,7 +45,7 @@ onMounted(() => void initialize())
       <div>
         <h1 class="m-0 text-2xl font-semibold text-slate-900">指令控制</h1>
         <p class="mt-2 mb-0 text-sm text-slate-500">
-          提交人工操作意图；发布成功表示 Broker 已接收，不代表设备已执行
+          运行指令按配置发布到设备；控制参数仅保存，供自动状态机判断
         </p>
       </div>
       <div class="flex gap-3">
@@ -100,7 +100,17 @@ onMounted(() => void initialize())
                 {{ field.topic }} · 配置 {{ field.configId }}
               </p>
             </div>
-            <el-tag effect="plain">当前：{{ field.value ?? '--' }}</el-tag>
+            <div class="flex items-center gap-2">
+              <el-tag
+                :type="field.actionKind === 'command' ? 'warning' : 'info'"
+                effect="plain"
+              >
+                {{ field.actionKind === 'command' ? '运行指令' : '控制参数' }}
+              </el-tag>
+              <el-tag effect="plain">
+                当前：{{ field.value ?? '--' }}
+              </el-tag>
+            </div>
             <div class="control-node__editor" @click.stop>
               <el-switch
                 v-if="field.type === 'switch'"
@@ -116,6 +126,7 @@ onMounted(() => void initialize())
               <el-input
                 v-else-if="field.type === 'input'"
                 :model-value="field.value ?? ''"
+                :disabled="savingId !== undefined"
                 placeholder="请输入配置值"
                 @change="value => update(field, value)"
               />
@@ -124,11 +135,13 @@ onMounted(() => void initialize())
                 :model-value="Number(field.value || 0)"
                 :min="field.min ?? 0"
                 :max="field.max ?? 100"
+                :disabled="savingId !== undefined"
                 @change="value => update(field, Number(value))"
               />
               <el-select
                 v-else-if="field.type === 'radio'"
                 :model-value="field.value"
+                :disabled="savingId !== undefined"
                 @change="value => update(field, value)"
               >
                 <el-option
@@ -141,6 +154,7 @@ onMounted(() => void initialize())
               <el-time-picker
                 v-else-if="field.type === 'time'"
                 :model-value="field.value"
+                :disabled="savingId !== undefined"
                 value-format="HH:mm:ss"
                 placeholder="选择时间"
                 @change="updateTime(field, $event)"
@@ -148,6 +162,7 @@ onMounted(() => void initialize())
               <el-checkbox-group
                 v-else-if="field.type === 'checkbox'"
                 :model-value="field.value ? field.value.split(',') : []"
+                :disabled="savingId !== undefined"
                 @change="updateCheckbox(field, $event)"
               >
                 <el-checkbox

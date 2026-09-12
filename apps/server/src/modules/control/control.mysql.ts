@@ -14,6 +14,7 @@ import type {
   ControlDefinition,
   ControlRepository,
 } from './control.repository.js'
+import { isDeviceCommand } from './control-policy.js'
 
 const fieldTypes: Record<string, ControlField['type']> = {
   '1': 'switch',
@@ -131,7 +132,8 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
   async getSnapshot(deviceNumber) {
     const [rows] = await pool.query<RowDataPacket[]>(
       `select c.id as config_id, c.ref_id, c.ref_value, c.t_name, c.f_type,
-              c.min, c.max, c.topic, c.options, coalesce(g.value, 'off') as value
+              c.min, c.max, c.topic, c.options,
+              coalesce(g.value, 'off') as value
        from t_direct_config c
        left join t_direct_global g on g.config_id = c.id
        order by cast(c.order as unsigned), c.id`,
@@ -148,6 +150,9 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
         max: numberOrNull(row.max),
         options: parseOptions(row.options),
         topic: String(row.topic || ''),
+        actionKind: isDeviceCommand(String(row.topic || ''))
+          ? 'command'
+          : 'parameter',
         value: row.value ?? null,
         heaterStartBlocked: row.topic === 'heater',
         automaticStartBlocked: row.topic === 'master',
