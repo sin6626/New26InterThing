@@ -1,5 +1,4 @@
 const deviceCommandTopics = new Set([
-  'master',
   'pump',
   'heater',
 ])
