@@ -18,7 +18,6 @@ export interface AutomationConfig {
   minSafeFlow: number
   buildFlowTimeoutSeconds: number
   coolingDelaySeconds: number
-  dataTimeoutSeconds: number
   pid: PidConfig
 }
 
@@ -37,6 +36,7 @@ interface Dependencies {
   execute(topic: 'pump' | 'heater', value: ActuatorValue): Promise<void>
   getWaterFlow(): Promise<WaterFlowSnapshot>
   emit(message: AutomationStatusMessage): void
+  disableMaster?(reason: string): Promise<void>
 }
 
 export const createAutomationEngine = ({
@@ -46,6 +46,7 @@ export const createAutomationEngine = ({
   execute,
   getWaterFlow,
   emit,
+  disableMaster = async () => {},
 }: Dependencies) => {
   const temperatureController = createTemperatureController(clock)
   let enabled = false
@@ -59,18 +60,47 @@ export const createAutomationEngine = ({
   let outletTemperature: number | null = null
   let pid: AutomationSnapshot['pid'] = null
   let limitationReason: string | null = null
+  let lastAction: AutomationSnapshot['lastAction'] = null
+  let publishedPump: ActuatorValue = 'off'
+  let publishedHeater: ActuatorValue = 'off'
+  let configFingerprint = ''
   let actionTail = Promise.resolve()
 
   const runAction = async (
     topic: 'pump' | 'heater',
     value: ActuatorValue,
   ) => {
-    if (topic === 'pump' && desiredPump === value) return
-    if (topic === 'heater' && desiredHeater === value) return
+    if (topic === 'pump') {
+      desiredPump = value
+      if (publishedPump === value) return
+    }
+    if (topic === 'heater') {
+      desiredHeater = value
+      if (publishedHeater === value) return
+    }
     actionTail = actionTail.then(() => execute(topic, value))
-    await actionTail
-    if (topic === 'pump') desiredPump = value
-    if (topic === 'heater') desiredHeater = value
+    try {
+      await actionTail
+      if (topic === 'pump') publishedPump = value
+      if (topic === 'heater') publishedHeater = value
+      lastAction = {
+        topic,
+        value,
+        status: 'published',
+        message: 'MQTT 已发布',
+      }
+    }
+    catch (error) {
+      actionTail = Promise.resolve()
+      const message = error instanceof Error ? error.message : String(error)
+      lastAction = {
+        topic,
+        value,
+        status: message.includes('安全保护尚未完成') ? 'blocked' : 'failed',
+        message,
+      }
+      throw error
+    }
   }
 
   const getSnapshot = async (): Promise<AutomationSnapshot> => ({
@@ -95,6 +125,7 @@ export const createAutomationEngine = ({
     outletTemperature,
     pid,
     limitationReason,
+    lastAction,
     waterFlow: await getWaterFlow(),
   })
 
@@ -110,6 +141,7 @@ export const createAutomationEngine = ({
       if (enabled === nextEnabled) return getSnapshot()
       config = await loadConfig()
       if (nextEnabled) {
+        configFingerprint = JSON.stringify(config)
         await runAction('pump', 'on')
         enabled = true
         state = 'building-flow'
@@ -150,7 +182,14 @@ export const createAutomationEngine = ({
             desiredHeater,
           )
           limitationReason = pid.limitationReason
-          await runAction('heater', pid.desired)
+          try {
+            await runAction('heater', pid.desired)
+          }
+          catch (error) {
+            limitationReason = error instanceof Error
+              ? error.message
+              : String(error)
+          }
         }
         else {
           const demand = hysteresisDemand(
@@ -159,7 +198,14 @@ export const createAutomationEngine = ({
             config.temperatureHysteresis,
             desiredHeater,
           )
-          await runAction('heater', demand)
+          try {
+            await runAction('heater', demand)
+          }
+          catch (error) {
+            limitationReason = error instanceof Error
+              ? error.message
+              : String(error)
+          }
         }
       }
       await notify()
@@ -167,6 +213,14 @@ export const createAutomationEngine = ({
 
     async tick() {
       if (!config) return
+      const latestConfig = await loadConfig()
+      const latestFingerprint = JSON.stringify(latestConfig)
+      if (latestFingerprint !== configFingerprint) {
+        config = latestConfig
+        configFingerprint = latestFingerprint
+        temperatureController.reset()
+        pid = null
+      }
       const elapsed = (clock() - enteredAt) / 1_000
       if (state === 'building-flow' && elapsed >= config.buildFlowTimeoutSeconds) {
         enabled = false
@@ -174,6 +228,7 @@ export const createAutomationEngine = ({
         await runAction('pump', 'off')
         state = 'stopped'
         limitationReason = '启动超时，未建立安全流量'
+        await disableMaster(limitationReason)
       }
       if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
         await runAction('pump', 'off')

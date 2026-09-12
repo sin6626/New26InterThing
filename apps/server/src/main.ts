@@ -46,6 +46,16 @@ automationManager = createAutomationManager({
   loadConfig: createAutomationConfigLoader(pool),
   waterFlow: waterFlowService,
   emit: message => realtimeWebSocket.broadcast(message),
+  async disableMaster(deviceNumber, reason) {
+    const definition = await controlRepository.getDefinitionByTopic?.('master')
+    if (!definition) throw new Error('未配置 master 自动模式')
+    await controlRepository.saveSuccess(
+      definition,
+      deviceNumber,
+      'off',
+      `自动启动失败：${reason}`,
+    )
+  },
   async execute(deviceNumber, topic, value) {
     const definition = await controlRepository.getDefinitionByTopic?.(topic)
     if (!definition) throw new Error(`未配置 ${topic} 设备指令`)
@@ -77,11 +87,10 @@ const handleSensorReading = createSensorRealtimeHandler({
       const rawFlow = message.values.flow_rate ?? message.values.field5
       const flow = Number(rawFlow)
       if (!Number.isFinite(flow) || flow < 0) return
-      const recordedAt = new Date(message.recordedAt.replace(' ', 'T')).getTime()
       const snapshot = await waterFlowService.handleReading(
         message.deviceNumber,
         flow,
-        Number.isFinite(recordedAt) ? recordedAt : Date.now(),
+        Date.now(),
       )
       realtimeWebSocket.broadcast({
         type: 'water-flow.realtime',
@@ -90,8 +99,12 @@ const handleSensorReading = createSensorRealtimeHandler({
     },
     async (message) => {
       const actuator = (value: unknown) => {
-        if (value === 'on' || value === 1 || value === '1' || value === true) return 'on' as const
-        if (value === 'off' || value === 0 || value === '0' || value === false) return 'off' as const
+        if (value === 'on' || value === 1 || value === '1') {
+          return 'on' as const
+        }
+        if (value === 'off' || value === 0 || value === '0') {
+          return 'off' as const
+        }
         return 'unknown' as const
       }
       const numeric = (value: unknown) => {

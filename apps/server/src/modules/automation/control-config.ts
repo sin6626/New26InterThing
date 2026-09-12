@@ -18,14 +18,25 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     const topic = aliases[String(row.topic)] ?? String(row.topic)
     if (row.value !== null) values.set(topic, String(row.value))
   }
-  const number = (topic: string) => {
+  const getRequiredNumber = (topic: string) => {
     const value = Number(values.get(topic))
-    if (!Number.isFinite(value)) throw new Error(`控制参数 ${topic} 未配置或不是有效数字`)
+    if (!Number.isFinite(value)) {
+      throw new Error(`控制参数 ${topic} 未配置或不是有效数字`)
+    }
     return value
   }
   const positive = (topic: string) => {
-    const value = number(topic)
-    if (value <= 0) throw new Error(`控制参数 ${topic} 必须大于 0`)
+    const value = getRequiredNumber(topic)
+    if (value <= 0) {
+      throw new Error(`控制参数 ${topic} 必须大于 0`)
+    }
+    return value
+  }
+  const nonNegative = (topic: string) => {
+    const value = getRequiredNumber(topic)
+    if (value < 0) {
+      throw new Error(`控制参数 ${topic} 必须大于或等于 0`)
+    }
     return value
   }
   const strategy = values.get('temperature_control_strategy')
@@ -42,16 +53,15 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     minSafeFlow: positive('min_safe_flow'),
     buildFlowTimeoutSeconds: positive('build_flow_timeout'),
     coolingDelaySeconds: positive('cooling_delay'),
-    dataTimeoutSeconds: positive('data_timeout'),
     pid: {
       targetTemperature,
-      kp: number('pid_kp'),
-      ki: number('pid_ki'),
-      kd: number('pid_kd'),
+      kp: nonNegative('pid_kp'),
+      ki: nonNegative('pid_ki'),
+      kd: nonNegative('pid_kd'),
       cycleSeconds: positive('pid_cycle_time'),
       minOnSeconds: positive('pid_min_on_time'),
       minOffSeconds: positive('pid_min_off_time'),
-      overshootAllowance: number('pid_overshoot_allowance'),
+      overshootAllowance: nonNegative('pid_overshoot_allowance'),
       resumeHysteresis: positive('pid_resume_hysteresis'),
     },
   }
@@ -67,5 +77,23 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
   if (config.pid.cycleSeconds < config.pid.minOnSeconds + config.pid.minOffSeconds) {
     throw new Error('PID 周期必须不小于最短开启与关闭时间之和')
   }
+  for (const [topic, value] of [
+    ['pid_cycle_time', config.pid.cycleSeconds],
+    ['pid_min_on_time', config.pid.minOnSeconds],
+    ['pid_min_off_time', config.pid.minOffSeconds],
+  ] as const) {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(`控制参数 ${topic} 必须是正整数秒`)
+    }
+  }
+  if (targetTemperature + config.pid.overshootAllowance >= maxSafeTemperature) {
+    throw new Error('PID 强制关热温度必须低于最高安全温度')
+  }
+  if (config.pid.resumeHysteresis >= targetTemperature) {
+    throw new Error('PID 恢复回差必须小于目标温度')
+  }
+  positive('command_timeout')
+  positive('data_timeout')
+  positive('pipe_inner_diameter')
   return config
 }

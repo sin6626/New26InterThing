@@ -39,6 +39,12 @@ export interface AutomationSnapshot {
   outletTemperature: number | null
   pid: PidSnapshot | null
   limitationReason: string | null
+  lastAction: {
+    topic: 'pump' | 'heater'
+    value: ActuatorValue
+    status: 'published' | 'blocked' | 'failed'
+    message: string
+  } | null
   waterFlow: WaterFlowSnapshot
 }
 

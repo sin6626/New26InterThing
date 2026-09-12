@@ -18,6 +18,7 @@ interface Dependencies {
   ): Promise<void>
   waterFlow: WaterFlowService
   emit(message: AutomationStatusMessage): void
+  disableMaster(deviceNumber: string, reason: string): Promise<void>
 }
 
 export const createAutomationManager = ({
@@ -26,21 +27,26 @@ export const createAutomationManager = ({
   execute,
   waterFlow,
   emit,
+  disableMaster,
 }: Dependencies) => {
-  const engines = new Map<string, AutomationEngine>()
+  let engine: AutomationEngine | undefined
+  let activeDeviceNumber: string | undefined
 
   const getEngine = (deviceNumber: string) => {
-    const existing = engines.get(deviceNumber)
-    if (existing) return existing
-    const engine = createAutomationEngine({
+    if (engine && activeDeviceNumber !== deviceNumber) {
+      throw new Error('系统只允许维护一台自动控制设备')
+    }
+    if (engine) return engine
+    activeDeviceNumber = deviceNumber
+    engine = createAutomationEngine({
       deviceNumber,
       clock,
       loadConfig,
       execute: (topic, value) => execute(deviceNumber, topic, value),
       getWaterFlow: () => waterFlow.getSnapshot(deviceNumber),
       emit,
+      disableMaster: reason => disableMaster(deviceNumber, reason),
     })
-    engines.set(deviceNumber, engine)
     return engine
   }
 
@@ -55,10 +61,10 @@ export const createAutomationManager = ({
       return getEngine(deviceNumber).handleReading(reading)
     },
     async tick() {
-      await Promise.all([...engines.values()].map(engine => engine.tick()))
+      await engine?.tick()
     },
     async close() {
-      await Promise.all([...engines.values()].map(engine => engine.close()))
+      await engine?.close()
     },
   }
 }

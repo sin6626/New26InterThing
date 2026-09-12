@@ -104,4 +104,74 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenLastCalledWith('pump', 'off')
     expect((await engine.getSnapshot()).state).toBe('stopped')
   })
+
+  it('keeps the requested heater state visible when the safety gate blocks publishing', async () => {
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn(async (topic, value) => {
+        if (topic === 'heater' && value === 'on') {
+          throw new Error('安全保护尚未完成，当前禁止人工开启加热')
+        }
+      }),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+    const snapshot = await engine.getSnapshot()
+
+    expect(snapshot.desiredHeater).toBe('on')
+    expect(snapshot.lastAction).toMatchObject({
+      topic: 'heater',
+      value: 'on',
+      status: 'blocked',
+    })
+  })
+
+  it('turns master off and records the reason when building flow times out', async () => {
+    let now = 1_000
+    const disableMaster = vi.fn()
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => now,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn(),
+      disableMaster,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.setEnabled(true)
+    now = 6_000
+    await engine.tick()
+
+    expect(disableMaster).toHaveBeenCalledWith('启动超时，未建立安全流量')
+    expect((await engine.getSnapshot()).enabled).toBe(false)
+  })
 })

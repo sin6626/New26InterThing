@@ -105,6 +105,12 @@ onMounted(() => void initialize())
         </div>
       </template>
       <el-descriptions :column="4" border>
+        <el-descriptions-item label="控温策略">
+          {{ automation?.temperatureStrategy ?? '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="目标温度">
+          {{ automation?.targetTemperature ?? '--' }} ℃
+        </el-descriptions-item>
         <el-descriptions-item label="水泵状态">
           实际 {{ automation?.actualPump ?? '--' }} / 期望 {{ automation?.desiredPump ?? '--' }}
         </el-descriptions-item>
@@ -139,6 +145,22 @@ onMounted(() => void initialize())
               清零
             </el-button>
           </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="PID 输出">
+          {{ automation?.pid?.outputPercent ?? '--' }} %
+        </el-descriptions-item>
+        <el-descriptions-item label="计划占空比">
+          {{ automation?.pid?.plannedDutyPercent ?? '--' }} %
+        </el-descriptions-item>
+        <el-descriptions-item label="PID 窗口剩余">
+          {{ automation?.pid?.windowRemainingSeconds ?? '--' }} 秒
+        </el-descriptions-item>
+        <el-descriptions-item label="最近动作">
+          <template v-if="automation?.lastAction">
+            {{ automation.lastAction.topic }}={{ automation.lastAction.value }}；
+            {{ automation.lastAction.message }}
+          </template>
+          <template v-else>--</template>
         </el-descriptions-item>
       </el-descriptions>
       <p v-if="automation?.limitationReason" class="mb-0 text-sm text-amber-600">

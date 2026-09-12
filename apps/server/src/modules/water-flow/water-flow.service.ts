@@ -13,7 +13,10 @@ interface Dependencies {
 }
 
 interface FlowState extends PersistedWaterFlow {
-  samples: Array<{ at: number, flow: number }>
+  samples: Array<{
+    at: number
+    flow: number
+  }>
   lastSavedAt: number
 }
 
@@ -54,9 +57,20 @@ export const createWaterFlowService = ({
     state: FlowState,
   ): Promise<WaterFlowSnapshot> => {
     const diameter = await loadPipeDiameter(deviceNumber)
-    const average = state.samples.length
-      ? state.samples.reduce((sum, item) => sum + item.flow, 0) / state.samples.length
-      : state.lastFlowRateLitersPerMinute
+    let average = state.lastFlowRateLitersPerMinute
+    if (state.samples.length > 1) {
+      let weightedFlow = 0
+      let totalMilliseconds = 0
+      for (let index = 1; index < state.samples.length; index += 1) {
+        const previous = state.samples[index - 1]
+        const current = state.samples[index]
+        if (!previous || !current) continue
+        const milliseconds = current.at - previous.at
+        weightedFlow += (previous.flow + current.flow) / 2 * milliseconds
+        totalMilliseconds += milliseconds
+      }
+      if (totalMilliseconds > 0) average = weightedFlow / totalMilliseconds
+    }
     return {
       deviceNumber,
       flowRateLitersPerMinute: Number(state.lastFlowRateLitersPerMinute.toFixed(3)),
