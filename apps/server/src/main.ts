@@ -6,6 +6,8 @@ import { createDatabasePool } from './infrastructure/database.js'
 import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
 import { createDeviceRepository } from './modules/device/device.repository.js'
+import { createBehaviorRepository } from './modules/behavior/behavior.mysql.js'
+import { createRecognitionService } from './modules/behavior/recognition.service.js'
 import { createFaultRepository } from './modules/fault/fault.mysql.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
@@ -15,10 +17,13 @@ import { createSensorHistoryRepository } from './modules/sensor-history/sensor-h
 const env = readEnv()
 const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
+const behaviorRepository = createBehaviorRepository(pool)
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
   faultRepository,
   sensorHistoryRepository: createSensorHistoryRepository(pool),
+  behaviorRepository,
+  recognitionService: createRecognitionService(behaviorRepository),
 })
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)

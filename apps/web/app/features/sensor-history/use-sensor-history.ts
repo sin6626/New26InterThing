@@ -21,6 +21,8 @@ export const useSensorHistory = () => {
   const page = reactive({ current: 1, size: 20 })
   const trendLimit = ref(10)
   const chartType = ref<'line' | 'bar' | 'scatter'>('line')
+  const selectedRows = ref<SensorHistoryItem[]>([])
+  const recognizing = ref(false)
 
   const requestFilters = computed(() => ({
     deviceNumber: filters.deviceNumber || undefined,
@@ -98,6 +100,20 @@ export const useSensorHistory = () => {
   const fieldValue = (row: unknown, field: SensorHistoryField) =>
     (row as SensorHistoryItem).fields[field.key] ?? '--'
 
+  const updateSelection = (selection: SensorHistoryItem[]) => { selectedRows.value = selection }
+  const recognize = async () => {
+    if (!selectedRows.value.length) { ElMessage.warning('请先勾选需要识别的历史数据'); return }
+    recognizing.value = true
+    try {
+      const result = await api.recognize(selectedRows.value.map(row => row.id))
+      ElMessage.success(result.message)
+      await navigateTo('/behaviors')
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+      ElMessage.error(message || (error instanceof Error ? error.message : '智能识别失败'))
+    } finally { recognizing.value = false }
+  }
+
   const initialize = async () => {
     loading.value = true
     try {
@@ -125,11 +141,14 @@ export const useSensorHistory = () => {
     options,
     page,
     reset,
+    recognize,
+    recognizing,
     rows,
     search,
     timeRange,
     total,
     trend,
     trendLimit,
+    updateSelection,
   }
 }

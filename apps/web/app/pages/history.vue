@@ -6,6 +6,7 @@ const {
   chartType, changeTrendLimit, errorMessage, fieldValue, filters, initialize,
   loadCurrentPage, loading, options, page, reset, rows, search, timeRange,
   total, trend, trendLimit,
+  recognize, recognizing, updateSelection,
 } = useSensorHistory()
 
 onMounted(() => void initialize())
@@ -57,10 +58,11 @@ onMounted(() => void initialize())
       <template #header>
         <div class="flex items-center justify-between">
           <span class="font-medium text-slate-800">历史记录</span>
-          <span class="text-sm text-slate-500">共 {{ total }} 条</span>
+          <div class="flex items-center gap-3"><el-button type="primary" :loading="recognizing" @click="recognize">智能识别</el-button><span class="text-sm text-slate-500">共 {{ total }} 条</span></div>
         </div>
       </template>
-      <el-table v-loading="loading" :data="rows" stripe>
+      <el-table v-loading="loading" :data="rows" stripe @selection-change="updateSelection">
+        <el-table-column type="selection" width="48" />
         <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="deviceNumber" label="设备编号" min-width="180" />
         <el-table-column v-for="field in options.fields" :key="field.key" :label="`${field.label}${field.unit ? ` (${field.unit})` : ''}`" min-width="130">

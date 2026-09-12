@@ -1,0 +1,12 @@
+{
+  "url": "",
+  "method": "POST",
+  "timeoutMs": 10000,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "requestTemplate": {
+    "rows": "$rows"
+  },
+  "responseDataPath": "data"
+}

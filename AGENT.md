@@ -13,7 +13,7 @@
 - 第二里程碑：MQTT `device/sensor` → 动态字段映射 → `t_sensor_data` → WebSocket `/ws` → 实时监控页。
 - 第三里程碑：独立 `sensor-history` 页面模块，提供动态历史表格、筛选分页和按分钟趋势图；不迁移识别按钮。已完成。
 - 第四里程碑：本地规则调用 `reportFault()` → `t_error_code_mapper` 中文映射 → `t_error_msg` → 全局右上角警告；故障页面保持纯 HTTP 查询。已完成基础记录能力，具体安全规则留在对应控制里程碑实现。
-- 第五里程碑：计划迁移 `device/behavior` → `t_behavior_field_mapper` 动态映射 → `t_behavior_data` → `behavior.realtime` → 行为实时与历史页面；不接入协议尚未明确的智能判定服务。
+- 第五里程碑：历史数据勾选 → 可配置 HTTP 智能识别 → `t_behavior_field_mapper` 动态映射 → `t_behavior_data` → 行为页面 HTTP 查询；不使用行为 MQTT 或 WebSocket。已完成。
 - 后续模块继续按页面纵向切片迁移，删除无用旧接口，不提前搭建通用框架。
 
 ## 开发约定
