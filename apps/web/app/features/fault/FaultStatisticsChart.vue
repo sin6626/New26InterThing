@@ -25,7 +25,7 @@ const render = () => {
       data: props.items.map((item) => ({ name: item.label, value: item.count })),
       label: { formatter: '{b}\n{c} 条' },
     }],
-  }, true)
+  }, false)
 }
 
 const resize = () => chart?.resize()

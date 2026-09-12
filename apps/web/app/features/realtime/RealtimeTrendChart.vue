@@ -109,7 +109,7 @@ const render = () => {
         width: 2,
       },
     })),
-  }, true)
+  }, false)
 }
 
 const resize = () => chart?.resize()

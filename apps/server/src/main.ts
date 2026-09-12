@@ -37,7 +37,11 @@ const sensorMqtt = createSensorMqtt({
   async onMessage(topic, payload) {
     const result = parseSensorMessage(topic, payload)
     if (!result.accepted) {
-      console.warn(`忽略 MQTT 消息：${result.reason}`)
+      console.warn('忽略 MQTT 消息', {
+        reason: result.reason,
+        topic,
+        payload: payload.toString('utf8'),
+      })
       return
     }
     await handleSensorReading(result.message)

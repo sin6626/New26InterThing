@@ -36,6 +36,9 @@ const deviceNumbers = computed(() => [...new Set([
   ...Object.keys(readings.value),
 ])])
 const currentReading = computed(() => readings.value[selectedDevice.value])
+const fieldLabels = computed(() => new Map(
+  trendOptions.value.fields.map(field => [field.key, field.label]),
+))
 
 watch(deviceNumbers, (numbers) => {
   if (!numbers.includes(selectedDevice.value)) {
@@ -99,7 +102,9 @@ onMounted(() => {
 
       <div v-if="currentReading && Object.keys(currentReading.fields).length" class="grid grid-cols-4 gap-4">
         <div v-for="(value, name) in currentReading.fields" :key="name" class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">{{ name }}</p>
+          <p class="m-0 text-sm text-slate-500">
+            {{ fieldLabels.get(name) || name }}
+          </p>
           <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
             {{ value ?? '--' }}
           </p>

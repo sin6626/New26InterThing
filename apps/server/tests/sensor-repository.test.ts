@@ -19,7 +19,7 @@ describe('sensor repository', () => {
     })).resolves.toEqual({
       deviceNumber: '202111',
       recordedAt: '2026-09-11 09:30:00',
-      fields: { 出水温度: 28.7 },
+      fields: { temp_out: 28.7 },
     })
     expect(query).toHaveBeenLastCalledWith(
       expect.stringContaining('insert into t_sensor_data (d_no, field1, field2, c_time, online, vstatus)'),

@@ -50,7 +50,7 @@ const render = () => {
       symbolSize: props.chartType === 'scatter' ? 8 : 5,
       smooth: props.chartType === 'line',
     })),
-  }, true)
+  }, false)
 }
 
 const resize = () => chart?.resize()

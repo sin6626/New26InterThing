@@ -54,7 +54,7 @@ export const createSensorRepository = (pool: Pool): SensorRepository => ({
       recordedAt: message.recordedAt,
       fields: Object.fromEntries(
         visibleMappings.map((mapping) => [
-          mapping.f_name,
+          mapping.p_name,
           message.values[mapping.p_name] ?? null,
         ]),
       ),
