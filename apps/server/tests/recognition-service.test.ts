@@ -6,6 +6,8 @@ import { createRecognitionAdapter } from '../src/modules/behavior/recognition.ad
 import { createRecognitionService } from '../src/modules/behavior/recognition.service.js'
 
 const configPath = path.resolve(process.cwd(), 'tests/fixtures/recognition.json')
+const emptyConfigPath = path.resolve(process.cwd(), 'tests/fixtures/recognition-empty.json')
+const invalidConfigPath = path.resolve(process.cwd(), 'tests/fixtures/recognition-invalid.json')
 
 describe('recognition service', () => {
   it('loads selected rows, applies offline config, and saves the mapped result once', async () => {
@@ -40,5 +42,11 @@ describe('recognition service', () => {
 
     const wrongPath = createRecognitionAdapter({ configPath, fetchImpl: vi.fn().mockResolvedValue(new Response(JSON.stringify({ result: {} }), { status: 200 })) })
     await expect(wrongPath.recognize(row)).rejects.toThrow('responseDataPath')
+  })
+
+  it('gives actionable Chinese errors for an empty URL or broken JSON', async () => {
+    const row = [{ deviceNumber: '202111', recordedAt: null, pressure: 12 }]
+    await expect(createRecognitionAdapter({ configPath: emptyConfigPath }).recognize(row)).rejects.toThrow('智能识别接口尚未配置')
+    await expect(createRecognitionAdapter({ configPath: invalidConfigPath }).recognize(row)).rejects.toThrow('无法读取智能识别配置')
   })
 })

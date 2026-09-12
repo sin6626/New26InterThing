@@ -3,11 +3,7 @@
   "method": "POST",
   "bodyType": "json",
   "timeoutMs": 10000,
-  "headers": {
-    "Content-Type": "application/json"
-  },
-  "requestTemplate": {
-    "rows": "$rows"
-  },
+  "headers": { "Content-Type": "application/json" },
+  "requestTemplate": { "rows": "$rows" },
   "responseDataPath": "data"
 }

@@ -32,4 +32,16 @@ describe('behavior repository', () => {
     await expect(repository.getRecognitionRows([3])).resolves.toEqual([{ deviceNumber: '202111', recordedAt: '2026-09-12 10:00:00', pressure: '12' }])
     expect(query.mock.calls[1][0]).toContain('order by c_time, id')
   })
+
+  it('lists only visible behavior fields and converts configured numbers', async () => {
+    const query = vi.fn().mockResolvedValueOnce([mappings]).mockResolvedValueOnce([[{ total: 1 }]]).mockResolvedValueOnce([[
+      { id: 8, d_no: '202111', field2: '12', c_time: '2026-09-12 11:00:00' },
+    ]])
+    const repository = createBehaviorRepository({ query } as never)
+    await expect(repository.list({ page: 1, pageSize: 20 })).resolves.toEqual({
+      total: 1,
+      items: [{ id: 8, deviceNumber: '202111', fields: { action: '12' }, recordedAt: '2026-09-12 11:00:00' }],
+    })
+    expect(query.mock.calls[2][0]).not.toContain('remarks')
+  })
 })

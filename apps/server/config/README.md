@@ -20,4 +20,4 @@
 
 配置或映射错误时接口会返回具体中文原因，并且不会写入 `t_behavior_data`。
 
-当前离线适配器支持带 JSON 请求体的 `POST`、`PUT`、`PATCH`。如果赛方文档要求 GET、文件上传或其他非 JSON 协议，应在比赛前修改 `recognition.adapter.ts`，不能只改配置后强行调用。
+`bodyType` 支持 `json`、`form`、`query` 和 `none`；HTTP 方法支持 `GET`、`POST`、`PUT`、`PATCH`。GET 必须配合 `query` 或 `none`。如果赛方要求文件上传等二进制协议，应根据现场文档修改集中隔离的 `recognition.adapter.ts`，不需要改业务服务或页面。

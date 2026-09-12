@@ -1,6 +1,7 @@
 {
   "url": "http://127.0.0.1:9000/infer",
   "method": "POST",
+  "bodyType": "json",
   "timeoutMs": 10000,
   "headers": { "Content-Type": "application/json" },
   "requestTemplate": { "samples": "$rows", "count": "$selectedCount" },
