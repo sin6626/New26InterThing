@@ -53,6 +53,9 @@ export const createSensorFreshness = (clock: () => number) => {
     value(key: SensorKey) {
       return facts[key].value
     },
+    invalidate(key: SensorKey) {
+      facts[key].invalid = true
+    },
     isFresh,
     status(key: SensorKey, timeoutSeconds?: number): SensorSafetyStatus {
       const fact = facts[key]

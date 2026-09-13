@@ -18,18 +18,10 @@ type DeviceControlAction = {
 
 export interface AutomationModeController {
   setEnabled(deviceNumber: string, enabled: boolean): Promise<unknown>
-  authorizeAction?(
+  executeAction?(
     deviceNumber: string,
     action: DeviceControlAction,
-  ): Promise<{ allowed: boolean, reason: string | null }>
-  recordCommand?(
-    deviceNumber: string,
-    action: DeviceControlAction,
-  ): void
-  recordCommandFailure?(
-    deviceNumber: string,
-    action: DeviceControlAction,
-    message: string,
+    publish: () => Promise<void>,
   ): Promise<void>
 }
 
@@ -117,16 +109,8 @@ export const createControlService = (
         }
       : null
     if (!trustedAutomation && action) {
-      if (!automation?.authorizeAction) {
+      if (!automation?.executeAction) {
         throw new ControlError('安全控制服务尚未初始化', 503)
-      }
-      const authorization = await automation.authorizeAction(intent.deviceNumber, action)
-      if (!authorization.allowed) {
-        throw new ControlError(
-          authorization.reason || '安全条件不满足',
-          409,
-          'SAFETY_BLOCKED',
-        )
       }
     }
     if (definition.topic === 'master') {
@@ -151,27 +135,27 @@ export const createControlService = (
         value,
       })
       try {
-        await publisher.publish(envelope.topic, envelope.payload)
+        const publish = () => publisher.publish(envelope.topic, envelope.payload)
+        if (!trustedAutomation && action) {
+          await automation!.executeAction!(intent.deviceNumber, action, publish)
+        }
+        else await publish()
       }
       catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        if (!trustedAutomation && action) {
-          await Promise.resolve(automation?.recordCommandFailure?.(
-            intent.deviceNumber,
-            action,
-            message,
-          )).catch(() => undefined)
-        }
         await Promise.resolve(repository.saveFailure(
           definition,
           intent.deviceNumber,
           value,
           `应用层下发失败：${message}`,
         )).catch(() => undefined)
-        throw new ControlError(message, 503)
-      }
-      if (!trustedAutomation && action) {
-        automation?.recordCommand?.(intent.deviceNumber, action)
+        const status = error
+          && typeof error === 'object'
+          && 'status' in error
+          && typeof error.status === 'number'
+          ? error.status
+          : 503
+        throw new ControlError(message, status)
       }
     }
 

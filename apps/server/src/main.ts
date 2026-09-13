@@ -44,14 +44,8 @@ const controlService = createControlService(controlRepository, {
   setEnabled: (deviceNumber, enabled) => (
     automationManager.setEnabled(deviceNumber, enabled)
   ),
-  authorizeAction: (deviceNumber, action) => (
-    automationManager.authorizeAction(deviceNumber, action)
-  ),
-  recordCommand: (deviceNumber, action) => {
-    automationManager.recordCommand(deviceNumber, action)
-  },
-  recordCommandFailure: (deviceNumber, action, message) => (
-    automationManager.recordCommandFailure(deviceNumber, action, message)
+  executeAction: (deviceNumber, action, publish) => (
+    automationManager.executeAction(deviceNumber, action, publish)
   ),
 })
 const waterFlowService = createWaterFlowService({

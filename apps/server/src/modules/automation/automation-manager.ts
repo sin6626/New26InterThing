@@ -80,6 +80,13 @@ export const createAutomationManager = ({
     authorizeAction(deviceNumber: string, action: SafetyAction) {
       return getEngine(deviceNumber).authorizeAction(action)
     },
+    executeAction(
+      deviceNumber: string,
+      action: SafetyAction,
+      publish: () => Promise<void>,
+    ) {
+      return getEngine(deviceNumber).executeManualAction(action, publish)
+    },
     recordCommand(deviceNumber: string, action: SafetyAction) {
       getEngine(deviceNumber).recordCommand(action)
     },

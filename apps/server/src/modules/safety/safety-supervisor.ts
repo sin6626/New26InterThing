@@ -41,10 +41,39 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let lastEffectiveHeatingAt: number | null = null
   let observedManualPumpStartedAt: number | null = null
   let manualFlowEstablished = false
+  let flowZeroSince: number | null = null
+  let pressureZeroSince: number | null = null
 
   const isFresh = (key: SensorKey, context: SafetyContext) => (
     sensors.isFresh(key, context.config.dataTimeoutSeconds)
   )
+
+  const refreshActiveZeroObservations = (context: SafetyContext) => {
+    const hydraulicallyActive = context.state === 'building-flow'
+      || context.state === 'running'
+      || context.state === 'cooling'
+      || context.desiredPump === 'on'
+      || context.desiredHeater === 'on'
+      || latestReading?.actualPump === 'on'
+      || latestReading?.actualHeater === 'on'
+    if (!hydraulicallyActive) {
+      flowZeroSince = null
+      pressureZeroSince = null
+      return
+    }
+    const now = clock()
+    if (sensors.value('flow') === 0) flowZeroSince ??= now
+    else flowZeroSince = null
+    if (sensors.value('pressure') === 0) pressureZeroSince ??= now
+    else pressureZeroSince = null
+    const timeoutMilliseconds = context.config.dataTimeoutSeconds * 1_000
+    if (flowZeroSince !== null && now - flowZeroSince >= timeoutMilliseconds) {
+      sensors.invalidate('flow')
+    }
+    if (pressureZeroSince !== null && now - pressureZeroSince >= timeoutMilliseconds) {
+      sensors.invalidate('pressure')
+    }
+  }
 
   const upgradeLockedProtection = (context: SafetyContext) => {
     if (!lockedDecision || lockedDecision.stopPump) return lockedDecision
@@ -99,8 +128,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return null
   }
 
-  const evaluateTimedRules = (context: SafetyContext): SafetyDecision | null => {
-    if (lockedDecision) return lockedDecision
+  const evaluateInitialBuildTimeouts = (context: SafetyContext) => {
     const now = clock()
     if (context.state === 'building-flow' && context.stateEnteredAt !== undefined) {
       if (now - context.stateEnteredAt >= context.config.buildFlowTimeoutSeconds * 1_000) {
@@ -114,6 +142,14 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       && (sensors.value('flow') ?? 0) < context.config.minSafeFlow
       && now - context.manualPumpStartedAt >= context.config.buildFlowTimeoutSeconds * 1_000
     ) return latch('PUMP_IDLING')
+    return null
+  }
+
+  const evaluateTimedRules = (context: SafetyContext): SafetyDecision | null => {
+    if (lockedDecision) return lockedDecision
+    const now = clock()
+    const buildDecision = evaluateInitialBuildTimeouts(context)
+    if (buildDecision) return buildDecision
     if (!active(context)) return null
     if (!isFresh('pressure', context)) return latch('SENSOR_PRESSURE_TIMEOUT')
     if (!isFresh('flow', context)) return latch('SENSOR_FLOW_TIMEOUT')
@@ -208,6 +244,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       sensors.update('pressure', reading.pressure, reading.recordedAt)
       sensors.update('inletTemperature', reading.inletTemperature, reading.recordedAt, true)
       sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt, true)
+      refreshActiveZeroObservations(context)
       if (context.manualPumpStartedAt !== observedManualPumpStartedAt) {
         observedManualPumpStartedAt = context.manualPumpStartedAt ?? null
         manualFlowEstablished = false
@@ -234,6 +271,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
           detail: detailWithConcurrentFacts('OVER_PRESSURE', reading, context),
         })
       }
+      const buildDecision = evaluateInitialBuildTimeouts(context)
+      if (buildDecision) return buildDecision
       const missingHydraulicSensorDecision = evaluateRequiredSensors(
         reading,
         context,
@@ -342,6 +381,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
 
     tick(context: SafetyContext): SafetyDecision | null {
       latestContext = context
+      refreshActiveZeroObservations(context)
       if (lockedDecision) return upgradeLockedProtection(context)
       if (latestReading) {
         const missingSensorDecision = evaluateRequiredSensors(latestReading, context)
@@ -411,6 +451,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       heatingBaseline = null
       observedManualPumpStartedAt = null
       manualFlowEstablished = false
+      flowZeroSince = null
+      pressureZeroSince = null
     },
 
     getSnapshot(): SafetySnapshot {

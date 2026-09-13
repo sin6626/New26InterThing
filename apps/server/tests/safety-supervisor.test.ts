@@ -356,6 +356,30 @@ describe('safety supervisor', () => {
     })
   })
 
+  it('treats sustained zero pressure as invalid only during active control', () => {
+    let now = 1_000
+    const activeSupervisor = createSafetySupervisor(() => now)
+    activeSupervisor.handleReading({
+      ...reading(now),
+      pressure: 0,
+    }, context())
+    now = 4_000
+    expect(activeSupervisor.tick(context())).toMatchObject({
+      faultCode: 'SENSOR_PRESSURE_TIMEOUT',
+    })
+
+    const stoppedSupervisor = createSafetySupervisor(() => now)
+    stoppedSupervisor.handleReading({
+      ...reading(now),
+      pressure: 0,
+      actualPump: 'off',
+    }, context({ state: 'stopped', desiredPump: 'off' }))
+    now = 8_000
+    expect(stoppedSupervisor.tick(
+      context({ state: 'stopped', desiredPump: 'off' }),
+    )).toBeNull()
+  })
+
   it('keeps the last valid sensor fact when a partial message omits the field', () => {
     let now = 1_000
     const supervisor = createSafetySupervisor(() => now)

@@ -358,6 +358,40 @@ export const createAutomationEngine = ({
       })
     },
 
+    executeManualAction(
+      action: SafetyAction,
+      publish: () => Promise<void>,
+    ) {
+      return serialize(async () => {
+        if (!config) await loadCheckedConfig()
+        if (latestReading) {
+          const decision = safetyBridge.evaluateReading(latestReading)
+          if (decision) await applySafetyDecision(decision)
+        }
+        const authorization = safetyBridge.authorize(action, 'manual')
+        if (!authorization.allowed) {
+          throw new AutomationError(authorization.reason || '安全条件不满足')
+        }
+        try {
+          await publish()
+        }
+        catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          await applySafetyDecision(safety.trip(
+            'COMMAND_PUBLISH_FAILED',
+            `${action.topic}=${action.value} 指令发布失败：${message}`,
+          ))
+          await notify()
+          throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
+        }
+        actuator.adoptPublished(action.topic, action.value)
+        if (action.topic === 'pump') {
+          manualPumpStartedAt = action.value === 'on' ? clock() : null
+        }
+        await notify()
+      })
+    },
+
     recordCommand(action: SafetyAction) {
       actuator.adoptPublished(action.topic, action.value)
       if (action.topic === 'pump') {
