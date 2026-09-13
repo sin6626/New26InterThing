@@ -698,6 +698,82 @@ describe('automation engine', () => {
     })
   })
 
+  it('withdraws manually requested heating on the first unsafe-flow reading', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+    engine.recordCommand({ topic: 'heater', value: 'on' })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0.2,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(execute).toHaveBeenCalledWith('heater', 'off')
+  })
+
+  it('does not let pending fault persistence block the protection operation', async () => {
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn().mockResolvedValue(undefined),
+      reportFault: vi.fn(() => new Promise<void>(() => {})),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 45,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(await engine.getSnapshot()).toMatchObject({ state: 'fault' })
+  })
+
   it('keeps a locked fault when the failed command is heater off', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     let failHeaterOff = false

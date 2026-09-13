@@ -54,4 +54,14 @@ describe('automation reading normalization', () => {
     expect(Number.isNaN(normalized.pressure)).toBe(true)
     expect(normalized.flowRate).toBeNull()
   })
+
+  it('treats empty and whitespace-only sensor values as invalid', () => {
+    const normalized = normalizeAutomationReading({
+      pressure: '',
+      flow_rate: '   ',
+    }, 4_000)
+
+    expect(Number.isNaN(normalized.pressure)).toBe(true)
+    expect(Number.isNaN(normalized.flowRate)).toBe(true)
+  })
 })

@@ -4,6 +4,7 @@ type SensorValues = Record<string, string | number | null>
 
 const numeric = (value: unknown) => {
   if (value === null || value === undefined) return null
+  if (typeof value === 'string' && value.trim() === '') return Number.NaN
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : Number.NaN
 }

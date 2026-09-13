@@ -88,17 +88,20 @@ export const createAutomationProtection = ({
         }
       }
       if (firstEntry) {
-        await Promise.resolve(disableMaster(decision.detail)).catch(() => undefined)
+        void Promise.resolve(disableMaster(decision.detail)).catch(() => undefined)
       }
       if (reportedFaultCode !== decision.faultCode) {
         reportedFaultCode = decision.faultCode
         faultRecorded = false
         faultRecordError = null
-        await Promise.resolve(reportFault(decision.faultCode, decision.detail)).catch((error) => {
-          faultRecordError = error instanceof Error ? error.message : String(error)
-          setLimitation(`${decision.detail}；故障记录失败：${faultRecordError}`)
-        })
-        if (faultRecordError === null) faultRecorded = true
+        void Promise.resolve(reportFault(decision.faultCode, decision.detail))
+          .then(() => {
+            faultRecorded = true
+          })
+          .catch((error) => {
+            faultRecordError = error instanceof Error ? error.message : String(error)
+            setLimitation(`${decision.detail}；故障记录失败：${faultRecordError}`)
+          })
       }
     },
     async stopPumpAfterCooling() {

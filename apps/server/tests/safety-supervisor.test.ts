@@ -149,6 +149,35 @@ describe('safety supervisor', () => {
     })
   })
 
+  it('upgrades cooling protection on tick when hydraulic facts expire', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    supervisor.handleReading({
+      ...reading(now),
+      outletTemperature: 45,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))
+    now = 4_001
+
+    expect(supervisor.tick(context({ state: 'fault' }))).toMatchObject({
+      faultCode: 'OVER_TEMPERATURE',
+      stopPump: true,
+    })
+  })
+
+  it('stops the pump for cooling low flow even when temperature is invalid', () => {
+    const supervisor = createSafetySupervisor(() => 1_000)
+
+    expect(supervisor.handleReading({
+      ...reading(),
+      flowRate: 0,
+      inletTemperature: Number.NaN,
+    }, context({ state: 'cooling' }))).toMatchObject({
+      faultCode: 'LOW_FLOW',
+      stopPump: true,
+    })
+  })
+
   it('prioritizes actual over-pressure over a simultaneous invalid temperature', () => {
     const supervisor = createSafetySupervisor(() => 1_000)
 

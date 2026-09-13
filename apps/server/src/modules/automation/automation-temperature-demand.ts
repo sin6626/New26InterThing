@@ -64,7 +64,12 @@ export const createAutomationTemperatureDemand = ({
       config: AutomationConfig | null,
       outletTemperature: number | null,
     ) {
-      if (state !== 'running' || !config || outletTemperature === null) return
+      if (!config) return
+      if (state !== 'running') {
+        if (getDesiredHeater() === 'on') await publishAuthorized('on')
+        return
+      }
+      if (outletTemperature === null) return
       if (config.strategy === 'pid') {
         pid = controller.update(
           outletTemperature,
