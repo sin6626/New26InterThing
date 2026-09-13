@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { useRealtimeSocket } from '~/features/realtime/use-realtime-socket'
-import RealtimeTrendChart from '~/features/realtime/RealtimeTrendChart.vue'
-import { useRealtimeTrends } from '~/features/realtime/use-realtime-trends'
+import RealtimeSensorPanel from '~/features/realtime/RealtimeSensorPanel.vue'
+import RealtimeStatusCards from '~/features/realtime/RealtimeStatusCards.vue'
+import RealtimeTrendsPanel from '~/features/realtime/RealtimeTrendsPanel.vue'
+import WaterFlowMetricsPanel from '~/features/realtime/WaterFlowMetricsPanel.vue'
 import { useAutomation } from '~/features/control/use-automation'
+import { useRealtimeSocket } from '~/features/realtime/use-realtime-socket'
+import { useRealtimeTrends } from '~/features/realtime/use-realtime-trends'
 
+const selectedDevice = ref('')
 const {
   connectionGeneration,
   mqttConnected,
@@ -11,7 +15,6 @@ const {
   socketStatus,
   trendPoints,
 } = useRealtimeSocket()
-const selectedDevice = ref('')
 
 const {
   loading: metricsLoading,
@@ -31,8 +34,8 @@ const {
   latestReading,
   loading: trendLoading,
   options: trendOptions,
-  temperatureTrend,
   temperatureEmptyDescription,
+  temperatureTrend,
   windowSize,
 } = useRealtimeTrends(
   selectedDevice,
@@ -49,9 +52,6 @@ const currentReading = computed(() => (
   realtimeReading.value
   || latestReading.value
 ))
-const fieldLabels = computed(() => new Map(
-  trendOptions.value.fields.map(field => [field.key, field.label]),
-))
 
 watch(deviceNumbers, (numbers) => {
   if (!numbers.includes(selectedDevice.value)) {
@@ -59,209 +59,67 @@ watch(deviceNumbers, (numbers) => {
   }
 }, { immediate: true })
 
-const socketLabels = {
-  connecting: '连接中',
-  connected: '已连接',
-  disconnected: '已断开',
-} as const
-
 onMounted(() => {
   void initializeTrends()
 })
 </script>
 
 <template>
-  <!-- 首页就是实时监控页面 -->
   <div class="mx-auto max-w-[1500px] space-y-5">
-    <div class="flex items-end justify-between gap-4">
+    <header class="flex items-end justify-between gap-4">
       <div>
         <h1 class="m-0 text-2xl font-semibold text-slate-900">实时监控</h1>
-        <p class="mt-2 mb-0 text-sm text-slate-500">查看 MQTT 设备最新上传的传感器数据</p>
+        <p class="mt-2 mb-0 text-sm text-slate-500">
+          查看 MQTT 设备最新上传的传感器数据
+        </p>
       </div>
-      <el-select v-model="selectedDevice" placeholder="等待设备数据" class="w-56" :disabled="deviceNumbers.length === 0">
-        <el-option v-for="deviceNo in deviceNumbers" :key="deviceNo" :label="deviceNo" :value="deviceNo" />
+      <el-select
+        v-model="selectedDevice"
+        placeholder="等待设备数据"
+        class="w-56"
+        :disabled="deviceNumbers.length === 0"
+      >
+        <el-option
+          v-for="deviceNumber in deviceNumbers"
+          :key="deviceNumber"
+          :label="deviceNumber"
+          :value="deviceNumber"
+        />
       </el-select>
-    </div>
+    </header>
 
-    <div class="grid grid-cols-3 gap-4">
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p class="m-0 text-sm text-slate-500">MQTT 服务</p>
-        <p class="mt-3 mb-0 text-lg font-semibold" :class="mqttConnected ? 'text-emerald-600' : 'text-slate-400'">
-          {{ mqttConnected ? '已连接' : '未连接' }}
-        </p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p class="m-0 text-sm text-slate-500">实时通道</p>
-        <p class="mt-3 mb-0 text-lg font-semibold" :class="socketStatus === 'connected' ? 'text-emerald-600' : 'text-amber-500'">
-          {{ socketLabels[socketStatus] }}
-        </p>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p class="m-0 text-sm text-slate-500">最新数据时间</p>
-        <p class="mt-3 mb-0 text-lg font-semibold text-slate-800">
-          {{ currentReading?.recordedAt || '--' }}
-        </p>
-      </div>
-    </div>
-
-    <section class="min-h-80 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div class="mb-5 flex items-center justify-between">
-        <div>
-          <h2 class="m-0 text-lg font-semibold text-slate-900">传感器数据</h2>
-          <p class="mt-1 mb-0 text-sm text-slate-500">设备编号：{{ selectedDevice || '--' }}</p>
-        </div>
-        <el-tag v-if="currentReading" type="success" effect="light">
-          {{ realtimeReading ? '实时更新' : '最近记录' }}
-        </el-tag>
-      </div>
-
-      <div v-if="currentReading && Object.keys(currentReading.fields).length" class="grid grid-cols-4 gap-4">
-        <div v-for="(value, name) in currentReading.fields" :key="name" class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">
-            {{ fieldLabels.get(name) || name }}
-          </p>
-          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-            {{ value ?? '--' }}
-          </p>
-        </div>
-      </div>
-      <el-empty v-else description="等待设备上传传感器数据" />
-    </section>
-
-    <section
-      v-loading="metricsLoading"
-      class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-    >
-      <div class="mb-5 flex items-center justify-between">
-        <div>
-          <h2 class="m-0 text-lg font-semibold text-slate-900">水循环运行指标</h2>
-          <p class="mt-1 mb-0 text-sm text-slate-500">
-            根据实时流量计算，累计结果在后端持久化
-          </p>
-        </div>
-        <el-button
-          :loading="resettingWaterFlow"
-          :disabled="!selectedDevice"
-          @click="resetWaterFlow"
-        >
-          清零累计水量
-        </el-button>
-      </div>
-
-      <div class="grid grid-cols-4 gap-4">
-        <div class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">瞬时流量</p>
-          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-            {{ automation?.waterFlow.flowRateLitersPerMinute ?? '--' }}
-            <span class="text-sm font-normal text-slate-500">L/min</span>
-          </p>
-        </div>
-        <div class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">一分钟平均流量</p>
-          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-            {{ automation?.waterFlow.averageFlowOneMinute ?? '--' }}
-            <span class="text-sm font-normal text-slate-500">L/min</span>
-          </p>
-        </div>
-        <div class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">管内流速</p>
-          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-            {{ automation?.waterFlow.flowVelocityMetersPerSecond ?? '--' }}
-            <span class="text-sm font-normal text-slate-500">m/s</span>
-          </p>
-          <p
-            v-if="automation?.waterFlow.velocityStatus === 'unconfigured'"
-            class="mt-2 mb-0 text-xs text-amber-600"
-          >
-            请先配置管道内径
-          </p>
-        </div>
-        <div class="rounded-lg bg-slate-50 p-5">
-          <p class="m-0 text-sm text-slate-500">累计水量</p>
-          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-            {{ automation?.waterFlow.totalVolumeLiters ?? '--' }}
-            <span class="text-sm font-normal text-slate-500">L</span>
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <el-alert
-      v-if="errorMessage"
-      :title="errorMessage"
-      type="warning"
-      show-icon
-      :closable="false"
+    <RealtimeStatusCards
+      :mqtt-connected="mqttConnected"
+      :socket-status="socketStatus"
+      :latest-recorded-at="currentReading?.recordedAt"
     />
 
-    <section class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="m-0 text-lg font-semibold text-slate-900">传感器实时趋势</h2>
-          <p class="mt-1 mb-0 text-sm text-slate-500">
-            历史数据补充初始窗口，WebSocket 持续更新当前分钟
-          </p>
-        </div>
-        <div class="flex gap-3">
-          <el-select
-            v-model="windowSize"
-            style="width: 130px"
-            @change="changeWindowSize"
-          >
-            <el-option label="最近 30 点" :value="30" />
-            <el-option label="最近 60 点" :value="60" />
-            <el-option label="最近 120 点" :value="120" />
-          </el-select>
-          <el-select v-model="chartType" style="width: 110px">
-            <el-option label="折线图" value="line" />
-            <el-option label="柱状图" value="bar" />
-            <el-option label="散点图" value="scatter" />
-          </el-select>
-        </div>
-      </div>
+    <RealtimeSensorPanel
+      :device-number="selectedDevice"
+      :fields="trendOptions.fields"
+      :reading="currentReading"
+      :realtime="Boolean(realtimeReading)"
+    />
 
-      <el-card
-        v-loading="trendLoading"
-        shadow="never"
-        class="rounded-xl border-slate-200"
-      >
-        <RealtimeTrendChart
-          title="全部传感器趋势"
-          :trend="allTrend"
-          :chart-type="chartType"
-          empty-description="暂无传感器趋势数据"
-        />
-      </el-card>
+    <WaterFlowMetricsPanel
+      :snapshot="automation?.waterFlow"
+      :loading="metricsLoading"
+      :resetting="resettingWaterFlow"
+      :disabled="!selectedDevice"
+      @reset="resetWaterFlow"
+    />
 
-      <div class="grid grid-cols-2 gap-4">
-        <el-card
-          v-loading="trendLoading"
-          shadow="never"
-          class="min-w-0 rounded-xl border-slate-200"
-        >
-          <RealtimeTrendChart
-            title="温度趋势"
-            :trend="temperatureTrend"
-            :chart-type="chartType"
-            :empty-description="temperatureEmptyDescription"
-            compact
-          />
-        </el-card>
-
-        <el-card
-          v-loading="trendLoading"
-          shadow="never"
-          class="min-w-0 rounded-xl border-slate-200"
-        >
-          <RealtimeTrendChart
-            title="流量趋势"
-            :trend="flowTrend"
-            :chart-type="chartType"
-            :empty-description="flowEmptyDescription"
-            compact
-          />
-        </el-card>
-      </div>
-    </section>
+    <RealtimeTrendsPanel
+      v-model:chart-type="chartType"
+      v-model:window-size="windowSize"
+      :all-trend="allTrend"
+      :error-message="errorMessage"
+      :flow-empty-description="flowEmptyDescription"
+      :flow-trend="flowTrend"
+      :loading="trendLoading"
+      :temperature-empty-description="temperatureEmptyDescription"
+      :temperature-trend="temperatureTrend"
+      @change-window="changeWindowSize"
+    />
   </div>
 </template>
