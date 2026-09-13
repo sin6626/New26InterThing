@@ -51,6 +51,8 @@ export interface SafetyAuthorization {
   reason: string | null
 }
 
+export type SafetyActionSource = 'manual' | 'automation'
+
 export interface SafetyDecision {
   faultCode: SafetyFaultCode
   detail: string

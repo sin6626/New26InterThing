@@ -11,19 +11,24 @@ export interface CommandPublisher {
   publish(topic: string, payload: Record<string, unknown>): Promise<void>
 }
 
+type DeviceControlAction = {
+  topic: 'pump' | 'heater'
+  value: 'on' | 'off'
+}
+
 export interface AutomationModeController {
   setEnabled(deviceNumber: string, enabled: boolean): Promise<unknown>
   authorizeAction?(
     deviceNumber: string,
-    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+    action: DeviceControlAction,
   ): Promise<{ allowed: boolean, reason: string | null }>
   recordCommand?(
     deviceNumber: string,
-    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+    action: DeviceControlAction,
   ): void
   recordCommandFailure?(
     deviceNumber: string,
-    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+    action: DeviceControlAction,
     message: string,
   ): Promise<void>
 }
@@ -150,7 +155,6 @@ export const createControlService = (
       }
       catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        await repository.saveFailure(definition, intent.deviceNumber, value, `应用层下发失败：${message}`)
         if (!trustedAutomation && action) {
           await Promise.resolve(automation?.recordCommandFailure?.(
             intent.deviceNumber,
@@ -158,6 +162,12 @@ export const createControlService = (
             message,
           )).catch(() => undefined)
         }
+        await Promise.resolve(repository.saveFailure(
+          definition,
+          intent.deviceNumber,
+          value,
+          `应用层下发失败：${message}`,
+        )).catch(() => undefined)
         throw new ControlError(message, 503)
       }
       if (!trustedAutomation && action) {

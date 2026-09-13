@@ -3,7 +3,10 @@ import type {
   AutomationState,
 } from '@new26interthing/shared'
 
-import type { SafetyAction } from '../safety/safety.types.js'
+import type {
+  SafetyAction,
+  SafetyActionSource,
+} from '../safety/safety.types.js'
 import type { SafetySupervisor } from '../safety/safety-supervisor.js'
 import type {
   AutomationConfig,
@@ -70,8 +73,8 @@ export const createAutomationSafetyBridge = ({
     tick() {
       return safety.tick(context())
     },
-    authorize(action: SafetyAction) {
-      return safety.authorize(action, context())
+    authorize(action: SafetyAction, source: SafetyActionSource = 'automation') {
+      return safety.authorize(action, context(), source)
     },
     canReset() {
       return safety.canReset(context())

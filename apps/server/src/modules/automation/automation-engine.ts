@@ -62,6 +62,7 @@ export const createAutomationEngine = ({
   let latestReading: AutomationReading | null = null
   let operationTail = Promise.resolve()
   let manualPumpStartedAt: number | null = null
+  let readingGeneration = 0
 
   const safetyBridge = createAutomationSafetyBridge({
     safety,
@@ -86,6 +87,8 @@ export const createAutomationEngine = ({
     clock,
     actuator,
     getState: () => state,
+    getActualPump: () => actualPump,
+    getActualHeater: () => actualHeater,
     getCoolingDelaySeconds: () => config?.coolingDelaySeconds ?? 0,
     enterFault(detail) {
       enabled = false
@@ -155,6 +158,23 @@ export const createAutomationEngine = ({
     await protection.apply(decision)
   }
 
+  const loadCheckedConfig = async () => {
+    try {
+      const loaded = await loadConfig()
+      config = loaded
+      configFingerprint = JSON.stringify(loaded)
+      return loaded
+    }
+    catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      await applySafetyDecision(safety.trip(
+        'CONTROL_CONFIG_INVALID',
+        `控制配置无效：${detail}`,
+      ))
+      throw new AutomationError(`控制配置无效：${detail}`)
+    }
+  }
+
   const updateTemperatureDemand = () => temperatureDemand.update(
     state,
     config,
@@ -165,17 +185,7 @@ export const createAutomationEngine = ({
     setEnabled(nextEnabled: boolean) {
       return serialize(async () => {
         if (enabled === nextEnabled) return getSnapshot()
-        try {
-          config = await loadConfig()
-        }
-        catch (error) {
-          const detail = error instanceof Error ? error.message : String(error)
-          await applySafetyDecision(safety.trip(
-            'CONTROL_CONFIG_INVALID',
-            `控制配置无效：${detail}`,
-          ))
-          throw new AutomationError(`控制配置无效：${detail}`)
-        }
+        config = await loadCheckedConfig()
         if (nextEnabled) {
           if (safety.getSnapshot().locked) {
             throw new AutomationError(safety.getSnapshot().detail || '故障已锁定，无法启动自动模式')
@@ -203,12 +213,18 @@ export const createAutomationEngine = ({
             await applySafetyDecision(initialDecision)
             throw new AutomationError(initialDecision.detail)
           }
-          configFingerprint = JSON.stringify(config)
           enabled = true
           state = 'building-flow'
           enteredAt = clock()
           limitationReason = '等待设备建流'
-          await actuator.run('pump', 'on')
+          try {
+            await actuator.run('pump', 'on')
+          }
+          catch (error) {
+            await handleDemandFailure(error)
+            await notify()
+            throw new AutomationError(error instanceof Error ? error.message : String(error))
+          }
         }
         else {
           enabled = false
@@ -220,10 +236,9 @@ export const createAutomationEngine = ({
           }
           catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            limitationReason = message
-            await disableMaster(message)
+            await handleDemandFailure(error)
             await notify()
-            throw error
+            throw new AutomationError(message)
           }
         }
         await notify()
@@ -232,18 +247,26 @@ export const createAutomationEngine = ({
     },
 
     handleReading(reading: AutomationReading) {
+      readingGeneration += 1
       return serialize(async () => {
         latestReading = reading
         actualPump = reading.actualPump
         actualHeater = reading.actualHeater
         outletTemperature = reading.outletTemperature
-        if (config) {
-          const decision = safetyBridge.evaluateReading(reading)
-          if (decision) {
-            await applySafetyDecision(decision)
+        if (!config) {
+          try {
+            await loadCheckedConfig()
+          }
+          catch {
             await notify()
             return
           }
+        }
+        const decision = safetyBridge.evaluateReading(reading)
+        if (decision) {
+          await applySafetyDecision(decision)
+          await notify()
+          return
         }
         if (
           state === 'building-flow'
@@ -263,6 +286,15 @@ export const createAutomationEngine = ({
 
     tick() {
       return serialize(async () => {
+        if (!config) {
+          try {
+            await loadCheckedConfig()
+          }
+          catch {
+            await notify()
+            return
+          }
+        }
         if (!config) return
         let latestConfig: AutomationConfig
         try {
@@ -288,11 +320,23 @@ export const createAutomationEngine = ({
         if (safetyDecision) {
           await applySafetyDecision(safetyDecision)
         }
-        if (state === 'fault') await protection.stopPumpAfterCooling()
+        if (state === 'fault') {
+          try {
+            await protection.stopPumpAfterCooling()
+          }
+          catch (error) {
+            await handleDemandFailure(error)
+          }
+        }
         if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
-          await actuator.run('pump', 'off')
-          state = 'stopped'
-          limitationReason = null
+          try {
+            await actuator.run('pump', 'off')
+            state = 'stopped'
+            limitationReason = null
+          }
+          catch (error) {
+            await handleDemandFailure(error)
+          }
         }
         await updateTemperatureDemand()
         await notify()
@@ -308,12 +352,12 @@ export const createAutomationEngine = ({
           const decision = safetyBridge.evaluateReading(latestReading)
           if (decision) await applySafetyDecision(decision)
         }
-        return safetyBridge.authorize(action)
+        return safetyBridge.authorize(action, 'manual')
       })
     },
 
     recordCommand(action: SafetyAction) {
-      actuator.adoptDesired(action.topic, action.value)
+      actuator.adoptPublished(action.topic, action.value)
       if (action.topic === 'pump') {
         manualPumpStartedAt = action.value === 'on' ? clock() : null
       }
@@ -332,13 +376,21 @@ export const createAutomationEngine = ({
 
     resetFault() {
       return serialize(async () => {
-        config ??= await loadConfig()
+        config = await loadCheckedConfig()
+        const resetGeneration = readingGeneration
         const authorization = safetyBridge.canReset()
         if (!authorization.allowed) {
           throw new AutomationError(authorization.reason || '当前不能复位')
         }
         await actuator.run('heater', 'off', true)
         await actuator.run('pump', 'off', true)
+        if (readingGeneration !== resetGeneration) {
+          throw new AutomationError('复位期间收到新的设备数据，请重新确认安全状态')
+        }
+        const finalAuthorization = safetyBridge.canReset()
+        if (!finalAuthorization.allowed) {
+          throw new AutomationError(finalAuthorization.reason || '复位条件已变化')
+        }
         safety.reset()
         state = 'stopped'
         enabled = false
@@ -354,9 +406,21 @@ export const createAutomationEngine = ({
     close() {
       return serialize(async () => {
         enabled = false
-        await actuator.run('heater', 'off')
-        await actuator.run('pump', 'off')
+        let closeError: unknown
+        try {
+          await actuator.run('heater', 'off', true)
+        }
+        catch (error) {
+          closeError = error
+        }
+        try {
+          await actuator.run('pump', 'off', true)
+        }
+        catch (error) {
+          closeError ??= error
+        }
         state = 'stopped'
+        if (closeError) throw closeError
       })
     },
   }

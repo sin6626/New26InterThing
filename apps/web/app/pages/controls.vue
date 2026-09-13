@@ -42,6 +42,16 @@ const sensorStatusLabels = {
   timeout: '超时',
 }
 
+const automationStateTagType = computed(() => {
+  if (automation.value?.safety.locked) return 'danger'
+  return automation.value?.enabled ? 'success' : 'info'
+})
+
+const faultRecordStatus = computed(() => {
+  if (automation.value?.safety.faultRecorded) return '已入库并告警'
+  return automation.value?.safety.faultRecordError || '等待记录'
+})
+
 const switchValue = (field: ControlField) => field.value === 'on'
 
 const updateTime = (
@@ -123,9 +133,9 @@ onMounted(() => void initialize())
             >
               确认并复位
             </el-button>
-          <el-tag :type="automation?.safety.locked ? 'danger' : automation?.enabled ? 'success' : 'info'">
-            {{ automation ? stateLabels[automation.state] : '--' }}
-          </el-tag>
+            <el-tag :type="automationStateTagType">
+              {{ automation ? stateLabels[automation.state] : '--' }}
+            </el-tag>
           </div>
         </div>
       </template>
@@ -169,7 +179,7 @@ onMounted(() => void initialize())
         </el-descriptions-item>
         <el-descriptions-item label="故障记录">
           <template v-if="automation?.safety.locked">
-            {{ automation.safety.faultRecorded ? '已入库并告警' : automation.safety.faultRecordError || '等待记录' }}
+            {{ faultRecordStatus }}
           </template>
           <template v-else>--</template>
         </el-descriptions-item>

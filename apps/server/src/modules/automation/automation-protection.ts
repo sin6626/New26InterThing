@@ -16,6 +16,8 @@ interface Dependencies {
   clock(): number
   actuator: ProtectionActuator
   getState(): AutomationState
+  getActualPump(): ActuatorValue | 'unknown'
+  getActualHeater(): ActuatorValue | 'unknown'
   getCoolingDelaySeconds(): number
   enterFault(detail: string): void
   resetTemperatureControl(): void
@@ -29,6 +31,8 @@ export const createAutomationProtection = ({
   clock,
   actuator,
   getState,
+  getActualPump,
+  getActualHeater,
   getCoolingDelaySeconds,
   enterFault,
   resetTemperatureControl,
@@ -41,6 +45,23 @@ export const createAutomationProtection = ({
   let faultPumpStopAt: number | null = null
   let faultRecorded = false
   let faultRecordError: string | null = null
+  let lastHeaterCloseAttempt = Number.NEGATIVE_INFINITY
+  let lastPumpCloseAttempt = Number.NEGATIVE_INFINITY
+
+  const closeIfNeeded = async (
+    topic: 'pump' | 'heater',
+    firstEntry: boolean,
+  ) => {
+    const actual = topic === 'pump' ? getActualPump() : getActualHeater()
+    if (!firstEntry && actual !== 'on') return
+    const lastAttempt = topic === 'pump'
+      ? lastPumpCloseAttempt
+      : lastHeaterCloseAttempt
+    if (!firstEntry && clock() - lastAttempt < 1_000) return
+    if (topic === 'pump') lastPumpCloseAttempt = clock()
+    else lastHeaterCloseAttempt = clock()
+    await actuator.run(topic, 'off', true)
+  }
 
   return {
     async apply(decision: SafetyDecision) {
@@ -53,14 +74,14 @@ export const createAutomationProtection = ({
       refreshSafetyContext()
 
       try {
-        await actuator.run('heater', 'off', firstEntry)
+        await closeIfNeeded('heater', firstEntry)
       }
       catch (error) {
         setLimitation(`安全关热失败：${error instanceof Error ? error.message : String(error)}`)
       }
       if (decision.stopPump) {
         try {
-          await actuator.run('pump', 'off', firstEntry)
+          await closeIfNeeded('pump', firstEntry)
         }
         catch (error) {
           setLimitation(`安全停泵失败：${error instanceof Error ? error.message : String(error)}`)
@@ -82,8 +103,14 @@ export const createAutomationProtection = ({
     },
     async stopPumpAfterCooling() {
       if (faultPumpStopAt === null || clock() < faultPumpStopAt) return
+      actuator.adoptDesired('pump', 'off')
+      if (getActualPump() !== 'on') {
+        faultPumpStopAt = null
+        return
+      }
+      if (clock() - lastPumpCloseAttempt < 1_000) return
+      lastPumpCloseAttempt = clock()
       await actuator.run('pump', 'off', true)
-      faultPumpStopAt = null
     },
     reportingSnapshot() {
       return { faultRecorded, faultRecordError }
@@ -93,6 +120,8 @@ export const createAutomationProtection = ({
       faultPumpStopAt = null
       faultRecorded = false
       faultRecordError = null
+      lastHeaterCloseAttempt = Number.NEGATIVE_INFINITY
+      lastPumpCloseAttempt = Number.NEGATIVE_INFINITY
     },
   }
 }

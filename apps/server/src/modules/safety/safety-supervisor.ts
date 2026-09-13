@@ -1,5 +1,6 @@
 import type {
   SafetyAction,
+  SafetyActionSource,
   SafetyAuthorization,
   SafetyContext,
   SafetyDecision,
@@ -36,7 +37,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let lowFlowSince: number | null = null
   let reversedSince: number | null = null
   let heatingBaseline: number | null = null
-  let effectiveHeatingStartedAt: number | null = null
+  let effectiveHeatingMilliseconds = 0
+  let lastEffectiveHeatingAt: number | null = null
 
   const isFresh = (key: SensorKey, context: SafetyContext) => (
     sensors.isFresh(key, context.config.dataTimeoutSeconds)
@@ -109,9 +111,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return latch('TEMP_SENSOR_REVERSED', { stopPump: false })
     }
     if (
-      effectiveHeatingStartedAt !== null
-      && heatingBaseline !== null
-      && now - effectiveHeatingStartedAt >= context.config.dryHeatingTimeoutSeconds * 1_000
+      heatingBaseline !== null
+      && effectiveHeatingMilliseconds + (
+        lastEffectiveHeatingAt === null ? 0 : now - lastEffectiveHeatingAt
+      ) >= context.config.dryHeatingTimeoutSeconds * 1_000
       && (sensors.value('outletTemperature') ?? heatingBaseline) - heatingBaseline
         < context.config.dryHeatingTemperatureDifference
     ) {
@@ -130,14 +133,25 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt, true)
 
       if (lockedDecision) return lockedDecision
-      if (reading.pressure !== null && reading.pressure >= context.config.maxSafePressure) {
+      if (
+        reading.actualPump === 'on'
+        && reading.pressure !== null
+        && reading.pressure >= context.config.maxSafePressure
+      ) {
         return latch('OVER_PRESSURE')
       }
       if (
         (reading.inletTemperature !== null && reading.inletTemperature >= context.config.maxSafeTemperature)
         || (reading.outletTemperature !== null && reading.outletTemperature >= context.config.maxSafeTemperature)
       ) {
-        return latch('OVER_TEMPERATURE', { stopPump: false })
+        const hydraulicsSafe = reading.actualPump === 'on'
+          && isFresh('flow', context)
+          && isFresh('pressure', context)
+          && reading.flowRate !== null
+          && reading.flowRate >= context.config.minSafeFlow
+          && reading.pressure !== null
+          && reading.pressure < context.config.maxSafePressure
+        return latch('OVER_TEMPERATURE', { stopPump: !hydraulicsSafe })
       }
 
       const monitorRunningFlow = context.state === 'running'
@@ -168,14 +182,24 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       else reversedSince = null
 
       if (heatingEffective && reading.outletTemperature !== null) {
-        if (effectiveHeatingStartedAt === null) {
-          effectiveHeatingStartedAt = clock()
+        if (heatingBaseline === null) {
           heatingBaseline = reading.outletTemperature
+          effectiveHeatingMilliseconds = 0
         }
+        if (lastEffectiveHeatingAt !== null) {
+          effectiveHeatingMilliseconds += clock() - lastEffectiveHeatingAt
+        }
+        lastEffectiveHeatingAt = clock()
       }
       else {
-        effectiveHeatingStartedAt = null
+        if (lastEffectiveHeatingAt !== null) {
+          effectiveHeatingMilliseconds += clock() - lastEffectiveHeatingAt
+        }
+        lastEffectiveHeatingAt = null
+      }
+      if (context.state === 'stopped' && reading.actualHeater === 'off') {
         heatingBaseline = null
+        effectiveHeatingMilliseconds = 0
       }
       return evaluateTimedRules(context)
     },
@@ -195,10 +219,17 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return decision
     },
 
-    authorize(action: SafetyAction, context: SafetyContext): SafetyAuthorization {
+    authorize(
+      action: SafetyAction,
+      context: SafetyContext,
+      source: SafetyActionSource = 'automation',
+    ): SafetyAuthorization {
       if (action.value === 'off') return { allowed: true, reason: null }
       if (lockedDecision) {
         return { allowed: false, reason: `故障已锁定：${lockedDecision.detail}` }
+      }
+      if (source === 'manual' && context.state !== 'stopped') {
+        return { allowed: false, reason: '自动运行、冷却或故障处理期间禁止人工开启设备' }
       }
       if (action.topic === 'pump') {
         return { allowed: true, reason: null }
@@ -234,7 +265,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       occurredAt = null
       lowFlowSince = null
       reversedSince = null
-      effectiveHeatingStartedAt = null
+      effectiveHeatingMilliseconds = 0
+      lastEffectiveHeatingAt = null
       heatingBaseline = null
     },
 

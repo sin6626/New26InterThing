@@ -80,6 +80,55 @@ describe('safety supervisor', () => {
     )).toMatchObject({ allowed: false })
   })
 
+  it('keeps cooling flow only when the hydraulic path is safe', () => {
+    const safeSupervisor = createSafetySupervisor(() => 1_000)
+    expect(safeSupervisor.handleReading({
+      ...reading(),
+      outletTemperature: 45,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))).toMatchObject({
+      faultCode: 'OVER_TEMPERATURE',
+      stopPump: false,
+    })
+
+    const unsafeSupervisor = createSafetySupervisor(() => 1_000)
+    expect(unsafeSupervisor.handleReading({
+      ...reading(),
+      flowRate: 0,
+      outletTemperature: 45,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))).toMatchObject({
+      faultCode: 'OVER_TEMPERATURE',
+      stopPump: true,
+    })
+  })
+
+  it('ignores static pressure at the limit while the pump is actually off', () => {
+    const supervisor = createSafetySupervisor(() => 1_000)
+
+    expect(supervisor.handleReading({
+      ...reading(),
+      pressure: 130,
+      actualPump: 'off',
+    }, context({ state: 'stopped', desiredPump: 'off' }))).toBeNull()
+  })
+
+  it('blocks manual starts while automatic control or cooling owns the actuators', () => {
+    const supervisor = createSafetySupervisor(() => 1_000)
+    supervisor.handleReading(reading(), context())
+
+    expect(supervisor.authorize(
+      { topic: 'pump', value: 'on' },
+      context(),
+      'manual',
+    )).toMatchObject({ allowed: false })
+    expect(supervisor.authorize(
+      { topic: 'heater', value: 'on' },
+      context({ state: 'cooling' }),
+      'manual',
+    )).toMatchObject({ allowed: false })
+  })
+
   it('treats equal inlet and outlet temperatures as correctly oriented', () => {
     let now = 1_000
     const supervisor = createSafetySupervisor(() => now)
@@ -209,6 +258,33 @@ describe('safety supervisor', () => {
     })
     supervisor.handleReading(heatingReading(), context({ desiredHeater: 'on' }))
     now = 61_000
+
+    expect(supervisor.handleReading(
+      heatingReading(),
+      context({ desiredHeater: 'on' }),
+    )).toMatchObject({ faultCode: 'DRY_HEATING_NO_TEMP_RISE' })
+  })
+
+  it('pauses no-rise timing while heating is ineffective', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const heatingReading = () => ({
+      ...reading(now),
+      outletTemperature: 31,
+      actualHeater: 'on' as const,
+    })
+    supervisor.handleReading(heatingReading(), context({ desiredHeater: 'on' }))
+    now = 31_000
+    supervisor.handleReading({
+      ...heatingReading(),
+      actualHeater: 'off',
+    }, context({ desiredHeater: 'on' }))
+    now = 91_000
+    expect(supervisor.handleReading(
+      heatingReading(),
+      context({ desiredHeater: 'on' }),
+    )).toBeNull()
+    now = 121_000
 
     expect(supervisor.handleReading(
       heatingReading(),

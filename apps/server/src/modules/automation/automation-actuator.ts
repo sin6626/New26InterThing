@@ -73,6 +73,16 @@ export const createAutomationActuator = ({ execute }: Dependencies) => {
       if (topic === 'pump') desiredPump = value
       else desiredHeater = value
     },
+    adoptPublished(topic: ActuatorTopic, value: ActuatorValue) {
+      if (topic === 'pump') {
+        desiredPump = value
+        publishedPump = value
+      }
+      else {
+        desiredHeater = value
+        publishedHeater = value
+      }
+    },
     run,
   }
 }

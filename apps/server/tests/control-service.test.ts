@@ -91,6 +91,26 @@ describe('control service', () => {
     )
   })
 
+  it('still trips command safety when writing the failure log also fails', async () => {
+    const repo = repository()
+    vi.mocked(repo.saveFailure).mockRejectedValue(new Error('数据库不可用'))
+    const recordCommandFailure = vi.fn().mockResolvedValue(undefined)
+    const service = createControlService(repo, {
+      publish: vi.fn().mockRejectedValue(new Error('MQTT 当前未连接')),
+    }, {
+      setEnabled: vi.fn(),
+      authorizeAction: vi.fn().mockResolvedValue({ allowed: true, reason: null }),
+      recordCommandFailure,
+    })
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 23,
+      value: true,
+    })).rejects.toMatchObject({ status: 503, message: 'MQTT 当前未连接' })
+    expect(recordCommandFailure).toHaveBeenCalledOnce()
+  })
+
   it('saves state-machine parameters without publishing MQTT', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({

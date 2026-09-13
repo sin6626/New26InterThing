@@ -35,6 +35,86 @@ const config = {
 }
 
 describe('automation engine', () => {
+  it('loads safety configuration on the first reading and protects immediately', async () => {
+    const loadConfig = vi.fn().mockResolvedValue(config)
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const reportFault = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig,
+      execute,
+      reportFault,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 45,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(loadConfig).toHaveBeenCalledOnce()
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'fault',
+      safety: { faultCode: 'OVER_TEMPERATURE' },
+    })
+    expect(execute).toHaveBeenCalledWith('heater', 'off')
+    expect(reportFault).toHaveBeenCalledWith(
+      'OVER_TEMPERATURE',
+      expect.any(String),
+    )
+  })
+
+  it('locks command failure when automatic pump start cannot publish', async () => {
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn().mockRejectedValue(new Error('MQTT 当前未连接')),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+
+    await expect(engine.setEnabled(true)).rejects.toThrow('MQTT 当前未连接')
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'fault',
+      safety: { faultCode: 'COMMAND_PUBLISH_FAILED' },
+    })
+  })
+
   it('refuses to start until a recent sensor reading is available', async () => {
     let now = 5_000
     const execute = vi.fn().mockResolvedValue(undefined)
@@ -569,7 +649,7 @@ describe('automation engine', () => {
     expect(heaterStarts).toHaveLength(1)
   })
 
-  it('enters cooling when manual stop cannot publish heater off', async () => {
+  it('locks a fault when manual stop cannot publish heater off', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     let failHeaterOff = false
     const engine = createAutomationEngine({
@@ -615,10 +695,10 @@ describe('automation engine', () => {
 
     expect(await engine.getSnapshot()).toMatchObject({
       enabled: false,
-      state: 'cooling',
+      state: 'fault',
       desiredHeater: 'off',
-      limitationReason: '关热指令发布失败',
+      limitationReason: '安全关热失败：关热指令发布失败',
     })
-    expect(disableMaster).toHaveBeenCalledWith('关热指令发布失败')
+    expect(disableMaster).toHaveBeenCalledWith('控制指令发布失败：关热指令发布失败')
   })
 })
