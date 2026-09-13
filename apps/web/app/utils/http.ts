@@ -48,6 +48,9 @@ export const createHttpClient = (baseURL: string) => {
         params: snapshot?.params,
         response: error.response?.data ?? error.message,
       })
+      if (error.response?.data?.message) {
+        error.message = error.response.data.message
+      }
       return Promise.reject(error)
     },
   )
