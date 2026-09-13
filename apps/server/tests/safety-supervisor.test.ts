@@ -525,6 +525,7 @@ describe('safety supervisor', () => {
       expect(supervisor.handleReading({
         ...reading(now),
         flowRate: 0,
+        pressure: 0,
       }, buildingContext())).toBeNull()
       expect(supervisor.tick(buildingContext())).toBeNull()
     }

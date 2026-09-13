@@ -63,6 +63,8 @@ export const createAutomationEngine = ({
   let operationTail = Promise.resolve()
   let manualPumpStartedAt: number | null = null
   let readingGeneration = 0
+  let emergencyOffGeneration = 0
+  const emergencyOffPublishers = new Map<'pump' | 'heater', () => Promise<void>>()
 
   const safetyBridge = createAutomationSafetyBridge({
     safety,
@@ -362,7 +364,28 @@ export const createAutomationEngine = ({
       action: SafetyAction,
       publish: () => Promise<void>,
     ) {
+      if (action.value === 'off') {
+        emergencyOffGeneration += 1
+        emergencyOffPublishers.set(action.topic, publish)
+        return publish()
+          .then(() => {
+            actuator.adoptPublished(action.topic, 'off')
+            if (action.topic === 'pump') manualPumpStartedAt = null
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : String(error)
+            void serialize(async () => {
+              await applySafetyDecision(safety.trip(
+                'COMMAND_PUBLISH_FAILED',
+                `${action.topic}=off 指令发布失败：${message}`,
+              ))
+              await notify()
+            })
+            throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
+          })
+      }
       return serialize(async () => {
+        const startingEmergencyOffGeneration = emergencyOffGeneration
         if (action.value === 'on') {
           if (!config) await loadCheckedConfig()
           if (latestReading) {
@@ -385,6 +408,14 @@ export const createAutomationEngine = ({
           ))
           await notify()
           throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
+        }
+        if (startingEmergencyOffGeneration !== emergencyOffGeneration) {
+          const emergencyPublisher = emergencyOffPublishers.get(action.topic)
+          if (emergencyPublisher) await emergencyPublisher()
+          actuator.adoptPublished(action.topic, 'off')
+          if (action.topic === 'pump') manualPumpStartedAt = null
+          await notify()
+          return
         }
         actuator.adoptPublished(action.topic, action.value)
         if (action.topic === 'pump') {

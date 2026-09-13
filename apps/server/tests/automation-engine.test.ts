@@ -913,6 +913,62 @@ describe('automation engine', () => {
     expect(await engine.getSnapshot()).toMatchObject({ desiredHeater: 'off' })
   })
 
+  it('publishes manual off while a queued configuration refresh is pending', async () => {
+    let loadCount = 0
+    let signalRefresh = () => {}
+    const refreshStarted = new Promise<void>(resolve => {
+      signalRefresh = resolve
+    })
+    let releaseRefresh = () => {}
+    const pendingRefresh = new Promise<typeof config>(resolve => {
+      releaseRefresh = () => resolve(config)
+    })
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn(() => {
+        loadCount += 1
+        if (loadCount >= 2) {
+          signalRefresh()
+          return pendingRefresh
+        }
+        return Promise.resolve(config)
+      }),
+      execute: vi.fn(),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    const ticking = engine.tick()
+    await refreshStarted
+    const publishOff = vi.fn().mockResolvedValue(undefined)
+
+    await engine.executeManualAction(
+      { topic: 'heater', value: 'off' },
+      publishOff,
+    )
+    expect(publishOff).toHaveBeenCalledOnce()
+    releaseRefresh()
+    await ticking
+  })
+
   it('keeps a locked fault when the failed command is heater off', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     let failHeaterOff = false

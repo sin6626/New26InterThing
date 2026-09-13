@@ -78,7 +78,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     ) {
       sensors.invalidate('flow')
     }
-    if (pressureZeroSince !== null && now - pressureZeroSince >= timeoutMilliseconds) {
+    if (
+      !initiallyBuildingFlow
+      && pressureZeroSince !== null
+      && now - pressureZeroSince >= timeoutMilliseconds
+    ) {
       sensors.invalidate('pressure')
     }
   }
