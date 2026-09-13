@@ -77,6 +77,34 @@ const updateCheckbox = (
   }
 }
 
+const inputDrafts = ref<Record<number, string>>({})
+const focusedConfigId = ref<number>()
+
+const getInputValue = (field: ControlField) => {
+  if (focusedConfigId.value === field.configId && inputDrafts.value[field.configId] !== undefined) {
+    return inputDrafts.value[field.configId]
+  }
+  return field.value ?? ''
+}
+
+const onInputFocus = (field: ControlField) => {
+  focusedConfigId.value = field.configId
+  inputDrafts.value[field.configId] = field.value ?? ''
+}
+
+const onInputUpdate = (field: ControlField, value: string) => {
+  inputDrafts.value[field.configId] = value
+}
+
+const onInputCommit = (field: ControlField) => {
+  const draft = inputDrafts.value[field.configId]
+  focusedConfigId.value = undefined
+  if (draft !== undefined && draft !== (field.value ?? '')) {
+    void update(field, draft)
+  }
+  delete inputDrafts.value[field.configId]
+}
+
 onMounted(() => void initialize())
 </script>
 
@@ -279,10 +307,13 @@ onMounted(() => void initialize())
               />
               <el-input
                 v-else-if="field.type === 'input'"
-                :model-value="field.value ?? ''"
+                :model-value="getInputValue(field)"
                 :disabled="savingId !== undefined"
                 placeholder="请输入配置值"
-                @change="value => update(field, value)"
+                @focus="onInputFocus(field)"
+                @input="value => onInputUpdate(field, String(value))"
+                @keydown.enter.prevent="onInputCommit(field)"
+                @blur="onInputCommit(field)"
               />
               <el-slider
                 v-else-if="field.type === 'slider'"
