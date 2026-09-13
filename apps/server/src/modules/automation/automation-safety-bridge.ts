@@ -61,10 +61,8 @@ export const createAutomationSafetyBridge = ({
       return safety.handleReading({
         recordedAt: reading.recordedAt,
         flowRate: reading.flowRate,
-        pressure: reading.pressure === undefined ? 0 : reading.pressure,
-        inletTemperature: reading.inletTemperature === undefined
-          ? reading.outletTemperature
-          : reading.inletTemperature,
+        pressure: reading.pressure ?? null,
+        inletTemperature: reading.inletTemperature ?? null,
         outletTemperature: reading.outletTemperature,
         actualPump: reading.actualPump,
         actualHeater: reading.actualHeater,

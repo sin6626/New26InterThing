@@ -1,7 +1,14 @@
-import { Router } from 'express'
+import {
+  Router,
+  type NextFunction,
+  type Response,
+} from 'express'
 
 import type { ControlRepository } from '../control/control.repository.js'
-import type { ControlService } from '../control/control.service.js'
+import {
+  ControlError,
+  type ControlService,
+} from '../control/control.service.js'
 import type { WaterFlowService } from '../water-flow/water-flow.service.js'
 import type { AutomationManager } from './automation-manager.js'
 import { AutomationError } from './automation.types.js'
@@ -14,6 +21,22 @@ export const createAutomationRouter = (
 ) => {
   const router = Router()
 
+  const handleKnownError = (
+    error: unknown,
+    response: Response,
+    next: NextFunction,
+  ) => {
+    if (error instanceof AutomationError || error instanceof ControlError) {
+      response.status(error.status).json({
+        code: error.status,
+        message: error.message,
+        data: null,
+      })
+      return
+    }
+    next(error)
+  }
+
   router.get('/:deviceNumber', async (request, response, next) => {
     try {
       response.json({
@@ -23,7 +46,7 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
-      next(error)
+      handleKnownError(error, response, next)
     }
   })
 
@@ -50,7 +73,7 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
-      next(error)
+      handleKnownError(error, response, next)
     }
   })
 
@@ -76,14 +99,7 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
-      if (error instanceof AutomationError) {
-        return response.status(error.status).json({
-          code: error.status,
-          message: error.message,
-          data: null,
-        })
-      }
-      next(error)
+      handleKnownError(error, response, next)
     }
   })
 

@@ -41,7 +41,8 @@ export const createSensorFreshness = (clock: () => number) => {
       zeroInvalid = false,
     ) {
       const fact = facts[key]
-      if (value === null || !Number.isFinite(value) || (zeroInvalid && value === 0)) {
+      if (value === null) return
+      if (!Number.isFinite(value) || (zeroInvalid && value === 0)) {
         fact.invalid = true
         return
       }

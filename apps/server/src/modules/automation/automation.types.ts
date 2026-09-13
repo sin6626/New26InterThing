@@ -22,8 +22,8 @@ export interface AutomationConfig {
 export interface AutomationReading {
   recordedAt: number
   flowRate: number | null
-  pressure?: number | null
-  inletTemperature?: number | null
+  pressure: number | null
+  inletTemperature: number | null
   outletTemperature: number | null
   actualPump: ActuatorValue | 'unknown'
   actualHeater: ActuatorValue | 'unknown'

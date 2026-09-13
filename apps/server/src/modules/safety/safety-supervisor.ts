@@ -46,12 +46,12 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
 
   const latch = (
     faultCode: SafetyFaultCode,
-    options: Partial<Pick<SafetyDecision, 'closeHeater' | 'stopPump'>> = {},
+    options: Partial<Pick<SafetyDecision, 'detail' | 'closeHeater' | 'stopPump'>> = {},
   ) => {
     if (lockedDecision) return lockedDecision
     lockedDecision = {
       faultCode,
-      detail: decisionDetails[faultCode],
+      detail: options.detail ?? decisionDetails[faultCode],
       closeHeater: options.closeHeater ?? true,
       stopPump: options.stopPump ?? true,
     }
@@ -123,6 +123,47 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return null
   }
 
+  const evaluateRequiredSensors = (
+    reading: SafetyReading,
+    context: SafetyContext,
+  ) => {
+    if (!active(context)) return null
+    const concurrentFacts = [
+      reading.actualPump === 'on'
+        && reading.pressure !== null
+        && reading.pressure >= context.config.maxSafePressure
+        ? decisionDetails.OVER_PRESSURE
+        : null,
+      (reading.inletTemperature !== null
+        && reading.inletTemperature >= context.config.maxSafeTemperature)
+        || (reading.outletTemperature !== null
+          && reading.outletTemperature >= context.config.maxSafeTemperature)
+        ? decisionDetails.OVER_TEMPERATURE
+        : null,
+      reading.flowRate !== null && reading.flowRate < context.config.minSafeFlow
+        ? '当前流量低于安全阈值'
+        : null,
+    ].filter((fact): fact is string => fact !== null)
+    const withFacts = (faultCode: SafetyFaultCode) => ({
+      detail: concurrentFacts.length === 0
+        ? decisionDetails[faultCode]
+        : `${decisionDetails[faultCode]}；同时检测到：${concurrentFacts.join('、')}`,
+    })
+    if (!isFresh('pressure', context)) {
+      return latch('SENSOR_PRESSURE_TIMEOUT', withFacts('SENSOR_PRESSURE_TIMEOUT'))
+    }
+    if (!isFresh('flow', context)) {
+      return latch('SENSOR_FLOW_TIMEOUT', withFacts('SENSOR_FLOW_TIMEOUT'))
+    }
+    if (!isFresh('inletTemperature', context) || !isFresh('outletTemperature', context)) {
+      return latch('SENSOR_TEMPERATURE_TIMEOUT', {
+        ...withFacts('SENSOR_TEMPERATURE_TIMEOUT'),
+        stopPump: false,
+      })
+    }
+    return null
+  }
+
   const api = {
     handleReading(reading: SafetyReading, context: SafetyContext): SafetyDecision | null {
       latestReading = reading
@@ -132,7 +173,21 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       sensors.update('inletTemperature', reading.inletTemperature, reading.recordedAt, true)
       sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt, true)
 
-      if (lockedDecision) return lockedDecision
+      if (lockedDecision) {
+        const hydraulicPathUnsafe = reading.actualPump === 'on'
+          && (!isFresh('flow', context)
+            || !isFresh('pressure', context)
+            || reading.flowRate === null
+            || reading.flowRate < context.config.minSafeFlow
+            || reading.pressure === null
+            || reading.pressure >= context.config.maxSafePressure)
+        if (!lockedDecision.stopPump && hydraulicPathUnsafe) {
+          lockedDecision = { ...lockedDecision, stopPump: true }
+        }
+        return lockedDecision
+      }
+      const missingSensorDecision = evaluateRequiredSensors(reading, context)
+      if (missingSensorDecision) return missingSensorDecision
       if (
         reading.actualPump === 'on'
         && reading.pressure !== null

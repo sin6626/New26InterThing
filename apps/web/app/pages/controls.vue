@@ -52,6 +52,11 @@ const faultRecordStatus = computed(() => {
   return automation.value?.safety.faultRecordError || '等待记录'
 })
 
+const faultOccurredAt = computed(() => {
+  const occurredAt = automation.value?.safety.occurredAt
+  return occurredAt ? new Date(occurredAt).toLocaleString('zh-CN') : '--'
+})
+
 const switchValue = (field: ControlField) => field.value === 'on'
 
 const updateTime = (
@@ -176,6 +181,9 @@ onMounted(() => void initialize())
         </el-descriptions-item>
         <el-descriptions-item label="故障码">
           {{ automation?.safety.faultCode ?? '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="故障发生时间">
+          {{ faultOccurredAt }}
         </el-descriptions-item>
         <el-descriptions-item label="故障记录">
           <template v-if="automation?.safety.locked">

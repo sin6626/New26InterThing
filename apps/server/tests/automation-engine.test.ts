@@ -80,6 +80,31 @@ describe('automation engine', () => {
     )
   })
 
+  it('latches configuration failure during manual safety authorization', async () => {
+    const reportFault = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      loadConfig: vi.fn().mockRejectedValue(new Error('安全阈值缺失')),
+      execute: vi.fn(),
+      reportFault,
+      getWaterFlow: vi.fn(),
+      emit: vi.fn(),
+    })
+
+    await expect(engine.authorizeAction({
+      topic: 'pump',
+      value: 'on',
+    })).rejects.toThrow('控制配置无效：安全阈值缺失')
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'fault',
+      safety: { faultCode: 'CONTROL_CONFIG_INVALID' },
+    })
+    expect(reportFault).toHaveBeenCalledWith(
+      'CONTROL_CONFIG_INVALID',
+      expect.any(String),
+    )
+  })
+
   it('locks command failure when automatic pump start cannot publish', async () => {
     const engine = createAutomationEngine({
       deviceNumber: 'device-1',
@@ -143,6 +168,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -178,6 +205,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: null,
+      pressure: null,
+      inletTemperature: null,
       outletTemperature: null,
       actualPump: 'unknown',
       actualHeater: 'unknown',
@@ -211,6 +240,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -224,6 +255,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -256,6 +289,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -264,6 +299,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -308,6 +345,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -316,6 +355,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -355,6 +396,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -459,6 +502,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 33,
       actualPump: 'off',
       actualHeater: 'off',
@@ -467,6 +512,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: now,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 33,
       actualPump: 'on',
       actualHeater: 'off',
@@ -509,6 +556,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -517,6 +566,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -529,6 +580,67 @@ describe('automation engine', () => {
       limitationReason: '控制指令发布失败：MQTT 发布超时',
     })
     expect(disableMaster).toHaveBeenCalledWith('控制指令发布失败：MQTT 发布超时')
+  })
+
+  it('locks a command fault when safety-forced heater shutdown cannot publish', async () => {
+    let failHeaterOff = false
+    const execute = vi.fn(async (topic: string, value: string) => {
+      if (failHeaterOff && topic === 'heater' && value === 'off') {
+        throw new Error('安全关热发布失败')
+      }
+    })
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+    failHeaterOff = true
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0.2,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'fault',
+      safety: { faultCode: 'COMMAND_PUBLISH_FAILED' },
+    })
   })
 
   it('keeps a locked fault when the failed command is heater off', async () => {
@@ -559,6 +671,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -567,6 +681,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -576,6 +692,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 35,
       actualPump: 'on',
       actualHeater: 'on',
@@ -625,6 +743,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -634,6 +754,8 @@ describe('automation engine', () => {
     const reading = engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',
@@ -677,6 +799,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'off',
       actualHeater: 'off',
@@ -685,6 +809,8 @@ describe('automation engine', () => {
     await engine.handleReading({
       recordedAt: 1_000,
       flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
       outletTemperature: 34,
       actualPump: 'on',
       actualHeater: 'off',

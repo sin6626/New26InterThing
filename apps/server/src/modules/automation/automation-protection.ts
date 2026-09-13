@@ -53,7 +53,7 @@ export const createAutomationProtection = ({
     firstEntry: boolean,
   ) => {
     const actual = topic === 'pump' ? getActualPump() : getActualHeater()
-    if (!firstEntry && actual !== 'on') return
+    if (!firstEntry && actual === 'off') return
     const lastAttempt = topic === 'pump'
       ? lastPumpCloseAttempt
       : lastHeaterCloseAttempt
@@ -104,7 +104,7 @@ export const createAutomationProtection = ({
     async stopPumpAfterCooling() {
       if (faultPumpStopAt === null || clock() < faultPumpStopAt) return
       actuator.adoptDesired('pump', 'off')
-      if (getActualPump() !== 'on') {
+      if (getActualPump() === 'off') {
         faultPumpStopAt = null
         return
       }

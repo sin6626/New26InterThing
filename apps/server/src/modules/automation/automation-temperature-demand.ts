@@ -35,7 +35,12 @@ export const createAutomationTemperatureDemand = ({
     const authorization = authorize(value)
     if (!authorization.allowed) {
       setLimitation(authorization.reason)
-      await run('off')
+      try {
+        await run('off')
+      }
+      catch (error) {
+        await onFailure(error)
+      }
       return
     }
     try {

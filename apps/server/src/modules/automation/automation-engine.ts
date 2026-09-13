@@ -347,7 +347,7 @@ export const createAutomationEngine = ({
 
     authorizeAction(action: SafetyAction) {
       return serialize(async () => {
-        config ??= await loadConfig()
+        if (!config) await loadCheckedConfig()
         if (latestReading) {
           const decision = safetyBridge.evaluateReading(latestReading)
           if (decision) await applySafetyDecision(decision)
