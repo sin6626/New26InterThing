@@ -129,6 +129,52 @@ describe('safety supervisor', () => {
     })
   })
 
+  it('upgrades cooling protection when the actual pump state becomes unknown', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    supervisor.handleReading({
+      ...reading(now),
+      outletTemperature: 45,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))
+    now = 2_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      actualPump: 'unknown',
+      actualHeater: 'off',
+    }, context({ state: 'fault' }))).toMatchObject({
+      faultCode: 'OVER_TEMPERATURE',
+      stopPump: true,
+    })
+  })
+
+  it('prioritizes actual over-pressure over a simultaneous invalid temperature', () => {
+    const supervisor = createSafetySupervisor(() => 1_000)
+
+    expect(supervisor.handleReading({
+      ...reading(),
+      pressure: 130,
+      inletTemperature: Number.NaN,
+    }, context())).toMatchObject({
+      faultCode: 'OVER_PRESSURE',
+      stopPump: true,
+    })
+  })
+
+  it('marks an explicitly invalid pressure immediately instead of keeping it fresh', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    supervisor.handleReading(reading(now), context())
+    now = 2_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      pressure: Number.NaN,
+    }, context())).toMatchObject({ faultCode: 'SENSOR_PRESSURE_TIMEOUT' })
+    expect(supervisor.getSnapshot().sensors.pressure).toBe('invalid')
+  })
+
   it('prioritizes a missing pressure sensor and retains concurrent over-temperature facts', () => {
     const supervisor = createSafetySupervisor(() => 1_000)
 
@@ -284,20 +330,6 @@ describe('safety supervisor', () => {
     now = 4_001
     expect(supervisor.tick(context())).toMatchObject({
       faultCode: 'SENSOR_PRESSURE_TIMEOUT',
-    })
-  })
-
-  it('prioritizes a missing pressure fact and retains concurrent over-temperature detail', () => {
-    const supervisor = createSafetySupervisor(() => 1_000)
-
-    expect(supervisor.handleReading({
-      ...reading(),
-      pressure: null,
-      outletTemperature: 45,
-      actualHeater: 'on',
-    }, context({ desiredHeater: 'on' }))).toMatchObject({
-      faultCode: 'SENSOR_PRESSURE_TIMEOUT',
-      detail: expect.stringContaining('水温达到或超过安全上限'),
     })
   })
 

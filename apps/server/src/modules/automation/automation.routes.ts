@@ -86,7 +86,7 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
-      next(error)
+      handleKnownError(error, response, next)
     }
   })
 
@@ -112,7 +112,7 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
-      next(error)
+      handleKnownError(error, response, next)
     }
   })
 

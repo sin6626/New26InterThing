@@ -103,4 +103,30 @@ describe('automation HTTP API', () => {
       message: '最近传感器数据不可用，无法启动自动模式',
     })
   })
+
+  it('returns a visible 409 when automatic stop is rejected', async () => {
+    const controls = {
+      execute: vi.fn().mockRejectedValue(
+        new ControlError('关热指令发布失败', 409),
+      ),
+    } as unknown as ControlService
+    const controlRepository = {
+      getDefinitionByTopic: vi.fn().mockResolvedValue({ configId: 1 }),
+    } as unknown as ControlRepository
+    const baseUrl = await startServer(
+      vi.fn(),
+      controls,
+      controlRepository,
+    )
+
+    const response = await fetch(`${baseUrl}/api/automation/device-1/stop`, {
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      code: 409,
+      message: '关热指令发布失败',
+    })
+  })
 })

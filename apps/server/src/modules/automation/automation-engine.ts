@@ -296,6 +296,18 @@ export const createAutomationEngine = ({
           }
         }
         if (!config) return
+        const safetyDecision = safetyBridge.tick()
+        if (safetyDecision) {
+          await applySafetyDecision(safetyDecision)
+        }
+        if (state === 'fault') {
+          try {
+            await protection.stopPumpAfterCooling()
+          }
+          catch (error) {
+            await handleDemandFailure(error)
+          }
+        }
         let latestConfig: AutomationConfig
         try {
           latestConfig = await loadConfig()
@@ -316,18 +328,6 @@ export const createAutomationEngine = ({
           temperatureDemand.reset()
         }
         const elapsed = (clock() - enteredAt) / 1_000
-        const safetyDecision = safetyBridge.tick()
-        if (safetyDecision) {
-          await applySafetyDecision(safetyDecision)
-        }
-        if (state === 'fault') {
-          try {
-            await protection.stopPumpAfterCooling()
-          }
-          catch (error) {
-            await handleDemandFailure(error)
-          }
-        }
         if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
           try {
             await actuator.run('pump', 'off')

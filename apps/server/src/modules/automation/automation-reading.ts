@@ -3,9 +3,9 @@ import type { AutomationReading } from './automation.types.js'
 type SensorValues = Record<string, string | number | null>
 
 const numeric = (value: unknown) => {
-  if (value === null || value === undefined || value === '') return null
+  if (value === null || value === undefined) return null
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isFinite(parsed) ? parsed : Number.NaN
 }
 
 const actuator = (value: unknown) => {

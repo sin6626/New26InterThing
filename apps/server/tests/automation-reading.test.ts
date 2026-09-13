@@ -45,4 +45,13 @@ describe('automation reading normalization', () => {
       actualPump: 'on',
     })
   })
+
+  it('distinguishes an invalid number from an omitted field', () => {
+    const normalized = normalizeAutomationReading({
+      pressure: 'not-a-number',
+    }, 3_000)
+
+    expect(Number.isNaN(normalized.pressure)).toBe(true)
+    expect(normalized.flowRate).toBeNull()
+  })
 })

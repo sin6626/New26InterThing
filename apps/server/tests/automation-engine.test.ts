@@ -371,7 +371,7 @@ describe('automation engine', () => {
     })
   })
 
-  it('turns master off and records the reason when building flow times out', async () => {
+  it('turns master off for the higher-priority sensor timeout during flow building', async () => {
     let now = 1_000
     const disableMaster = vi.fn()
     const engine = createAutomationEngine({
@@ -406,7 +406,9 @@ describe('automation engine', () => {
     now = 6_000
     await engine.tick()
 
-    expect(disableMaster).toHaveBeenCalledWith('水泵启动后未在限定时间内建立安全流量')
+    expect(disableMaster).toHaveBeenCalledWith(
+      expect.stringContaining('压力传感器数据超时或无效'),
+    )
     expect((await engine.getSnapshot()).enabled).toBe(false)
     expect((await engine.getSnapshot()).state).toBe('fault')
   })
@@ -526,6 +528,59 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenCalledWith('heater', 'off')
     expect(execute).toHaveBeenLastCalledWith('pump', 'off')
     expect((await engine.getSnapshot()).safety.faultCode).toBe('SENSOR_PRESSURE_TIMEOUT')
+  })
+
+  it('runs safety timeout protection before waiting for configuration refresh', async () => {
+    let now = 1_000
+    let loadCount = 0
+    let releaseRefresh = () => {}
+    const refreshBlocked = new Promise<typeof config>((resolve) => {
+      releaseRefresh = () => resolve(config)
+    })
+    let signalProtected = () => {}
+    const protectionTriggered = new Promise<void>((resolve) => {
+      signalProtected = resolve
+    })
+    const execute = vi.fn(async (topic: string, value: string) => {
+      if (topic === 'heater' && value === 'off') signalProtected()
+    })
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => now,
+      loadConfig: vi.fn(() => {
+        loadCount += 1
+        return loadCount >= 3 ? refreshBlocked : Promise.resolve(config)
+      }),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    now = 5_000
+
+    const ticking = engine.tick()
+    await protectionTriggered
+    expect(execute).toHaveBeenCalledWith('heater', 'off')
+    releaseRefresh()
+    await ticking
   })
 
   it('locks a fault and disables master after a heater publish failure', async () => {
