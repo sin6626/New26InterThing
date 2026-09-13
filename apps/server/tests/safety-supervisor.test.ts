@@ -513,6 +513,28 @@ describe('safety supervisor', () => {
     }, buildingContext())).toBeNull()
   })
 
+  it('keeps continuous zero flow in the build phase until the build timeout', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const buildingContext = () => context({
+      state: 'building-flow',
+      stateEnteredAt: 1_000,
+      desiredPump: 'on',
+    })
+    for (now = 1_000; now <= 4_000; now += 1_000) {
+      expect(supervisor.handleReading({
+        ...reading(now),
+        flowRate: 0,
+      }, buildingContext())).toBeNull()
+      expect(supervisor.tick(buildingContext())).toBeNull()
+    }
+    now = 6_000
+
+    expect(supervisor.tick(buildingContext())).toMatchObject({
+      faultCode: 'BUILD_FLOW_TIMEOUT',
+    })
+  })
+
   it('does not report manual pump idling before its build-flow timeout', () => {
     let now = 1_000
     const supervisor = createSafetySupervisor(() => now)

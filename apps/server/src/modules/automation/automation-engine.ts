@@ -363,14 +363,16 @@ export const createAutomationEngine = ({
       publish: () => Promise<void>,
     ) {
       return serialize(async () => {
-        if (!config) await loadCheckedConfig()
-        if (latestReading) {
-          const decision = safetyBridge.evaluateReading(latestReading)
-          if (decision) await applySafetyDecision(decision)
-        }
-        const authorization = safetyBridge.authorize(action, 'manual')
-        if (!authorization.allowed) {
-          throw new AutomationError(authorization.reason || '安全条件不满足')
+        if (action.value === 'on') {
+          if (!config) await loadCheckedConfig()
+          if (latestReading) {
+            const decision = safetyBridge.evaluateReading(latestReading)
+            if (decision) await applySafetyDecision(decision)
+          }
+          const authorization = safetyBridge.authorize(action, 'manual')
+          if (!authorization.allowed) {
+            throw new AutomationError(authorization.reason || '安全条件不满足')
+          }
         }
         try {
           await publish()

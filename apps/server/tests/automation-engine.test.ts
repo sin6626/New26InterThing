@@ -890,6 +890,29 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenCalledWith('heater', 'off')
   })
 
+  it('publishes a manual off command without waiting for safety configuration', async () => {
+    let signalPublished = () => {}
+    const published = new Promise<void>(resolve => {
+      signalPublished = resolve
+    })
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      loadConfig: vi.fn(() => new Promise<typeof config>(() => {})),
+      execute: vi.fn(),
+      getWaterFlow: vi.fn(),
+      emit: vi.fn(),
+    })
+
+    const closing = engine.executeManualAction(
+      { topic: 'heater', value: 'off' },
+      async () => signalPublished(),
+    )
+
+    await published
+    await closing
+    expect(await engine.getSnapshot()).toMatchObject({ desiredHeater: 'off' })
+  })
+
   it('keeps a locked fault when the failed command is heater off', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     let failHeaterOff = false

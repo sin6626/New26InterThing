@@ -67,7 +67,15 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     if (sensors.value('pressure') === 0) pressureZeroSince ??= now
     else pressureZeroSince = null
     const timeoutMilliseconds = context.config.dataTimeoutSeconds * 1_000
-    if (flowZeroSince !== null && now - flowZeroSince >= timeoutMilliseconds) {
+    const initiallyBuildingFlow = context.state === 'building-flow'
+      || (context.manualPumpStartedAt !== null
+        && context.manualPumpStartedAt !== undefined
+        && !manualFlowEstablished)
+    if (
+      !initiallyBuildingFlow
+      && flowZeroSince !== null
+      && now - flowZeroSince >= timeoutMilliseconds
+    ) {
       sensors.invalidate('flow')
     }
     if (pressureZeroSince !== null && now - pressureZeroSince >= timeoutMilliseconds) {
