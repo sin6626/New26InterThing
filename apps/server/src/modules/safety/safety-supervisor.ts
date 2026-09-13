@@ -244,8 +244,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       const monitorRunningFlow = context.state === 'running'
         || context.state === 'cooling'
         || context.state === 'fault'
+      const monitorManualHeatingFlow = context.desiredHeater === 'on'
+        || reading.actualHeater === 'on'
       if (
-        (monitorRunningFlow || active(context))
+        (monitorRunningFlow || monitorManualHeatingFlow)
         && reading.flowRate !== null
         && reading.flowRate < context.config.minSafeFlow
       ) {

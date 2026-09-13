@@ -450,4 +450,48 @@ describe('safety supervisor', () => {
       actualPump: 'on',
     }, manualContext())).toMatchObject({ faultCode: 'PUMP_IDLING' })
   })
+
+  it('does not apply running low-flow confirmation during automatic flow building', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const buildingContext = () => context({
+      state: 'building-flow',
+      stateEnteredAt: 1_000,
+      desiredPump: 'on',
+    })
+    supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+      actualPump: 'off',
+    }, buildingContext())
+    now = 3_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+      actualPump: 'on',
+    }, buildingContext())).toBeNull()
+  })
+
+  it('does not report manual pump idling before its build-flow timeout', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const manualContext = () => context({
+      state: 'stopped',
+      manualPumpStartedAt: 1_000,
+      desiredPump: 'on',
+    })
+    supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+      actualPump: 'off',
+    }, manualContext())
+    now = 3_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+      actualPump: 'on',
+    }, manualContext())).toBeNull()
+  })
 })
