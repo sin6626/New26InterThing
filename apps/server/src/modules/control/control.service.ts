@@ -135,7 +135,14 @@ export const createControlService = (
       if (!automation) {
         throw new ControlError('自动控制服务尚未初始化', 503)
       }
-      await automation.setEnabled(intent.deviceNumber, value === 'on')
+      try {
+        await automation.setEnabled(intent.deviceNumber, value === 'on')
+      }
+      catch (error) {
+        if (error instanceof ControlError) throw error
+        const message = error instanceof Error ? error.message : String(error)
+        throw new ControlError(message, 409)
+      }
     }
 
     const shouldPublish = isDeviceCommand(definition.topic)

@@ -230,10 +230,19 @@ export const createAutomationEngine = ({
         }
         else {
           enabled = false
-          await runAction('heater', 'off')
           state = desiredPump === 'on' ? 'cooling' : 'stopped'
           enteredAt = clock()
           limitationReason = state === 'cooling' ? '正在冷却' : null
+          try {
+            await runAction('heater', 'off')
+          }
+          catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            limitationReason = message
+            await disableMaster(message)
+            await notify()
+            throw error
+          }
         }
         await notify()
         return getSnapshot()

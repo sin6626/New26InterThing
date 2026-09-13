@@ -496,4 +496,57 @@ describe('automation engine', () => {
     ))
     expect(heaterStarts).toHaveLength(1)
   })
+
+  it('enters cooling when manual stop cannot publish heater off', async () => {
+    const disableMaster = vi.fn().mockResolvedValue(undefined)
+    let failHeaterOff = false
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn(async (topic, value) => {
+        if (topic === 'heater' && value === 'off' && failHeaterOff) {
+          throw new Error('关热指令发布失败')
+        }
+      }),
+      disableMaster,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+
+    failHeaterOff = true
+    await expect(engine.setEnabled(false)).rejects.toThrow('关热指令发布失败')
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      enabled: false,
+      state: 'cooling',
+      desiredHeater: 'off',
+      limitationReason: '关热指令发布失败',
+    })
+    expect(disableMaster).toHaveBeenCalledWith('关热指令发布失败')
+  })
 })

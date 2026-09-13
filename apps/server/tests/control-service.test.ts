@@ -120,6 +120,33 @@ describe('control service', () => {
     expect(repo.saveSuccess).toHaveBeenCalledOnce()
   })
 
+  it('returns the automation rejection as a visible control conflict', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      configId: 1,
+      topic: 'master',
+    })
+    const service = createControlService(
+      repo,
+      { publish: vi.fn() },
+      {
+        setEnabled: vi.fn().mockRejectedValue(
+          new Error('最近传感器数据不可用，无法启动自动模式'),
+        ),
+      },
+    )
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 1,
+      value: 'on',
+    })).rejects.toMatchObject({
+      message: '最近传感器数据不可用，无法启动自动模式',
+      status: 409,
+    })
+  })
+
   it('rejects heater start before publishing', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({
