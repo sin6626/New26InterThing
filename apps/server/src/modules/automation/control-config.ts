@@ -53,6 +53,7 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     minSafeFlow: positive('min_safe_flow'),
     buildFlowTimeoutSeconds: positive('build_flow_timeout'),
     coolingDelaySeconds: positive('cooling_delay'),
+    dataTimeoutSeconds: positive('data_timeout'),
     pid: {
       targetTemperature,
       kp: nonNegative('pid_kp'),
@@ -93,7 +94,6 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     throw new Error('PID 恢复回差必须小于目标温度')
   }
   positive('command_timeout')
-  positive('data_timeout')
   positive('pipe_inner_diameter')
   return config
 }

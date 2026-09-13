@@ -99,8 +99,10 @@ export const createTemperatureController = (
         onSeconds < config.cycleSeconds
         && config.cycleSeconds - onSeconds < config.minOffSeconds
       ) {
-        plannedDutyPercent = 100
-        limitationReason = '低于最短关闭时间'
+        plannedDutyPercent = (
+          config.cycleSeconds - config.minOffSeconds
+        ) / config.cycleSeconds * 100
+        limitationReason = '保留最短关闭时间'
       }
       const elapsedInWindow = (now - windowStartedAt) / 1_000
       const plannedOnSeconds = config.cycleSeconds * plannedDutyPercent / 100

@@ -18,6 +18,7 @@ export interface AutomationConfig {
   minSafeFlow: number
   buildFlowTimeoutSeconds: number
   coolingDelaySeconds: number
+  dataTimeoutSeconds: number
   pid: PidConfig
 }
 
@@ -64,6 +65,7 @@ export const createAutomationEngine = ({
   let publishedPump: ActuatorValue = 'off'
   let publishedHeater: ActuatorValue = 'off'
   let configFingerprint = ''
+  let latestReadingAt: number | null = null
   let actionTail = Promise.resolve()
 
   const runAction = async (
@@ -136,11 +138,64 @@ export const createAutomationEngine = ({
     })
   }
 
+  const handleDemandFailure = async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    limitationReason = message
+    if (lastAction?.status === 'blocked') return
+
+    enabled = false
+    await runAction('heater', 'off')
+    state = desiredPump === 'on' ? 'cooling' : 'stopped'
+    enteredAt = clock()
+    await disableMaster(message)
+  }
+
+  const updateTemperatureDemand = async () => {
+    if (state !== 'running' || !config || outletTemperature === null) return
+    if (config.strategy === 'pid') {
+      pid = temperatureController.update(
+        outletTemperature,
+        config.pid,
+        desiredHeater,
+      )
+      limitationReason = pid.limitationReason
+      try {
+        await runAction('heater', pid.desired)
+      }
+      catch (error) {
+        await handleDemandFailure(error)
+      }
+      return
+    }
+
+    const demand = hysteresisDemand(
+      outletTemperature,
+      config.targetTemperature,
+      config.temperatureHysteresis,
+      desiredHeater,
+    )
+    try {
+      await runAction('heater', demand)
+    }
+    catch (error) {
+      await handleDemandFailure(error)
+    }
+  }
+
   return {
     async setEnabled(nextEnabled: boolean) {
       if (enabled === nextEnabled) return getSnapshot()
       config = await loadConfig()
       if (nextEnabled) {
+        const readingAge = latestReadingAt === null
+          ? Number.POSITIVE_INFINITY
+          : clock() - latestReadingAt
+        if (
+          readingAge < 0
+          || readingAge > config.dataTimeoutSeconds * 1_000
+        ) {
+          throw new Error('最近传感器数据不可用，无法启动自动模式')
+        }
         configFingerprint = JSON.stringify(config)
         await runAction('pump', 'on')
         enabled = true
@@ -160,6 +215,7 @@ export const createAutomationEngine = ({
     },
 
     async handleReading(reading: AutomationReading) {
+      latestReadingAt = reading.recordedAt
       actualPump = reading.actualPump
       actualHeater = reading.actualHeater
       outletTemperature = reading.outletTemperature
@@ -174,40 +230,7 @@ export const createAutomationEngine = ({
         enteredAt = clock()
         limitationReason = null
       }
-      if (state === 'running' && config && outletTemperature !== null) {
-        if (config.strategy === 'pid') {
-          pid = temperatureController.update(
-            outletTemperature,
-            config.pid,
-            desiredHeater,
-          )
-          limitationReason = pid.limitationReason
-          try {
-            await runAction('heater', pid.desired)
-          }
-          catch (error) {
-            limitationReason = error instanceof Error
-              ? error.message
-              : String(error)
-          }
-        }
-        else {
-          const demand = hysteresisDemand(
-            outletTemperature,
-            config.targetTemperature,
-            config.temperatureHysteresis,
-            desiredHeater,
-          )
-          try {
-            await runAction('heater', demand)
-          }
-          catch (error) {
-            limitationReason = error instanceof Error
-              ? error.message
-              : String(error)
-          }
-        }
-      }
+      await updateTemperatureDemand()
       await notify()
     },
 
@@ -235,6 +258,7 @@ export const createAutomationEngine = ({
         state = 'stopped'
         limitationReason = null
       }
+      await updateTemperatureDemand()
       await notify()
     },
 

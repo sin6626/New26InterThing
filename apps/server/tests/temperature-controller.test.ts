@@ -37,4 +37,23 @@ describe('temperature controller', () => {
     expect(result.desired).toBe('on')
     expect(result.windowRemainingSeconds).toBe(20)
   })
+
+  it('reduces duty to preserve the configured minimum off time', () => {
+    const controller = createTemperatureController(() => 0)
+    const result = controller.update(26, {
+      targetTemperature: 35,
+      kp: 10,
+      ki: 0,
+      kd: 0,
+      cycleSeconds: 20,
+      minOnSeconds: 3,
+      minOffSeconds: 3,
+      overshootAllowance: 0.1,
+      resumeHysteresis: 0.3,
+    }, 'off')
+
+    expect(result.outputPercent).toBe(90)
+    expect(result.plannedDutyPercent).toBe(85)
+    expect(result.limitationReason).toBe('保留最短关闭时间')
+  })
 })

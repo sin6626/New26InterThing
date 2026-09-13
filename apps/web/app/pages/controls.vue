@@ -3,6 +3,7 @@ import type { ControlField } from '@new26interthing/shared'
 
 import { useControls } from '~/features/control/use-controls'
 import { useAutomation } from '~/features/control/use-automation'
+import WaterFlowMetricsPanel from '~/features/realtime/WaterFlowMetricsPanel.vue'
 
 const {
   controlTree,
@@ -19,6 +20,8 @@ const {
 
 const {
   loading: automationLoading,
+  resetting: resettingWaterFlow,
+  resetWaterFlow,
   snapshot: automation,
 } = useAutomation(selectedDevice)
 
@@ -142,6 +145,14 @@ onMounted(() => void initialize())
         当前限制：{{ automation.limitationReason }}
       </p>
     </el-card>
+
+    <WaterFlowMetricsPanel
+      :snapshot="automation?.waterFlow"
+      :loading="automationLoading"
+      :resetting="resettingWaterFlow"
+      :disabled="!selectedDevice"
+      @reset="resetWaterFlow"
+    />
 
     <el-card v-loading="loading" shadow="never" class="rounded-xl border-slate-200">
       <template #header>

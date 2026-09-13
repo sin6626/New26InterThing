@@ -29,6 +29,46 @@ const config = {
 }
 
 describe('automation engine', () => {
+  it('refuses to start until a recent sensor reading is available', async () => {
+    let now = 5_000
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => now,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await expect(engine.setEnabled(true)).rejects.toThrow('最近传感器数据不可用')
+    expect(execute).not.toHaveBeenCalled()
+
+    now = 6_000
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 0,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+
+    await expect(engine.setEnabled(true)).resolves.toMatchObject({
+      enabled: true,
+      state: 'building-flow',
+    })
+    expect(execute).toHaveBeenCalledWith('pump', 'on')
+  })
+
   it('starts by opening only the pump and enters running after actual flow', async () => {
     let now = 1_000
     const execute = vi.fn().mockResolvedValue(undefined)
@@ -48,6 +88,14 @@ describe('automation engine', () => {
         updatedAt: null,
       }),
       emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 0,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
     })
 
     expect((await engine.setEnabled(true)).state).toBe('building-flow')
@@ -87,6 +135,13 @@ describe('automation engine', () => {
       }),
       emit: vi.fn(),
     })
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 0,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
     await engine.setEnabled(true)
     await engine.handleReading({
       recordedAt: now,
@@ -106,6 +161,7 @@ describe('automation engine', () => {
   })
 
   it('keeps the requested heater state visible when the safety gate blocks publishing', async () => {
+    const now = Date.now()
     const engine = createAutomationEngine({
       deviceNumber: 'device-1',
       loadConfig: vi.fn().mockResolvedValue(config),
@@ -127,9 +183,16 @@ describe('automation engine', () => {
       emit: vi.fn(),
     })
 
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 0,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
     await engine.setEnabled(true)
     await engine.handleReading({
-      recordedAt: 1_000,
+      recordedAt: now,
       flowRate: 1,
       outletTemperature: 34,
       actualPump: 'on',
@@ -167,11 +230,117 @@ describe('automation engine', () => {
       emit: vi.fn(),
     })
 
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 0,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
     await engine.setEnabled(true)
     now = 6_000
     await engine.tick()
 
     expect(disableMaster).toHaveBeenCalledWith('启动超时，未建立安全流量')
     expect((await engine.getSnapshot()).enabled).toBe(false)
+  })
+
+  it('advances the PID time window from tick without a new sensor message', async () => {
+    let now = 1_000
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const pidConfig = {
+      ...config,
+      strategy: 'pid' as const,
+    }
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => now,
+      loadConfig: vi.fn().mockResolvedValue(pidConfig),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 1,
+      outletTemperature: 33,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: now,
+      flowRate: 1,
+      outletTemperature: 33,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+    expect(execute).toHaveBeenCalledWith('heater', 'on')
+
+    now = 6_000
+    await engine.tick()
+
+    expect(execute).toHaveBeenLastCalledWith('heater', 'off')
+    expect((await engine.getSnapshot()).pid?.desired).toBe('off')
+  })
+
+  it('enters cooling and disables master after a heater publish failure', async () => {
+    const disableMaster = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn(async (topic, value) => {
+        if (topic === 'heater' && value === 'on') {
+          throw new Error('MQTT 发布超时')
+        }
+      }),
+      disableMaster,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      enabled: false,
+      state: 'cooling',
+      desiredHeater: 'off',
+      limitationReason: 'MQTT 发布超时',
+    })
+    expect(disableMaster).toHaveBeenCalledWith('MQTT 发布超时')
   })
 })
