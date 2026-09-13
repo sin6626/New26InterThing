@@ -1,4 +1,8 @@
 import type { AutomationStatusMessage } from '@new26interthing/shared'
+import type {
+  SafetyAction,
+  SafetyFaultCode,
+} from '../safety/safety.types.js'
 
 import {
   createAutomationEngine,
@@ -21,6 +25,11 @@ interface Dependencies {
   waterFlow: WaterFlowService
   emit(message: AutomationStatusMessage): void
   disableMaster(deviceNumber: string, reason: string): Promise<void>
+  reportFault(
+    deviceNumber: string,
+    errorNumber: SafetyFaultCode,
+    detail: string,
+  ): Promise<void>
 }
 
 export const createAutomationManager = ({
@@ -30,6 +39,7 @@ export const createAutomationManager = ({
   waterFlow,
   emit,
   disableMaster,
+  reportFault,
 }: Dependencies) => {
   let engine: AutomationEngine | undefined
   let activeDeviceNumber: string | undefined
@@ -48,6 +58,11 @@ export const createAutomationManager = ({
       getWaterFlow: () => waterFlow.getSnapshot(deviceNumber),
       emit,
       disableMaster: reason => disableMaster(deviceNumber, reason),
+      reportFault: (errorNumber, detail) => reportFault(
+        deviceNumber,
+        errorNumber,
+        detail,
+      ),
     })
     return engine
   }
@@ -61,6 +76,22 @@ export const createAutomationManager = ({
     },
     handleReading(deviceNumber: string, reading: AutomationReading) {
       return getEngine(deviceNumber).handleReading(reading)
+    },
+    authorizeAction(deviceNumber: string, action: SafetyAction) {
+      return getEngine(deviceNumber).authorizeAction(action)
+    },
+    recordCommand(deviceNumber: string, action: SafetyAction) {
+      getEngine(deviceNumber).recordCommand(action)
+    },
+    recordCommandFailure(
+      deviceNumber: string,
+      action: SafetyAction,
+      message: string,
+    ) {
+      return getEngine(deviceNumber).handleCommandFailure(action, message)
+    },
+    resetFault(deviceNumber: string) {
+      return getEngine(deviceNumber).resetFault()
     },
     async tick() {
       await engine?.tick()

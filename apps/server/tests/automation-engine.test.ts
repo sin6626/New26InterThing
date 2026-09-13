@@ -15,6 +15,12 @@ const config = {
   buildFlowTimeoutSeconds: 5,
   coolingDelaySeconds: 10,
   dataTimeoutSeconds: 3,
+  lowFlowConfirmSeconds: 2,
+  maxSafePressure: 130,
+  maxSafeTemperature: 45,
+  temperatureReversedConfirmSeconds: 5,
+  dryHeatingTimeoutSeconds: 60,
+  dryHeatingTemperatureDifference: 0.1,
   pid: {
     targetTemperature: 35,
     kp: 10,
@@ -189,7 +195,8 @@ describe('automation engine', () => {
     await engine.tick()
 
     expect(execute).toHaveBeenLastCalledWith('pump', 'off')
-    expect((await engine.getSnapshot()).state).toBe('stopped')
+    expect((await engine.getSnapshot()).state).toBe('fault')
+    expect((await engine.getSnapshot()).safety.faultCode).toBe('SENSOR_PRESSURE_TIMEOUT')
   })
 
   it('keeps the requested heater state visible when the safety gate blocks publishing', async () => {
@@ -276,8 +283,72 @@ describe('automation engine', () => {
     now = 6_000
     await engine.tick()
 
-    expect(disableMaster).toHaveBeenCalledWith('启动超时，未建立安全流量')
+    expect(disableMaster).toHaveBeenCalledWith('水泵启动后未在限定时间内建立安全流量')
     expect((await engine.getSnapshot()).enabled).toBe(false)
+    expect((await engine.getSnapshot()).state).toBe('fault')
+  })
+
+  it('reports an over-pressure fault once and resets only after safe off feedback', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const reportFault = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      reportFault,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 31,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 130,
+      inletTemperature: 30,
+      outletTemperature: 31,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 31,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+
+    expect(reportFault).toHaveBeenCalledOnce()
+    expect(reportFault).toHaveBeenCalledWith(
+      'OVER_PRESSURE',
+      '管路压力达到或超过安全上限',
+    )
+    expect((await engine.getSnapshot()).safety.resetAllowed).toBe(true)
+    await expect(engine.resetFault()).resolves.toMatchObject({
+      state: 'stopped',
+      safety: { locked: false },
+    })
   })
 
   it('advances the PID time window from tick without a new sensor message', async () => {
@@ -325,11 +396,12 @@ describe('automation engine', () => {
     now = 6_000
     await engine.tick()
 
-    expect(execute).toHaveBeenLastCalledWith('heater', 'off')
-    expect((await engine.getSnapshot()).pid?.desired).toBe('off')
+    expect(execute).toHaveBeenCalledWith('heater', 'off')
+    expect(execute).toHaveBeenLastCalledWith('pump', 'off')
+    expect((await engine.getSnapshot()).safety.faultCode).toBe('SENSOR_PRESSURE_TIMEOUT')
   })
 
-  it('enters cooling and disables master after a heater publish failure', async () => {
+  it('locks a fault and disables master after a heater publish failure', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     const engine = createAutomationEngine({
       deviceNumber: 'device-1',
@@ -372,14 +444,14 @@ describe('automation engine', () => {
 
     expect(await engine.getSnapshot()).toMatchObject({
       enabled: false,
-      state: 'cooling',
+      state: 'fault',
       desiredHeater: 'off',
-      limitationReason: 'MQTT 发布超时',
+      limitationReason: '控制指令发布失败：MQTT 发布超时',
     })
-    expect(disableMaster).toHaveBeenCalledWith('MQTT 发布超时')
+    expect(disableMaster).toHaveBeenCalledWith('控制指令发布失败：MQTT 发布超时')
   })
 
-  it('keeps cooling state when the failed command is heater off', async () => {
+  it('keeps a locked fault when the failed command is heater off', async () => {
     const disableMaster = vi.fn().mockResolvedValue(undefined)
     let failHeaterOff = false
     const engine = createAutomationEngine({
@@ -431,11 +503,11 @@ describe('automation engine', () => {
 
     expect(await engine.getSnapshot()).toMatchObject({
       enabled: false,
-      state: 'cooling',
+      state: 'fault',
       desiredHeater: 'off',
-      limitationReason: '关热指令发布失败',
+      limitationReason: '安全关热失败：关热指令发布失败',
     })
-    expect(disableMaster).toHaveBeenCalledWith('关热指令发布失败')
+    expect(disableMaster).toHaveBeenCalledWith('控制指令发布失败：关热指令发布失败')
   })
 
   it('serializes sensor and tick decisions without duplicate commands', async () => {

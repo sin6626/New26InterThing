@@ -9,6 +9,7 @@ import { createDeviceRepository } from './modules/device/device.repository.js'
 import { createBehaviorRepository } from './modules/behavior/behavior.mysql.js'
 import { createRecognitionService } from './modules/behavior/recognition.service.js'
 import { createFaultRepository } from './modules/fault/fault.mysql.js'
+import { createFaultReporter } from './modules/fault/fault-reporter.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
@@ -18,6 +19,8 @@ import { createControlService } from './modules/control/control.service.js'
 import { parseDeviceReport } from './modules/control/device-report.js'
 import { createAutomationConfigLoader } from './modules/automation/control-config.js'
 import { createAutomationManager } from './modules/automation/automation-manager.js'
+import { normalizeAutomationReading } from './modules/automation/automation-reading.js'
+import { getSafetyFaultType } from './modules/safety/safety-fault-catalog.js'
 import {
   createPipeDiameterLoader,
   createWaterFlowRepository,
@@ -29,6 +32,10 @@ const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
+const faultReporter = createFaultReporter({
+  repository: faultRepository,
+  broadcast: message => realtimeWebSocket.broadcast(message),
+})
 let sensorMqtt: ReturnType<typeof createSensorMqtt>
 let automationManager: ReturnType<typeof createAutomationManager>
 const controlService = createControlService(controlRepository, {
@@ -36,6 +43,15 @@ const controlService = createControlService(controlRepository, {
 }, {
   setEnabled: (deviceNumber, enabled) => (
     automationManager.setEnabled(deviceNumber, enabled)
+  ),
+  authorizeAction: (deviceNumber, action) => (
+    automationManager.authorizeAction(deviceNumber, action)
+  ),
+  recordCommand: (deviceNumber, action) => {
+    automationManager.recordCommand(deviceNumber, action)
+  },
+  recordCommandFailure: (deviceNumber, action, message) => (
+    automationManager.recordCommandFailure(deviceNumber, action, message)
   ),
 })
 const waterFlowService = createWaterFlowService({
@@ -59,10 +75,18 @@ automationManager = createAutomationManager({
   async execute(deviceNumber, topic, value) {
     const definition = await controlRepository.getDefinitionByTopic?.(topic)
     if (!definition) throw new Error(`未配置 ${topic} 设备指令`)
-    await controlService.execute({
+    await controlService.executeAutomation({
       deviceNumber,
       configId: definition.configId,
       value,
+    })
+  },
+  async reportFault(deviceNumber, errorNumber, detail) {
+    await faultReporter.reportFault({
+      deviceNumber,
+      errorNumber,
+      type: getSafetyFaultType(errorNumber),
+      detail,
     })
   },
 })
@@ -84,40 +108,20 @@ const handleSensorReading = createSensorRealtimeHandler({
   broadcast: (message) => realtimeWebSocket.broadcast(message),
   afterSave: [
     async (message) => {
-      const rawFlow = message.values.flow_rate ?? message.values.field5
-      const flow = Number(rawFlow)
-      if (!Number.isFinite(flow) || flow < 0) return
-      const snapshot = await waterFlowService.handleReading(
-        message.deviceNumber,
-        flow,
-        Date.now(),
-      )
-      realtimeWebSocket.broadcast({
-        type: 'water-flow.realtime',
-        data: snapshot,
-      })
-    },
-    async (message) => {
-      const actuator = (value: unknown) => {
-        if (value === 'on' || value === 1 || value === '1') {
-          return 'on' as const
-        }
-        if (value === 'off' || value === 0 || value === '0') {
-          return 'off' as const
-        }
-        return 'unknown' as const
+      const receivedAt = Date.now()
+      const reading = normalizeAutomationReading(message.values, receivedAt)
+      if (reading.flowRate !== null && reading.flowRate >= 0) {
+        const snapshot = await waterFlowService.handleReading(
+          message.deviceNumber,
+          reading.flowRate,
+          receivedAt,
+        )
+        realtimeWebSocket.broadcast({
+          type: 'water-flow.realtime',
+          data: snapshot,
+        })
       }
-      const numeric = (value: unknown) => {
-        const parsed = Number(value)
-        return Number.isFinite(parsed) ? parsed : null
-      }
-      await automationManager.handleReading(message.deviceNumber, {
-        recordedAt: Date.now(),
-        flowRate: numeric(message.values.flow_rate ?? message.values.field5),
-        outletTemperature: numeric(message.values.temp_out ?? message.values.field4),
-        actualPump: actuator(message.values.water_Y2),
-        actualHeater: actuator(message.values.heat_Y1),
-      })
+      await automationManager.handleReading(message.deviceNumber, reading)
     },
   ],
 })

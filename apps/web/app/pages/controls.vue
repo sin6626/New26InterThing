@@ -21,6 +21,8 @@ const {
 const {
   loading: automationLoading,
   resetting: resettingWaterFlow,
+  resettingFault,
+  resetFault,
   resetWaterFlow,
   snapshot: automation,
 } = useAutomation(selectedDevice)
@@ -30,6 +32,14 @@ const stateLabels = {
   'building-flow': '正在建流',
   running: '自动运行',
   cooling: '正在冷却',
+  fault: '故障锁定',
+}
+
+const sensorStatusLabels = {
+  unknown: '未知',
+  ok: '正常',
+  invalid: '无效',
+  timeout: '超时',
 }
 
 const switchValue = (field: ControlField) => field.value === 'on'
@@ -86,8 +96,10 @@ onMounted(() => void initialize())
       :closable="false"
     />
     <el-alert
-      title="自动模式可以进行建流和状态演练；第八里程碑安全保护完成前，系统不会真正开启加热。"
-      type="warning"
+      :title="automation?.safety.locked
+        ? `安全故障已锁定：${automation.safety.detail}`
+        : '加热、水泵和自动模式均由后端统一安全门持续保护。'"
+      :type="automation?.safety.locked ? 'error' : 'success'"
       show-icon
       :closable="false"
     />
@@ -100,9 +112,21 @@ onMounted(() => void initialize())
       <template #header>
         <div class="flex items-center justify-between">
           <span class="font-medium">自动水循环状态</span>
-          <el-tag :type="automation?.enabled ? 'success' : 'info'">
+          <div class="flex items-center gap-2">
+            <el-button
+              v-if="automation?.safety.locked"
+              type="danger"
+              plain
+              :loading="resettingFault"
+              :disabled="!automation.safety.resetAllowed"
+              @click="resetFault"
+            >
+              确认并复位
+            </el-button>
+          <el-tag :type="automation?.safety.locked ? 'danger' : automation?.enabled ? 'success' : 'info'">
             {{ automation ? stateLabels[automation.state] : '--' }}
           </el-tag>
+          </div>
         </div>
       </template>
       <el-descriptions :column="4" border>
@@ -140,9 +164,40 @@ onMounted(() => void initialize())
           </template>
           <template v-else>--</template>
         </el-descriptions-item>
+        <el-descriptions-item label="故障码">
+          {{ automation?.safety.faultCode ?? '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="故障记录">
+          <template v-if="automation?.safety.locked">
+            {{ automation.safety.faultRecorded ? '已入库并告警' : automation.safety.faultRecordError || '等待记录' }}
+          </template>
+          <template v-else>--</template>
+        </el-descriptions-item>
+        <el-descriptions-item label="保护动作">
+          <template v-if="automation?.safety.protection">
+            关热：{{ automation.safety.protection.closeHeater ? '是' : '否' }}；
+            停泵：{{ automation.safety.protection.stopPump ? '是' : '延时散热' }}
+          </template>
+          <template v-else>--</template>
+        </el-descriptions-item>
+        <el-descriptions-item label="流量传感器">
+          {{ automation ? sensorStatusLabels[automation.safety.sensors.flow] : '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="压力传感器">
+          {{ automation ? sensorStatusLabels[automation.safety.sensors.pressure] : '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="入口温度传感器">
+          {{ automation ? sensorStatusLabels[automation.safety.sensors.inletTemperature] : '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="出口温度传感器">
+          {{ automation ? sensorStatusLabels[automation.safety.sensors.outletTemperature] : '--' }}
+        </el-descriptions-item>
       </el-descriptions>
       <p v-if="automation?.limitationReason" class="mb-0 text-sm text-amber-600">
         当前限制：{{ automation.limitationReason }}
+      </p>
+      <p v-if="automation?.safety.locked && !automation.safety.resetAllowed" class="mb-0 text-sm text-red-600">
+        暂不可复位：{{ automation.safety.resetReason }}
       </p>
     </el-card>
 
@@ -196,7 +251,10 @@ onMounted(() => void initialize())
                 :loading="savingId === field.configId"
                 :disabled="savingId !== undefined
                   || (field.heaterStartBlocked && field.value !== 'on')
-                  || (field.automaticStartBlocked && field.value !== 'on')"
+                  || (field.automaticStartBlocked && field.value !== 'on')
+                  || (automation?.safety.locked
+                    && field.value !== 'on'
+                    && ['pump', 'heater', 'master'].includes(field.topic))"
                 active-text="开启"
                 inactive-text="关闭"
                 @change="value => update(field, Boolean(value))"

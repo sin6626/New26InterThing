@@ -207,7 +207,7 @@ Content-Type: application/json
 GET /api/automation/:deviceNumber
 ```
 
-返回状态机状态、实际与期望执行器状态、PID 诊断以及累计水量快照。页面首次进入必须调用该接口，WebSocket 只补充后续的 `automation.status` 和 `water-flow.realtime` 更新。
+返回状态机状态、实际与期望执行器状态、PID 诊断、累计水量以及 `safety` 安全快照。`safety` 包含故障锁定、故障码、中文事实详情、发生时间、保护动作、故障入库状态、四类传感器新鲜度以及复位条件。页面首次进入必须调用该接口，WebSocket 只补充后续的 `automation.status` 和 `water-flow.realtime` 更新。
 
 ### 启停自动模式
 
@@ -216,7 +216,15 @@ POST /api/automation/:deviceNumber/start
 POST /api/automation/:deviceNumber/stop
 ```
 
-启停接口与指令页面的 `master` 开关进入同一个自动控制引擎。`master` 不发布 MQTT；启动时状态机只先发布水泵开启。第八里程碑安全保护完成前，加热开启仍由后端拒绝。
+启停接口与指令页面的 `master` 开关进入同一个自动控制引擎。`master` 不发布 MQTT；启动时状态机只先发布水泵开启。水泵、加热和自动模式开启均经过后端统一安全门；关闭动作始终允许。故障锁定时启动返回 HTTP 409 和具体原因。
+
+### 人工复位安全故障
+
+```http
+POST /api/automation/:deviceNumber/fault/reset
+```
+
+只有配置有效、四类传感器数据新鲜、温压恢复安全且实际与期望水泵/加热均已关闭时才能复位。失败返回 HTTP 409 和不满足条件；成功仅解除故障锁定并返回 `stopped` 快照，不恢复 `master`，也不自动开启设备。
 
 ### 清零累计水量
 

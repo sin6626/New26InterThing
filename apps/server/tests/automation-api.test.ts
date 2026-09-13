@@ -1,0 +1,73 @@
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
+import express from 'express'
+
+import { createAutomationRouter } from '../src/modules/automation/automation.routes.js'
+import { AutomationError } from '../src/modules/automation/automation.types.js'
+import type { AutomationManager } from '../src/modules/automation/automation-manager.js'
+import type { ControlRepository } from '../src/modules/control/control.repository.js'
+import type { ControlService } from '../src/modules/control/control.service.js'
+import type { WaterFlowService } from '../src/modules/water-flow/water-flow.service.js'
+
+const servers: Array<{ close(): void }> = []
+
+afterEach(() => servers.splice(0).forEach(server => server.close()))
+
+const startServer = async (resetFault: ReturnType<typeof vi.fn>) => {
+  const app = express()
+  app.use('/api/automation', createAutomationRouter(
+    { resetFault } as unknown as AutomationManager,
+    {} as ControlService,
+    {} as ControlRepository,
+    {} as WaterFlowService,
+  ))
+  app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
+    response.status(500).json({ message: error instanceof Error ? error.message : String(error) })
+  })
+  const server = app.listen(0)
+  servers.push(server)
+  await new Promise<void>(resolve => server.once('listening', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('测试服务启动失败')
+  return `http://127.0.0.1:${address.port}`
+}
+
+describe('automation HTTP API', () => {
+  it('returns a visible 409 when fault reset conditions are not met', async () => {
+    const baseUrl = await startServer(vi.fn().mockRejectedValue(
+      new AutomationError('水泵和加热尚未全部关闭'),
+    ))
+
+    const response = await fetch(`${baseUrl}/api/automation/device-1/fault/reset`, {
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({
+      code: 409,
+      message: '水泵和加热尚未全部关闭',
+      data: null,
+    })
+  })
+
+  it('returns the stopped snapshot after a successful reset', async () => {
+    const resetFault = vi.fn().mockResolvedValue({ state: 'stopped' })
+    const baseUrl = await startServer(resetFault)
+
+    const response = await fetch(`${baseUrl}/api/automation/device-1/fault/reset`, {
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(200)
+    expect(resetFault).toHaveBeenCalledWith('device-1')
+    expect(await response.json()).toMatchObject({
+      code: 0,
+      data: { state: 'stopped' },
+    })
+  })
+})

@@ -28,11 +28,32 @@ const repository = () => ({
   saveFailure: vi.fn(),
 } as unknown as ControlRepository)
 
+const allowSafety = () => ({
+  setEnabled: vi.fn(),
+  authorizeAction: vi.fn().mockResolvedValue({ allowed: true, reason: null }),
+})
+
 describe('control service', () => {
-  it('publishes once before saving the expected value and success log', async () => {
+  it('fails closed when a device command has no safety controller', async () => {
     const repo = repository()
     const publish = vi.fn()
     const service = createControlService(repo, { publish })
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 23,
+      value: 'on',
+    })).rejects.toMatchObject({
+      status: 503,
+      message: '安全控制服务尚未初始化',
+    })
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('publishes once before saving the expected value and success log', async () => {
+    const repo = repository()
+    const publish = vi.fn()
+    const service = createControlService(repo, { publish }, allowSafety())
 
     await expect(service.execute({
       deviceNumber: '202111',
@@ -47,8 +68,13 @@ describe('control service', () => {
 
   it('records a failed publish without saving the expected value', async () => {
     const repo = repository()
+    const recordCommandFailure = vi.fn()
     const service = createControlService(repo, {
       publish: vi.fn().mockRejectedValue(new Error('MQTT 当前未连接')),
+    }, {
+      setEnabled: vi.fn(),
+      authorizeAction: vi.fn().mockResolvedValue({ allowed: true, reason: null }),
+      recordCommandFailure,
     })
 
     await expect(service.execute({
@@ -58,6 +84,11 @@ describe('control service', () => {
     })).rejects.toMatchObject({ status: 503 })
     expect(repo.saveFailure).toHaveBeenCalledOnce()
     expect(repo.saveSuccess).not.toHaveBeenCalled()
+    expect(recordCommandFailure).toHaveBeenCalledWith(
+      '202111',
+      { topic: 'pump', value: 'on' },
+      'MQTT 当前未连接',
+    )
   })
 
   it('saves state-machine parameters without publishing MQTT', async () => {
@@ -147,7 +178,7 @@ describe('control service', () => {
     })
   })
 
-  it('rejects heater start before publishing', async () => {
+  it('rejects heater start when the shared safety gate denies it', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({
       ...definition,
@@ -155,14 +186,50 @@ describe('control service', () => {
       topic: 'heater',
     })
     const publish = vi.fn()
-    const service = createControlService(repo, { publish })
+    const service = createControlService(repo, { publish }, {
+      setEnabled: vi.fn(),
+      authorizeAction: vi.fn().mockResolvedValue({
+        allowed: false,
+        reason: '设备实际水泵尚未开启',
+      }),
+    })
 
     await expect(service.execute({
       deviceNumber: '202111',
       configId: 24,
       value: 'on',
-    })).rejects.toMatchObject({ status: 409 })
+    })).rejects.toMatchObject({
+      status: 409,
+      message: '设备实际水泵尚未开启',
+    })
     expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('publishes heater start when the shared safety gate allows it', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      configId: 24,
+      topic: 'heater',
+    })
+    const publish = vi.fn()
+    const recordCommand = vi.fn()
+    const service = createControlService(repo, { publish }, {
+      setEnabled: vi.fn(),
+      authorizeAction: vi.fn().mockResolvedValue({ allowed: true, reason: null }),
+      recordCommand,
+    })
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 24,
+      value: 'on',
+    })).resolves.toMatchObject({ status: 'published' })
+    expect(publish).toHaveBeenCalledOnce()
+    expect(recordCommand).toHaveBeenCalledWith('202111', {
+      topic: 'heater',
+      value: 'on',
+    })
   })
 
   it('validates configured numeric ranges and choices', async () => {

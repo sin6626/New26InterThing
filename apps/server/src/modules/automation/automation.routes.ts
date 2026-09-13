@@ -4,6 +4,7 @@ import type { ControlRepository } from '../control/control.repository.js'
 import type { ControlService } from '../control/control.service.js'
 import type { WaterFlowService } from '../water-flow/water-flow.service.js'
 import type { AutomationManager } from './automation-manager.js'
+import { AutomationError } from './automation.types.js'
 
 export const createAutomationRouter = (
   manager: AutomationManager,
@@ -44,7 +45,7 @@ export const createAutomationRouter = (
     try {
       response.json({
         code: 0,
-        message: '自动模式已启动；安全保护完成前不会真正开启加热',
+        message: '自动模式已启动，所有运行指令受后端安全保护约束',
         data: await setMaster(request.params.deviceNumber, 'on'),
       })
     }
@@ -62,6 +63,26 @@ export const createAutomationRouter = (
       })
     }
     catch (error) {
+      next(error)
+    }
+  })
+
+  router.post('/:deviceNumber/fault/reset', async (request, response, next) => {
+    try {
+      response.json({
+        code: 0,
+        message: '故障已复位，系统保持停止',
+        data: await manager.resetFault(request.params.deviceNumber),
+      })
+    }
+    catch (error) {
+      if (error instanceof AutomationError) {
+        return response.status(error.status).json({
+          code: error.status,
+          message: error.message,
+          data: null,
+        })
+      }
       next(error)
     }
   })

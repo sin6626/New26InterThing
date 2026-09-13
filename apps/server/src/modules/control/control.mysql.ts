@@ -154,7 +154,7 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
           ? 'command'
           : 'parameter',
         value: row.value ?? null,
-        heaterStartBlocked: row.topic === 'heater',
+        heaterStartBlocked: false,
         automaticStartBlocked: false,
       })),
     }

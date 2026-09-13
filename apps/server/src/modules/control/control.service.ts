@@ -13,6 +13,19 @@ export interface CommandPublisher {
 
 export interface AutomationModeController {
   setEnabled(deviceNumber: string, enabled: boolean): Promise<unknown>
+  authorizeAction?(
+    deviceNumber: string,
+    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+  ): Promise<{ allowed: boolean, reason: string | null }>
+  recordCommand?(
+    deviceNumber: string,
+    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+  ): void
+  recordCommandFailure?(
+    deviceNumber: string,
+    action: { topic: 'pump' | 'heater', value: 'on' | 'off' },
+    message: string,
+  ): Promise<void>
 }
 
 export class ControlError extends Error {
@@ -55,44 +68,11 @@ export const createControlService = (
   repository: ControlRepository,
   publisher: CommandPublisher,
   automation?: AutomationModeController,
-) => ({
-  async syncTime(deviceNumber: string, requestedTime?: string) {
-    const date = requestedTime ? new Date(requestedTime.replace(' ', 'T')) : new Date()
-    if (Number.isNaN(date.getTime())) throw new ControlError('时间格式错误', 400)
-    const pad = (value: number) => String(value).padStart(2, '0')
-    const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    try {
-      await publisher.publish('device/updateTime', {
-        d_no: deviceNumber,
-        nowTime: value.slice(11),
-        nowdate: `${value.slice(2, 4)}.${value.slice(5, 7)}.${value.slice(8, 10)}`,
-      })
-    }
-    catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      await repository.saveTimeSync(deviceNumber, value, 'failed', `应用层下发失败：${message}`)
-      throw new ControlError(message, 503)
-    }
-
-    try {
-      await repository.saveTimeSync(
-        deviceNumber,
-        value,
-        'success',
-        '应用层下发；MQTT发布成功',
-      )
-    }
-    catch {
-      throw new ControlError('时间已发布，但操作日志保存失败', 500)
-    }
-
-    return {
-      value,
-      status: 'published' as const,
-    }
-  },
-
-  async execute(intent: ControlCommandIntent): Promise<ControlCommandResult> {
+) => {
+  const executeCommand = async (
+    intent: ControlCommandIntent,
+    trustedAutomation = false,
+  ): Promise<ControlCommandResult> => {
     const definition = await repository.getDefinition(intent.deviceNumber, intent.configId)
     if (!definition) throw new ControlError('未找到对应的指令配置', 404)
 
@@ -124,28 +104,36 @@ export const createControlService = (
         throw new ControlError('指令值不在配置选项中', 400)
       }
     }
-    if (definition.topic === 'heater' && value === 'on') {
-      throw new ControlError(
-        '安全保护尚未完成，当前禁止人工开启加热',
-        409,
-        'HEATER_SAFETY_BLOCKED',
-      )
+    const shouldPublish = isDeviceCommand(definition.topic)
+    const action = shouldPublish
+      ? {
+          topic: definition.topic as 'pump' | 'heater',
+          value: value as 'on' | 'off',
+        }
+      : null
+    if (!trustedAutomation && action) {
+      if (!automation?.authorizeAction) {
+        throw new ControlError('安全控制服务尚未初始化', 503)
+      }
+      const authorization = await automation.authorizeAction(intent.deviceNumber, action)
+      if (!authorization.allowed) {
+        throw new ControlError(
+          authorization.reason || '安全条件不满足',
+          409,
+          'SAFETY_BLOCKED',
+        )
+      }
     }
     if (definition.topic === 'master') {
-      if (!automation) {
-        throw new ControlError('自动控制服务尚未初始化', 503)
-      }
+      if (!automation) throw new ControlError('自动控制服务尚未初始化', 503)
       try {
         await automation.setEnabled(intent.deviceNumber, value === 'on')
       }
       catch (error) {
         if (error instanceof ControlError) throw error
-        const message = error instanceof Error ? error.message : String(error)
-        throw new ControlError(message, 409)
+        throw new ControlError(error instanceof Error ? error.message : String(error), 409)
       }
     }
-
-    const shouldPublish = isDeviceCommand(definition.topic)
 
     if (shouldPublish) {
       const envelope = buildCommandEnvelope({
@@ -163,7 +151,17 @@ export const createControlService = (
       catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         await repository.saveFailure(definition, intent.deviceNumber, value, `应用层下发失败：${message}`)
+        if (!trustedAutomation && action) {
+          await Promise.resolve(automation?.recordCommandFailure?.(
+            intent.deviceNumber,
+            action,
+            message,
+          )).catch(() => undefined)
+        }
         throw new ControlError(message, 503)
+      }
+      if (!trustedAutomation && action) {
+        automation?.recordCommand?.(intent.deviceNumber, action)
       }
     }
 
@@ -176,20 +174,55 @@ export const createControlService = (
       )
     }
     catch {
-      throw new ControlError(
-        shouldPublish
-          ? '设备指令可能已发布，但状态和日志保存失败'
-          : '配置保存失败',
-        500,
-      )
+      throw new ControlError(shouldPublish ? '设备指令可能已发布，但状态和日志保存失败' : '配置保存失败', 500)
     }
-
     return {
       configId: intent.configId,
       value,
       status: shouldPublish ? 'published' : 'saved',
     }
-  },
-})
+  }
+
+  return {
+    async syncTime(deviceNumber: string, requestedTime?: string) {
+      const date = requestedTime ? new Date(requestedTime.replace(' ', 'T')) : new Date()
+      if (Number.isNaN(date.getTime())) throw new ControlError('时间格式错误', 400)
+      const pad = (value: number) => String(value).padStart(2, '0')
+      const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+      try {
+        await publisher.publish('device/updateTime', {
+          d_no: deviceNumber,
+          nowTime: value.slice(11),
+          nowdate: `${value.slice(2, 4)}.${value.slice(5, 7)}.${value.slice(8, 10)}`,
+        })
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        await repository.saveTimeSync(deviceNumber, value, 'failed', `应用层下发失败：${message}`)
+        throw new ControlError(message, 503)
+      }
+
+      try {
+        await repository.saveTimeSync(
+          deviceNumber,
+          value,
+          'success',
+          '应用层下发；MQTT发布成功',
+        )
+      }
+      catch {
+        throw new ControlError('时间已发布，但操作日志保存失败', 500)
+      }
+
+      return {
+        value,
+        status: 'published' as const,
+      }
+    },
+
+    execute: (intent: ControlCommandIntent) => executeCommand(intent),
+    executeAutomation: (intent: ControlCommandIntent) => executeCommand(intent, true),
+  }
+}
 
 export type ControlService = ReturnType<typeof createControlService>

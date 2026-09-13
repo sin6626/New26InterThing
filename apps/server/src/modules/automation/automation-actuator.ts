@@ -20,14 +20,15 @@ export const createAutomationActuator = ({ execute }: Dependencies) => {
   const run = async (
     topic: ActuatorTopic,
     value: ActuatorValue,
+    force = false,
   ) => {
     if (topic === 'pump') {
       desiredPump = value
-      if (publishedPump === value) return
+      if (!force && publishedPump === value) return
     }
     else {
       desiredHeater = value
-      if (publishedHeater === value) return
+      if (!force && publishedHeater === value) return
     }
 
     actionTail = actionTail.then(() => execute(topic, value))
@@ -67,6 +68,10 @@ export const createAutomationActuator = ({ execute }: Dependencies) => {
     },
     get lastAction() {
       return lastAction
+    },
+    adoptDesired(topic: ActuatorTopic, value: ActuatorValue) {
+      if (topic === 'pump') desiredPump = value
+      else desiredHeater = value
     },
     run,
   }

@@ -54,6 +54,12 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     buildFlowTimeoutSeconds: positive('build_flow_timeout'),
     coolingDelaySeconds: positive('cooling_delay'),
     dataTimeoutSeconds: positive('data_timeout'),
+    lowFlowConfirmSeconds: positive('low_flow_confirm_time'),
+    maxSafePressure: positive('max_safe_pressure'),
+    maxSafeTemperature,
+    temperatureReversedConfirmSeconds: positive('temp_reversed_confirm_time'),
+    dryHeatingTimeoutSeconds: positive('dry_heating_timeout'),
+    dryHeatingTemperatureDifference: positive('dry_heating_temp_diff'),
     pid: {
       targetTemperature,
       kp: nonNegative('pid_kp'),
