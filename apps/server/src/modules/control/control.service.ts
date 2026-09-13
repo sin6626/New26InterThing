@@ -16,7 +16,11 @@ export interface AutomationModeController {
 }
 
 export class ControlError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
     super(message)
   }
 }
@@ -121,7 +125,11 @@ export const createControlService = (
       }
     }
     if (definition.topic === 'heater' && value === 'on') {
-      throw new ControlError('安全保护尚未完成，当前禁止人工开启加热', 409)
+      throw new ControlError(
+        '安全保护尚未完成，当前禁止人工开启加热',
+        409,
+        'HEATER_SAFETY_BLOCKED',
+      )
     }
     if (definition.topic === 'master') {
       if (!automation) {

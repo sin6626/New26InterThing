@@ -65,8 +65,18 @@ export const createAutomationEngine = ({
   let publishedPump: ActuatorValue = 'off'
   let publishedHeater: ActuatorValue = 'off'
   let configFingerprint = ''
-  let latestReadingAt: number | null = null
+  let latestReading: AutomationReading | null = null
   let actionTail = Promise.resolve()
+  let operationTail = Promise.resolve()
+
+  const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
+    const current = operationTail.then(operation, operation)
+    operationTail = current.then(
+      () => undefined,
+      () => undefined,
+    )
+    return current
+  }
 
   const runAction = async (
     topic: 'pump' | 'heater',
@@ -95,10 +105,13 @@ export const createAutomationEngine = ({
     catch (error) {
       actionTail = Promise.resolve()
       const message = error instanceof Error ? error.message : String(error)
+      const errorCode = error && typeof error === 'object' && 'code' in error
+        ? error.code
+        : undefined
       lastAction = {
         topic,
         value,
-        status: message.includes('安全保护尚未完成') ? 'blocked' : 'failed',
+        status: errorCode === 'HEATER_SAFETY_BLOCKED' ? 'blocked' : 'failed',
         message,
       }
       throw error
@@ -144,9 +157,14 @@ export const createAutomationEngine = ({
     if (lastAction?.status === 'blocked') return
 
     enabled = false
-    await runAction('heater', 'off')
     state = desiredPump === 'on' ? 'cooling' : 'stopped'
     enteredAt = clock()
+    try {
+      await runAction('heater', 'off')
+    }
+    catch {
+      limitationReason = message
+    }
     await disableMaster(message)
   }
 
@@ -183,92 +201,106 @@ export const createAutomationEngine = ({
   }
 
   return {
-    async setEnabled(nextEnabled: boolean) {
-      if (enabled === nextEnabled) return getSnapshot()
-      config = await loadConfig()
-      if (nextEnabled) {
-        const readingAge = latestReadingAt === null
-          ? Number.POSITIVE_INFINITY
-          : clock() - latestReadingAt
-        if (
-          readingAge < 0
-          || readingAge > config.dataTimeoutSeconds * 1_000
-        ) {
-          throw new Error('最近传感器数据不可用，无法启动自动模式')
+    setEnabled(nextEnabled: boolean) {
+      return serialize(async () => {
+        if (enabled === nextEnabled) return getSnapshot()
+        config = await loadConfig()
+        if (nextEnabled) {
+          const readingAge = latestReading === null
+            ? Number.POSITIVE_INFINITY
+            : clock() - latestReading.recordedAt
+          const readingValuesAvailable = latestReading !== null
+            && latestReading.flowRate !== null
+            && latestReading.outletTemperature !== null
+            && latestReading.actualPump !== 'unknown'
+            && latestReading.actualHeater !== 'unknown'
+          if (
+            !readingValuesAvailable
+            || readingAge < 0
+            || readingAge > config.dataTimeoutSeconds * 1_000
+          ) {
+            throw new Error('最近传感器数据不可用，无法启动自动模式')
+          }
+          configFingerprint = JSON.stringify(config)
+          await runAction('pump', 'on')
+          enabled = true
+          state = 'building-flow'
+          enteredAt = clock()
+          limitationReason = '等待设备建流'
         }
-        configFingerprint = JSON.stringify(config)
-        await runAction('pump', 'on')
-        enabled = true
-        state = 'building-flow'
-        enteredAt = clock()
-        limitationReason = '等待设备建流'
-      }
-      else {
-        enabled = false
-        await runAction('heater', 'off')
-        state = desiredPump === 'on' ? 'cooling' : 'stopped'
-        enteredAt = clock()
-        limitationReason = state === 'cooling' ? '正在冷却' : null
-      }
-      await notify()
-      return getSnapshot()
+        else {
+          enabled = false
+          await runAction('heater', 'off')
+          state = desiredPump === 'on' ? 'cooling' : 'stopped'
+          enteredAt = clock()
+          limitationReason = state === 'cooling' ? '正在冷却' : null
+        }
+        await notify()
+        return getSnapshot()
+      })
     },
 
-    async handleReading(reading: AutomationReading) {
-      latestReadingAt = reading.recordedAt
-      actualPump = reading.actualPump
-      actualHeater = reading.actualHeater
-      outletTemperature = reading.outletTemperature
-      if (
-        state === 'building-flow'
-        && config
-        && actualPump === 'on'
-        && reading.flowRate !== null
-        && reading.flowRate >= config.minSafeFlow
-      ) {
-        state = 'running'
-        enteredAt = clock()
-        limitationReason = null
-      }
-      await updateTemperatureDemand()
-      await notify()
+    handleReading(reading: AutomationReading) {
+      return serialize(async () => {
+        latestReading = reading
+        actualPump = reading.actualPump
+        actualHeater = reading.actualHeater
+        outletTemperature = reading.outletTemperature
+        if (
+          state === 'building-flow'
+          && config
+          && actualPump === 'on'
+          && reading.flowRate !== null
+          && reading.flowRate >= config.minSafeFlow
+        ) {
+          state = 'running'
+          enteredAt = clock()
+          limitationReason = null
+        }
+        await updateTemperatureDemand()
+        await notify()
+      })
     },
 
-    async tick() {
-      if (!config) return
-      const latestConfig = await loadConfig()
-      const latestFingerprint = JSON.stringify(latestConfig)
-      if (latestFingerprint !== configFingerprint) {
-        config = latestConfig
-        configFingerprint = latestFingerprint
-        temperatureController.reset()
-        pid = null
-      }
-      const elapsed = (clock() - enteredAt) / 1_000
-      if (state === 'building-flow' && elapsed >= config.buildFlowTimeoutSeconds) {
-        enabled = false
-        await runAction('heater', 'off')
-        await runAction('pump', 'off')
-        state = 'stopped'
-        limitationReason = '启动超时，未建立安全流量'
-        await disableMaster(limitationReason)
-      }
-      if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
-        await runAction('pump', 'off')
-        state = 'stopped'
-        limitationReason = null
-      }
-      await updateTemperatureDemand()
-      await notify()
+    tick() {
+      return serialize(async () => {
+        if (!config) return
+        const latestConfig = await loadConfig()
+        const latestFingerprint = JSON.stringify(latestConfig)
+        if (latestFingerprint !== configFingerprint) {
+          config = latestConfig
+          configFingerprint = latestFingerprint
+          temperatureController.reset()
+          pid = null
+        }
+        const elapsed = (clock() - enteredAt) / 1_000
+        if (state === 'building-flow' && elapsed >= config.buildFlowTimeoutSeconds) {
+          enabled = false
+          await runAction('heater', 'off')
+          await runAction('pump', 'off')
+          state = 'stopped'
+          limitationReason = '启动超时，未建立安全流量'
+          await disableMaster(limitationReason)
+        }
+        if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
+          await runAction('pump', 'off')
+          state = 'stopped'
+          limitationReason = null
+        }
+        await updateTemperatureDemand()
+        await notify()
+      })
     },
 
     getSnapshot,
 
-    async close() {
-      enabled = false
-      await runAction('heater', 'off')
-      await runAction('pump', 'off')
-      state = 'stopped'
+    close() {
+      return serialize(async () => {
+        enabled = false
+        await runAction('heater', 'off')
+        await runAction('pump', 'off')
+        state = 'stopped'
+      })
     },
   }
 }
