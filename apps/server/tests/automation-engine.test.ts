@@ -741,6 +741,59 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenCalledWith('heater', 'off')
   })
 
+  it('keeps the last outlet temperature so a partial low-flow reading still closes heat', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'off',
+      actualHeater: 'off',
+    })
+    await engine.setEnabled(true)
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 34,
+      actualPump: 'on',
+      actualHeater: 'off',
+    })
+    execute.mockClear()
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0.2,
+      pressure: null,
+      inletTemperature: null,
+      outletTemperature: null,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(execute).toHaveBeenCalledWith('heater', 'off')
+  })
+
   it('does not let pending fault persistence block the protection operation', async () => {
     const engine = createAutomationEngine({
       deviceNumber: 'device-1',

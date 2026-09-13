@@ -510,4 +510,32 @@ describe('safety supervisor', () => {
       actualPump: 'on',
     }, manualContext())).toBeNull()
   })
+
+  it('uses confirmed LOW_FLOW after a manual pump has successfully built flow', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const manualContext = () => context({
+      state: 'stopped',
+      manualPumpStartedAt: 1_000,
+      desiredPump: 'on',
+    })
+    supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+      actualPump: 'off',
+    }, manualContext())
+    now = 2_000
+    supervisor.handleReading(reading(now), manualContext())
+    now = 3_000
+    expect(supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+    }, manualContext())).toBeNull()
+    now = 5_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      flowRate: 0,
+    }, manualContext())).toMatchObject({ faultCode: 'LOW_FLOW' })
+  })
 })

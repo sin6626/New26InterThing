@@ -252,7 +252,9 @@ export const createAutomationEngine = ({
         latestReading = reading
         actualPump = reading.actualPump
         actualHeater = reading.actualHeater
-        outletTemperature = reading.outletTemperature
+        if (reading.outletTemperature !== null) {
+          outletTemperature = reading.outletTemperature
+        }
         if (!config) {
           try {
             await loadCheckedConfig()

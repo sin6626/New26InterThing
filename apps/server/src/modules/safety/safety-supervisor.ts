@@ -39,6 +39,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let heatingBaseline: number | null = null
   let effectiveHeatingMilliseconds = 0
   let lastEffectiveHeatingAt: number | null = null
+  let observedManualPumpStartedAt: number | null = null
+  let manualFlowEstablished = false
 
   const isFresh = (key: SensorKey, context: SafetyContext) => (
     sensors.isFresh(key, context.config.dataTimeoutSeconds)
@@ -108,6 +110,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     if (
       context.manualPumpStartedAt !== undefined
       && context.manualPumpStartedAt !== null
+      && !manualFlowEstablished
       && (sensors.value('flow') ?? 0) < context.config.minSafeFlow
       && now - context.manualPumpStartedAt >= context.config.buildFlowTimeoutSeconds * 1_000
     ) return latch('PUMP_IDLING')
@@ -205,6 +208,19 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       sensors.update('pressure', reading.pressure, reading.recordedAt)
       sensors.update('inletTemperature', reading.inletTemperature, reading.recordedAt, true)
       sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt, true)
+      if (context.manualPumpStartedAt !== observedManualPumpStartedAt) {
+        observedManualPumpStartedAt = context.manualPumpStartedAt ?? null
+        manualFlowEstablished = false
+      }
+      if (
+        context.manualPumpStartedAt !== null
+        && context.manualPumpStartedAt !== undefined
+        && reading.actualPump === 'on'
+        && reading.flowRate !== null
+        && reading.flowRate >= context.config.minSafeFlow
+      ) {
+        manualFlowEstablished = true
+      }
 
       if (lockedDecision) {
         return upgradeLockedProtection(context)
@@ -244,7 +260,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
           && reading.flowRate >= context.config.minSafeFlow
           && reading.pressure !== null
           && reading.pressure < context.config.maxSafePressure
-        return latch('OVER_TEMPERATURE', { stopPump: !hydraulicsSafe })
+        return latch('OVER_TEMPERATURE', {
+          detail: detailWithConcurrentFacts('OVER_TEMPERATURE', reading, context),
+          stopPump: !hydraulicsSafe,
+        })
       }
       if (
         active(context)
@@ -272,8 +291,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
         || context.state === 'fault'
       const monitorManualHeatingFlow = context.desiredHeater === 'on'
         || reading.actualHeater === 'on'
+      const monitorEstablishedManualPump = manualFlowEstablished
+        && context.manualPumpStartedAt !== null
+        && context.manualPumpStartedAt !== undefined
       if (
-        (monitorRunningFlow || monitorManualHeatingFlow)
+        (monitorRunningFlow || monitorManualHeatingFlow || monitorEstablishedManualPump)
         && reading.flowRate !== null
         && reading.flowRate < context.config.minSafeFlow
       ) {
@@ -387,6 +409,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       effectiveHeatingMilliseconds = 0
       lastEffectiveHeatingAt = null
       heatingBaseline = null
+      observedManualPumpStartedAt = null
+      manualFlowEstablished = false
     },
 
     getSnapshot(): SafetySnapshot {
