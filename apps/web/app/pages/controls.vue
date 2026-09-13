@@ -161,7 +161,6 @@ onMounted(() => void initialize())
               type="danger"
               plain
               :loading="resettingFault"
-              :disabled="!automation.safety.resetAllowed"
               @click="resetFault"
             >
               确认并复位
@@ -295,12 +294,7 @@ onMounted(() => void initialize())
                 v-if="field.type === 'switch'"
                 :model-value="switchValue(field)"
                 :loading="savingId === field.configId"
-                :disabled="savingId !== undefined
-                  || (field.heaterStartBlocked && field.value !== 'on')
-                  || (field.automaticStartBlocked && field.value !== 'on')
-                  || (automation?.safety.locked
-                    && field.value !== 'on'
-                    && ['pump', 'heater', 'master'].includes(field.topic))"
+                :disabled="savingId !== undefined"
                 active-text="开启"
                 inactive-text="关闭"
                 @change="value => update(field, Boolean(value))"

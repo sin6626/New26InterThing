@@ -84,14 +84,6 @@ export const useControls = () => {
     field: ControlField,
     value: string | number | boolean | string[],
   ) => {
-    if (field.heaterStartBlocked && (value === true || value === 'on')) {
-      ElMessage.warning('安全保护尚未完成，当前禁止人工开启加热')
-      return
-    }
-    if (field.automaticStartBlocked && (value === true || value === 'on')) {
-      ElMessage.warning('自动水循环尚未完成，当前禁止启动自动模式')
-      return
-    }
     savingId.value = field.configId
     try {
       const result = await api.execute({
