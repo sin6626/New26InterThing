@@ -8,27 +8,17 @@ import type {
 import {
   createTemperatureController,
   hysteresisDemand,
-  type PidConfig,
 } from './temperature-controller.js'
+import { createAutomationActuator } from './automation-actuator.js'
+import type {
+  AutomationConfig,
+  AutomationReading,
+} from './automation.types.js'
 
-export interface AutomationConfig {
-  strategy: 'hysteresis' | 'pid'
-  targetTemperature: number
-  temperatureHysteresis: number
-  minSafeFlow: number
-  buildFlowTimeoutSeconds: number
-  coolingDelaySeconds: number
-  dataTimeoutSeconds: number
-  pid: PidConfig
-}
-
-export interface AutomationReading {
-  recordedAt: number
-  flowRate: number | null
-  outletTemperature: number | null
-  actualPump: ActuatorValue | 'unknown'
-  actualHeater: ActuatorValue | 'unknown'
-}
+export type {
+  AutomationConfig,
+  AutomationReading,
+} from './automation.types.js'
 
 interface Dependencies {
   deviceNumber: string
@@ -50,10 +40,9 @@ export const createAutomationEngine = ({
   disableMaster = async () => {},
 }: Dependencies) => {
   const temperatureController = createTemperatureController(clock)
+  const actuator = createAutomationActuator({ execute })
   let enabled = false
   let state: AutomationSnapshot['state'] = 'stopped'
-  let desiredPump: ActuatorValue = 'off'
-  let desiredHeater: ActuatorValue = 'off'
   let actualPump: AutomationSnapshot['actualPump'] = 'unknown'
   let actualHeater: AutomationSnapshot['actualHeater'] = 'unknown'
   let enteredAt = clock()
@@ -61,12 +50,8 @@ export const createAutomationEngine = ({
   let outletTemperature: number | null = null
   let pid: AutomationSnapshot['pid'] = null
   let limitationReason: string | null = null
-  let lastAction: AutomationSnapshot['lastAction'] = null
-  let publishedPump: ActuatorValue = 'off'
-  let publishedHeater: ActuatorValue = 'off'
   let configFingerprint = ''
   let latestReading: AutomationReading | null = null
-  let actionTail = Promise.resolve()
   let operationTail = Promise.resolve()
 
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
@@ -78,52 +63,12 @@ export const createAutomationEngine = ({
     return current
   }
 
-  const runAction = async (
-    topic: 'pump' | 'heater',
-    value: ActuatorValue,
-  ) => {
-    if (topic === 'pump') {
-      desiredPump = value
-      if (publishedPump === value) return
-    }
-    if (topic === 'heater') {
-      desiredHeater = value
-      if (publishedHeater === value) return
-    }
-    actionTail = actionTail.then(() => execute(topic, value))
-    try {
-      await actionTail
-      if (topic === 'pump') publishedPump = value
-      if (topic === 'heater') publishedHeater = value
-      lastAction = {
-        topic,
-        value,
-        status: 'published',
-        message: 'MQTT 已发布',
-      }
-    }
-    catch (error) {
-      actionTail = Promise.resolve()
-      const message = error instanceof Error ? error.message : String(error)
-      const errorCode = error && typeof error === 'object' && 'code' in error
-        ? error.code
-        : undefined
-      lastAction = {
-        topic,
-        value,
-        status: errorCode === 'HEATER_SAFETY_BLOCKED' ? 'blocked' : 'failed',
-        message,
-      }
-      throw error
-    }
-  }
-
   const getSnapshot = async (): Promise<AutomationSnapshot> => ({
     deviceNumber,
     enabled,
     state,
-    desiredPump,
-    desiredHeater,
+    desiredPump: actuator.desiredPump,
+    desiredHeater: actuator.desiredHeater,
     actualPump,
     actualHeater,
     countdownSeconds: state === 'building-flow' && config
@@ -140,7 +85,7 @@ export const createAutomationEngine = ({
     outletTemperature,
     pid,
     limitationReason,
-    lastAction,
+    lastAction: actuator.lastAction,
     waterFlow: await getWaterFlow(),
   })
 
@@ -154,13 +99,13 @@ export const createAutomationEngine = ({
   const handleDemandFailure = async (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
     limitationReason = message
-    if (lastAction?.status === 'blocked') return
+    if (actuator.lastAction?.status === 'blocked') return
 
     enabled = false
-    state = desiredPump === 'on' ? 'cooling' : 'stopped'
+    state = actuator.desiredPump === 'on' ? 'cooling' : 'stopped'
     enteredAt = clock()
     try {
-      await runAction('heater', 'off')
+      await actuator.run('heater', 'off')
     }
     catch {
       limitationReason = message
@@ -174,11 +119,11 @@ export const createAutomationEngine = ({
       pid = temperatureController.update(
         outletTemperature,
         config.pid,
-        desiredHeater,
+        actuator.desiredHeater,
       )
       limitationReason = pid.limitationReason
       try {
-        await runAction('heater', pid.desired)
+        await actuator.run('heater', pid.desired)
       }
       catch (error) {
         await handleDemandFailure(error)
@@ -190,10 +135,10 @@ export const createAutomationEngine = ({
       outletTemperature,
       config.targetTemperature,
       config.temperatureHysteresis,
-      desiredHeater,
+      actuator.desiredHeater,
     )
     try {
-      await runAction('heater', demand)
+      await actuator.run('heater', demand)
     }
     catch (error) {
       await handleDemandFailure(error)
@@ -222,7 +167,7 @@ export const createAutomationEngine = ({
             throw new Error('最近传感器数据不可用，无法启动自动模式')
           }
           configFingerprint = JSON.stringify(config)
-          await runAction('pump', 'on')
+          await actuator.run('pump', 'on')
           enabled = true
           state = 'building-flow'
           enteredAt = clock()
@@ -230,11 +175,11 @@ export const createAutomationEngine = ({
         }
         else {
           enabled = false
-          state = desiredPump === 'on' ? 'cooling' : 'stopped'
+          state = actuator.desiredPump === 'on' ? 'cooling' : 'stopped'
           enteredAt = clock()
           limitationReason = state === 'cooling' ? '正在冷却' : null
           try {
-            await runAction('heater', 'off')
+            await actuator.run('heater', 'off')
           }
           catch (error) {
             const message = error instanceof Error ? error.message : String(error)
@@ -285,14 +230,14 @@ export const createAutomationEngine = ({
         const elapsed = (clock() - enteredAt) / 1_000
         if (state === 'building-flow' && elapsed >= config.buildFlowTimeoutSeconds) {
           enabled = false
-          await runAction('heater', 'off')
-          await runAction('pump', 'off')
+          await actuator.run('heater', 'off')
+          await actuator.run('pump', 'off')
           state = 'stopped'
           limitationReason = '启动超时，未建立安全流量'
           await disableMaster(limitationReason)
         }
         if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
-          await runAction('pump', 'off')
+          await actuator.run('pump', 'off')
           state = 'stopped'
           limitationReason = null
         }
@@ -306,8 +251,8 @@ export const createAutomationEngine = ({
     close() {
       return serialize(async () => {
         enabled = false
-        await runAction('heater', 'off')
-        await runAction('pump', 'off')
+        await actuator.run('heater', 'off')
+        await actuator.run('pump', 'off')
         state = 'stopped'
       })
     },

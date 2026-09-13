@@ -1,6 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 
-import type { AutomationConfig } from './automation-engine.js'
+import type { AutomationConfig } from './automation.types.js'
 
 const aliases: Record<string, string> = {
   pid_min_open_time: 'pid_min_on_time',

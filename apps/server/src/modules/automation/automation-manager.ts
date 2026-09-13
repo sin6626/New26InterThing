@@ -3,9 +3,11 @@ import type { AutomationStatusMessage } from '@new26interthing/shared'
 import {
   createAutomationEngine,
   type AutomationEngine,
-  type AutomationReading,
 } from './automation-engine.js'
-import type { AutomationConfig } from './automation-engine.js'
+import type {
+  AutomationConfig,
+  AutomationReading,
+} from './automation.types.js'
 import type { WaterFlowService } from '../water-flow/water-flow.service.js'
 
 interface Dependencies {
