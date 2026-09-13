@@ -45,6 +45,7 @@ export const createAutomationProtection = ({
   let faultPumpStopAt: number | null = null
   let faultRecorded = false
   let faultRecordError: string | null = null
+  let reportingGeneration = 0
   let lastHeaterCloseAttempt = Number.NEGATIVE_INFINITY
   let lastPumpCloseAttempt = Number.NEGATIVE_INFINITY
 
@@ -91,14 +92,18 @@ export const createAutomationProtection = ({
         void Promise.resolve(disableMaster(decision.detail)).catch(() => undefined)
       }
       if (reportedFaultCode !== decision.faultCode) {
+        const generation = ++reportingGeneration
         reportedFaultCode = decision.faultCode
         faultRecorded = false
         faultRecordError = null
-        void Promise.resolve(reportFault(decision.faultCode, decision.detail))
+        void Promise.resolve()
+          .then(() => reportFault(decision.faultCode, decision.detail))
           .then(() => {
+            if (generation !== reportingGeneration) return
             faultRecorded = true
           })
           .catch((error) => {
+            if (generation !== reportingGeneration) return
             faultRecordError = error instanceof Error ? error.message : String(error)
             setLimitation(`${decision.detail}；故障记录失败：${faultRecordError}`)
           })
@@ -119,6 +124,7 @@ export const createAutomationProtection = ({
       return { faultRecorded, faultRecordError }
     },
     reset() {
+      reportingGeneration += 1
       reportedFaultCode = null
       faultPumpStopAt = null
       faultRecorded = false

@@ -188,6 +188,22 @@ describe('safety supervisor', () => {
     }, context())).toMatchObject({
       faultCode: 'OVER_PRESSURE',
       stopPump: true,
+      detail: expect.stringContaining('温度传感器数据超时或无效'),
+    })
+  })
+
+  it('stops the pump when running low flow coincides with invalid temperature', () => {
+    const supervisor = createSafetySupervisor(() => 1_000)
+
+    expect(supervisor.handleReading({
+      ...reading(),
+      flowRate: 0,
+      inletTemperature: Number.NaN,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))).toMatchObject({
+      faultCode: 'SENSOR_TEMPERATURE_TIMEOUT',
+      stopPump: true,
+      detail: expect.stringContaining('当前流量低于安全阈值'),
     })
   })
 
