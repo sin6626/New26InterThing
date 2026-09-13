@@ -19,8 +19,6 @@ const {
 
 const {
   loading: automationLoading,
-  resetting,
-  resetWaterFlow,
   snapshot: automation,
 } = useAutomation(selectedDevice)
 
@@ -122,29 +120,6 @@ onMounted(() => void initialize())
         </el-descriptions-item>
         <el-descriptions-item label="倒计时">
           {{ automation?.countdownSeconds ?? '--' }} 秒
-        </el-descriptions-item>
-        <el-descriptions-item label="瞬时流量">
-          {{ automation?.waterFlow.flowRateLitersPerMinute ?? '--' }} L/min
-        </el-descriptions-item>
-        <el-descriptions-item label="一分钟平均">
-          {{ automation?.waterFlow.averageFlowOneMinute ?? '--' }} L/min
-        </el-descriptions-item>
-        <el-descriptions-item label="管内流速">
-          {{ automation?.waterFlow.flowVelocityMetersPerSecond ?? '未配置管径' }}
-          <span v-if="automation?.waterFlow.flowVelocityMetersPerSecond !== null"> m/s</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="累计水量">
-          <div class="flex items-center justify-between gap-3">
-            <span>{{ automation?.waterFlow.totalVolumeLiters ?? '--' }} L</span>
-            <el-button
-              size="small"
-              :loading="resetting"
-              :disabled="!selectedDevice"
-              @click="resetWaterFlow"
-            >
-              清零
-            </el-button>
-          </div>
         </el-descriptions-item>
         <el-descriptions-item label="PID 输出">
           {{ automation?.pid?.outputPercent ?? '--' }} %
