@@ -10,6 +10,7 @@ import { ElNotification } from 'element-plus'
 
 import {
   appendRealtimePoint,
+  appendRealtimeSecondPoint,
   type RealtimeTrendPoint,
 } from './realtime-trend'
 
@@ -43,6 +44,10 @@ export function useRealtimeSocket() {
     'realtime-trend-points',
     () => ({}),
   )
+  const realtimeDetailPoints = useState<Record<string, RealtimeTrendPoint[]>>(
+    'realtime-detail-points',
+    () => ({}),
+  )
   const connectionGeneration = useState(
     'realtime-connection-generation',
     () => 0,
@@ -69,6 +74,13 @@ export function useRealtimeSocket() {
             ...trendPoints.value,
             [message.data.deviceNumber]: appendRealtimePoint(
               trendPoints.value[message.data.deviceNumber] || [],
+              message.data,
+            ),
+          }
+          realtimeDetailPoints.value = {
+            ...realtimeDetailPoints.value,
+            [message.data.deviceNumber]: appendRealtimeSecondPoint(
+              realtimeDetailPoints.value[message.data.deviceNumber] || [],
               message.data,
             ),
           }
@@ -127,6 +139,7 @@ export function useRealtimeSocket() {
     hydraulicDiagnoses,
     mqttConnected,
     readings,
+    realtimeDetailPoints,
     socketStatus,
     trendPoints,
     waterFlowSnapshots,

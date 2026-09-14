@@ -15,6 +15,7 @@ import {
 export const useRealtimeTrends = (
   selectedDevice: Ref<string>,
   trendPoints: Ref<Record<string, RealtimeTrendPoint[]>>,
+  realtimeDetailPoints: Ref<Record<string, RealtimeTrendPoint[]>>,
   connectionGeneration: Ref<number>,
 ) => {
   const api = useSensorHistoryApi()
@@ -121,6 +122,11 @@ export const useRealtimeTrends = (
     trendPoints.value[selectedDevice.value] || [],
     windowSize.value,
   ))
+  const detailMerged = computed(() => mergeHistoryTrend(
+    history.value,
+    realtimeDetailPoints.value[selectedDevice.value] || [],
+    windowSize.value,
+  ))
 
   const allTrend = computed(() => buildRealtimeTrend(
     merged.value.points,
@@ -128,13 +134,13 @@ export const useRealtimeTrends = (
     'all',
   ))
   const temperatureTrend = computed(() => buildRealtimeTrend(
-    merged.value.points,
-    merged.value.metadata,
+    detailMerged.value.points,
+    detailMerged.value.metadata,
     'temperature',
   ))
   const flowTrend = computed(() => buildRealtimeTrend(
-    merged.value.points,
-    merged.value.metadata,
+    detailMerged.value.points,
+    detailMerged.value.metadata,
     'flow',
   ))
   const temperatureEmptyDescription = computed(() => history.value.series.some(

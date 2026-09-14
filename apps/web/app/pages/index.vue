@@ -15,6 +15,7 @@ const {
   hydraulicDiagnoses,
   mqttConnected,
   readings,
+  realtimeDetailPoints,
   socketStatus,
   trendPoints,
 } = useRealtimeSocket()
@@ -43,6 +44,7 @@ const {
 } = useRealtimeTrends(
   selectedDevice,
   trendPoints,
+  realtimeDetailPoints,
   connectionGeneration,
 )
 

@@ -39,7 +39,7 @@ defineEmits<{
       <div>
         <h2 class="m-0 text-lg font-semibold text-slate-900">传感器实时趋势</h2>
         <p class="mt-1 mb-0 text-sm text-slate-500">
-          历史数据补充初始窗口，WebSocket 持续更新当前分钟
+          全部传感器按分钟更新，温度和流量按实时报文更新
         </p>
       </div>
       <div class="flex gap-3">
@@ -85,6 +85,7 @@ defineEmits<{
           :chart-type="chartType"
           :empty-description="temperatureEmptyDescription"
           compact
+          show-seconds
         />
       </el-card>
 
@@ -99,6 +100,7 @@ defineEmits<{
           :chart-type="chartType"
           :empty-description="flowEmptyDescription"
           compact
+          show-seconds
         />
       </el-card>
     </div>

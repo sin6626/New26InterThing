@@ -10,6 +10,7 @@ import {
 
 import {
   appendRealtimePoint,
+  appendRealtimeSecondPoint,
   buildRealtimeTrend,
   mergeHistoryTrend,
 } from '../app/features/realtime/realtime-trend'
@@ -40,6 +41,25 @@ describe('realtime trend window', () => {
         flow_rate: 1.5,
         temp_in: 21,
       },
+    }])
+  })
+
+  it('keeps every realtime reading as a second-level point', () => {
+    const first = appendRealtimeSecondPoint([], reading('A', '2026-09-12 10:00:10', {
+      flow_rate: 1.5,
+      temp_in: 20,
+    }))
+    const second = appendRealtimeSecondPoint(first, reading('A', '2026-09-12 10:00:11', {
+      flow_rate: 1.6,
+      temp_in: 21,
+    }))
+
+    expect(second).toEqual([{
+      recordedAt: '2026-09-12 10:00:10',
+      fields: { flow_rate: 1.5, temp_in: 20 },
+    }, {
+      recordedAt: '2026-09-12 10:00:11',
+      fields: { flow_rate: 1.6, temp_in: 21 },
     }])
   })
 

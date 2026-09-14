@@ -31,6 +31,7 @@ const props = defineProps<{
   chartType: 'line' | 'bar' | 'scatter'
   emptyDescription: string
   compact?: boolean
+  showSeconds?: boolean
 }>()
 
 const chartElement = ref<HTMLElement>()
@@ -81,7 +82,9 @@ const render = () => {
       type: 'category',
       data: props.trend.times,
       axisLabel: {
-        formatter: (value: string) => value.slice(5, 16),
+        formatter: (value: string) => props.showSeconds
+          ? value.slice(11, 19)
+          : value.slice(5, 16),
       },
     },
     yAxis: {

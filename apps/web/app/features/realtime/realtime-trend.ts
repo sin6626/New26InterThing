@@ -64,6 +64,21 @@ export const appendRealtimePoint = (
   return sortAndTrim([...withoutSameMinute, nextPoint], limit)
 }
 
+export const appendRealtimeSecondPoint = (
+  points: RealtimeTrendPoint[],
+  reading: SensorRealtimeData,
+  limit = 120,
+) => {
+  const nextPoint: RealtimeTrendPoint = {
+    recordedAt: reading.recordedAt,
+    fields: reading.fields,
+  }
+  const withoutSameTime = points.filter(
+    point => point.recordedAt !== reading.recordedAt,
+  )
+  return sortAndTrim([...withoutSameTime, nextPoint], limit)
+}
+
 const historyPoints = (history: SensorHistoryTrend): RealtimeTrendPoint[] => history.times.map((recordedAt, index) => ({
   recordedAt,
   fields: Object.fromEntries(history.series.map(series => [
