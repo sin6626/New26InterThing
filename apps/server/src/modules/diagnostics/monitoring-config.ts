@@ -6,6 +6,7 @@ export interface MonitoringConfig {
   minSafeFlow: number
   minOperatingPressure: number
   maxSafePressure: number
+  maxSafeTemperature: number
   diagnosisConfirmSeconds: number
 }
 
@@ -27,6 +28,7 @@ export const createMonitoringConfigLoader = (
          'min_safe_flow',
          'min_operating_pressure',
          'max_safe_pressure',
+         'max_safe_temperature',
          'pressure_flow_diagnosis_confirm_time'
        )`,
     )
@@ -44,6 +46,7 @@ export const createMonitoringConfigLoader = (
       minSafeFlow: positive('min_safe_flow'),
       minOperatingPressure: positive('min_operating_pressure'),
       maxSafePressure: positive('max_safe_pressure'),
+      maxSafeTemperature: positive('max_safe_temperature'),
       diagnosisConfirmSeconds: positive('pressure_flow_diagnosis_confirm_time'),
     }
     if (config.minOperatingPressure >= config.maxSafePressure) {

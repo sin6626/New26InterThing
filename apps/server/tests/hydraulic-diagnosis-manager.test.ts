@@ -12,6 +12,7 @@ describe('hydraulic diagnosis manager', () => {
         minSafeFlow: 0.5,
         minOperatingPressure: 20,
         maxSafePressure: 130,
+        maxSafeTemperature: 45,
         diagnosisConfirmSeconds: 2,
       }),
       emit: vi.fn(),

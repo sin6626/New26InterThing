@@ -16,6 +16,7 @@ import { createFaultReporter } from './modules/fault/fault-reporter.js'
 import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
+import { createSensorVstatusEvaluator } from './modules/realtime/sensor-vstatus.js'
 import { createSensorHistoryRepository } from './modules/sensor-history/sensor-history.mysql.js'
 import { createOperationalMetricsService } from './modules/operational-metrics/operational-metrics.service.js'
 import { createControlRepository } from './modules/control/control.mysql.js'
@@ -40,6 +41,7 @@ const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
 const loadMonitoringConfig = createMonitoringConfigLoader(pool)
+const loadAutomationConfig = createAutomationConfigLoader(pool)
 const faultReporter = createFaultReporter({
   repository: faultRepository,
   broadcast: message => realtimeWebSocket.broadcast(message),
@@ -100,7 +102,7 @@ const operationalMetricsService = createOperationalMetricsService({
   ).dataTimeoutSeconds,
 })
 automationManager = createAutomationManager({
-  loadConfig: createAutomationConfigLoader(pool),
+  loadConfig: loadAutomationConfig,
   waterFlow: waterFlowService,
   emit: message => realtimeWebSocket.broadcast(message),
   async disableMaster(deviceNumber, reason) {
@@ -146,7 +148,10 @@ const app = createApp({
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)
 const handleSensorReading = createSensorRealtimeHandler({
-  repository: createSensorRepository(pool),
+  repository: createSensorRepository(
+    pool,
+    createSensorVstatusEvaluator(loadMonitoringConfig),
+  ),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
   onRealtimeReceived: message => devicePresence.recordActivity(message.deviceNumber),
   afterSave: [

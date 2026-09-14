@@ -14,10 +14,16 @@ export interface SensorRepository {
   save(message: ParsedSensorMessage): Promise<SensorRealtimeData>
 }
 
+export type EvaluateSensorVstatus = (message: ParsedSensorMessage) => Promise<number>
+
 const sensorColumns = new Set(Array.from({ length: 10 }, (_, index) => `field${index + 1}`))
 
-export const createSensorRepository = (pool: Pool): SensorRepository => ({
+export const createSensorRepository = (
+  pool: Pool,
+  evaluateVstatus: EvaluateSensorVstatus,
+): SensorRepository => ({
   async save(message) {
+    const vstatus = await evaluateVstatus(message)
     const [mappingRows] = await pool.query<SensorFieldMapping[]>(
       `select f_name, db_name, p_name, visible
        from t_sensor_field_mapper
@@ -37,7 +43,7 @@ export const createSensorRepository = (pool: Pool): SensorRepository => ({
       ...mappings.map((mapping) => message.values[mapping.p_name] ?? null),
       message.recordedAt,
       message.dataKind === 'backfill' ? '1' : '0',
-      0,
+      vstatus,
     ]
     const placeholders = columns.map(() => '?').join(', ')
     const [result] = await pool.query<ResultSetHeader>(

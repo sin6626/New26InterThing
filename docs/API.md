@@ -73,7 +73,7 @@ GET /sensor-history?page=1&pageSize=20&deviceNumber=202111&status=all&startTime=
 | `endTime` | 否 | `YYYY-MM-DD HH:mm:ss`，包含边界且不得早于开始时间 |
 | `status` | 否 | `all`、`normal` 或 `abnormal`，默认 `all` |
 
-成功响应的 `data` 为 `{ items, total, page, pageSize }`。每条数据包含 `deviceNumber`、动态 `fields`、`status`、`statusCode`、`online` 和 `recordedAt`。`online=0` 表示正常联网实时数据，`online=1` 表示断网补发数据；两类数据都保留在历史记录中。
+成功响应的 `data` 为 `{ items, total, page, pageSize }`。每条数据包含 `deviceNumber`、动态 `fields`、`status`、`statusCode`、`online` 和 `recordedAt`。`online=0` 表示正常联网实时数据，`online=1` 表示断网补发数据；两类数据都保留在历史记录中。`vstatus` 由后端入库时根据当前控制参数计算：达到最高安全温度或最高安全压力，以及水泵运行时流量低于最低安全流量，均记为告警 `1`，其余记为正常 `0`。调试模式不改变历史数据状态判定。
 
 ### 历史趋势
 
