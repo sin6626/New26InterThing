@@ -16,6 +16,7 @@ import {
   type ControlService,
 } from '../src/modules/control/control.service.js'
 import type { WaterFlowService } from '../src/modules/water-flow/water-flow.service.js'
+import type { OperationalMetricsService } from '../src/modules/operational-metrics/operational-metrics.service.js'
 
 const servers: Array<{ close(): void }> = []
 
@@ -25,6 +26,7 @@ const startServer = async (
   resetFault: ReturnType<typeof vi.fn>,
   controls = {} as ControlService,
   controlRepository = {} as ControlRepository,
+  operationalMetrics = undefined as OperationalMetricsService | undefined,
 ) => {
   const app = express()
   app.use('/api/automation', createAutomationRouter(
@@ -32,6 +34,7 @@ const startServer = async (
     controls,
     controlRepository,
     {} as WaterFlowService,
+    operationalMetrics,
   ))
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     response.status(500).json({ message: error instanceof Error ? error.message : String(error) })
@@ -45,6 +48,36 @@ const startServer = async (
 }
 
 describe('automation HTTP API', () => {
+  it('returns the current operational metrics for initial page loading', async () => {
+    const getSnapshot = vi.fn().mockReturnValue({
+      deviceNumber: 'device-1',
+      pumpRuntimeSeconds: 12,
+      heaterRuntimeSeconds: 8,
+      outletHeatingRatePerMinute: 1.5,
+    })
+    const baseUrl = await startServer(
+      vi.fn(),
+      {} as ControlService,
+      {} as ControlRepository,
+      { getSnapshot } as unknown as OperationalMetricsService,
+    )
+
+    const response = await fetch(
+      `${baseUrl}/api/automation/device-1/operational-metrics`,
+    )
+
+    expect(response.status).toBe(200)
+    expect(getSnapshot).toHaveBeenCalledWith('device-1')
+    expect(await response.json()).toMatchObject({
+      code: 0,
+      data: {
+        pumpRuntimeSeconds: 12,
+        heaterRuntimeSeconds: 8,
+        outletHeatingRatePerMinute: 1.5,
+      },
+    })
+  })
+
   it('returns a visible 409 when fault reset conditions are not met', async () => {
     const baseUrl = await startServer(vi.fn().mockRejectedValue(
       new AutomationError('水泵和加热尚未全部关闭'),

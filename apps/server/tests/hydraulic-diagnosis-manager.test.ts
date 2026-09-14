@@ -8,6 +8,7 @@ describe('hydraulic diagnosis manager', () => {
     const manager = createHydraulicDiagnosisManager({
       loadConfig: vi.fn().mockResolvedValue({
         deviceOfflineTimeoutSeconds: 5,
+        dataTimeoutSeconds: 3,
         minSafeFlow: 0.5,
         minOperatingPressure: 20,
         maxSafePressure: 130,

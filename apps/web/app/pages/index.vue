@@ -25,6 +25,7 @@ const {
   resetting: resettingWaterFlow,
   resetWaterFlow,
   snapshot: automation,
+  operationalMetrics,
 } = useAutomation(selectedDevice)
 
 const {
@@ -112,6 +113,7 @@ onMounted(() => {
 
     <WaterFlowMetricsPanel
       :snapshot="automation?.waterFlow"
+      :operational-metrics="operationalMetrics"
       :loading="metricsLoading"
       :resetting="resettingWaterFlow"
       :disabled="!selectedDevice"

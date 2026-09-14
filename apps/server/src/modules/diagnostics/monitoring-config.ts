@@ -2,6 +2,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise'
 
 export interface MonitoringConfig {
   deviceOfflineTimeoutSeconds: number
+  dataTimeoutSeconds: number
   minSafeFlow: number
   minOperatingPressure: number
   maxSafePressure: number
@@ -22,6 +23,7 @@ export const createMonitoringConfigLoader = (
        left join t_direct_global g on g.config_id = c.id
        where c.topic in (
          'device_offline_timeout',
+         'data_timeout',
          'min_safe_flow',
          'min_operating_pressure',
          'max_safe_pressure',
@@ -38,6 +40,7 @@ export const createMonitoringConfigLoader = (
     }
     const config = {
       deviceOfflineTimeoutSeconds: positive('device_offline_timeout'),
+      dataTimeoutSeconds: positive('data_timeout'),
       minSafeFlow: positive('min_safe_flow'),
       minOperatingPressure: positive('min_operating_pressure'),
       maxSafePressure: positive('max_safe_pressure'),

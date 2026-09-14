@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import type { WaterFlowSnapshot } from '@new26interthing/shared'
+import type {
+  OperationalMetricsSnapshot,
+  WaterFlowSnapshot,
+} from '@new26interthing/shared'
 
 defineProps<{
   disabled: boolean
   loading: boolean
   resetting: boolean
   snapshot?: WaterFlowSnapshot
+  operationalMetrics?: OperationalMetricsSnapshot
 }>()
+
+const formatDuration = (seconds?: number) => {
+  const total = Math.max(0, Math.floor(seconds ?? 0))
+  const hours = Math.floor(total / 3_600)
+  const minutes = Math.floor((total % 3_600) / 60)
+  const remainingSeconds = total % 60
+  const parts: string[] = []
+  if (hours) parts.push(`${hours}小时`)
+  if (minutes) parts.push(`${minutes}分`)
+  if (remainingSeconds || !parts.length) parts.push(`${remainingSeconds}秒`)
+  return parts.join('')
+}
 
 defineEmits<{
   reset: []
@@ -67,6 +83,25 @@ defineEmits<{
         <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
           {{ snapshot?.totalVolumeLiters ?? '--' }}
           <span class="text-sm font-normal text-slate-500">L</span>
+        </p>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-5">
+        <p class="m-0 text-sm text-slate-500">水泵运行时长</p>
+        <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
+          {{ formatDuration(operationalMetrics?.pumpRuntimeSeconds) }}
+        </p>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-5">
+        <p class="m-0 text-sm text-slate-500">加热运行时长</p>
+        <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
+          {{ formatDuration(operationalMetrics?.heaterRuntimeSeconds) }}
+        </p>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-5">
+        <p class="m-0 text-sm text-slate-500">出口水温每分钟变化</p>
+        <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
+          {{ operationalMetrics?.outletHeatingRatePerMinute ?? '--' }}
+          <span class="text-sm font-normal text-slate-500">℃/min</span>
         </p>
       </div>
     </div>

@@ -2,6 +2,7 @@ import type {
   AutomationSnapshot,
   DevicePresence,
   HydraulicDiagnosis,
+  OperationalMetricsSnapshot,
   RealtimeMessage,
   SensorRealtimeData,
   WaterFlowSnapshot,
@@ -38,6 +39,10 @@ export function useRealtimeSocket() {
   )
   const waterFlowSnapshots = useState<Record<string, WaterFlowSnapshot>>(
     'water-flow-snapshots',
+    () => ({}),
+  )
+  const operationalMetricsSnapshots = useState<Record<string, OperationalMetricsSnapshot>>(
+    'operational-metrics-snapshots',
     () => ({}),
   )
   const trendPoints = useState<Record<string, RealtimeTrendPoint[]>>(
@@ -109,6 +114,12 @@ export function useRealtimeSocket() {
             [message.data.deviceNumber]: message.data,
           }
         }
+        if (message.type === 'operational-metrics.realtime') {
+          operationalMetricsSnapshots.value = {
+            ...operationalMetricsSnapshots.value,
+            [message.data.deviceNumber]: message.data,
+          }
+        }
         if (message.type === 'fault.alert') {
           ElNotification.error({
             title: `设备 ${message.data.deviceNumber || '未知'} 发生故障`,
@@ -138,6 +149,7 @@ export function useRealtimeSocket() {
     devicePresence,
     hydraulicDiagnoses,
     mqttConnected,
+    operationalMetricsSnapshots,
     readings,
     realtimeDetailPoints,
     socketStatus,

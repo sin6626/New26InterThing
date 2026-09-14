@@ -11,6 +11,7 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
   const api = useControlApi()
   const {
     automationSnapshots,
+    operationalMetricsSnapshots,
     waterFlowSnapshots,
   } = useRealtimeSocket()
   const loading = ref(false)
@@ -23,15 +24,25 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
     const flow = waterFlowSnapshots.value[deviceNumber.value]
     return flow ? { ...current, waterFlow: flow } : current
   })
+  const operationalMetrics = computed(() => (
+    operationalMetricsSnapshots.value[deviceNumber.value]
+  ))
 
   const load = async () => {
     if (!deviceNumber.value) return
     loading.value = true
     try {
-      const result = await api.getAutomationSnapshot(deviceNumber.value)
+      const [result, metrics] = await Promise.all([
+        api.getAutomationSnapshot(deviceNumber.value),
+        api.getOperationalMetrics(deviceNumber.value),
+      ])
       automationSnapshots.value = {
         ...automationSnapshots.value,
         [deviceNumber.value]: result,
+      }
+      operationalMetricsSnapshots.value = {
+        ...operationalMetricsSnapshots.value,
+        [deviceNumber.value]: metrics,
       }
     }
     catch (error) {
@@ -95,6 +106,7 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
   return {
     load,
     loading,
+    operationalMetrics,
     resetting,
     resettingFault,
     resetFault,

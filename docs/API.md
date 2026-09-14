@@ -94,6 +94,7 @@ GET /sensor-history/trend?deviceNumber=202111&status=all&limit=10
 - `device.presence`：设备在线状态，包含 `deviceNumber`、`status` 和服务端记录的 `lastSeenAt`。超过控制参数 `device_offline_timeout` 未收到实时数据后变为 `offline`。
 - `hydraulic.diagnosis`：当前水力联合诊断，包含诊断编码、名称、详情和级别。
 - `automation.status`、`water-flow.realtime`：自动控制与累计量状态。
+- `operational-metrics.realtime`：设备实际水泵/加热运行时长与出口水温每分钟变化速度。
 - `fault.alert`：故障记录成功入库后的全局告警。
 
 断网补发数据仍写入历史，但不刷新设备在线时间，也不驱动实时广播、累计量、自动控制、安全保护或水力诊断。
@@ -221,6 +222,14 @@ GET /api/automation/:deviceNumber
 ```
 
 返回状态机状态、实际与期望执行器状态、PID 诊断、累计水量以及 `safety` 安全快照。`safety` 包含故障锁定、故障码、中文事实详情、发生时间、保护动作、故障入库状态、四类传感器新鲜度以及复位条件。页面首次进入必须调用该接口，WebSocket 只补充后续的 `automation.status` 和 `water-flow.realtime` 更新。
+
+### 获取运行指标快照
+
+```http
+GET /api/automation/:deviceNumber/operational-metrics
+```
+
+返回进程内累计的水泵和加热运行秒数、设备实际开关状态、出口水温每分钟变化速度及更新时间。运行时长不持久化，服务重启后从零统计；页面后续通过 `operational-metrics.realtime` 实时更新。
 
 ### 启停自动模式
 

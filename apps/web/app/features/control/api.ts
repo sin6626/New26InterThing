@@ -5,6 +5,7 @@ import type {
   ControlSnapshot,
   OperationLogOptions,
   OperationLogQuery,
+  OperationalMetricsSnapshot,
   PaginatedOperationLogs,
   AutomationSnapshot,
   WaterFlowSnapshot,
@@ -32,6 +33,12 @@ export const useControlApi = () => {
     async getAutomationSnapshot(deviceNumber: string) {
       const response = await http.get<ApiResponse<AutomationSnapshot>>(
         `/automation/${encodeURIComponent(deviceNumber)}`,
+      )
+      return unwrap(response.data)
+    },
+    async getOperationalMetrics(deviceNumber: string) {
+      const response = await http.get<ApiResponse<OperationalMetricsSnapshot>>(
+        `/automation/${encodeURIComponent(deviceNumber)}/operational-metrics`,
       )
       return unwrap(response.data)
     },

@@ -17,6 +17,7 @@ import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-
 import { parseSensorMessage } from './modules/realtime/sensor-message.js'
 import { createSensorRepository } from './modules/realtime/sensor.repository.js'
 import { createSensorHistoryRepository } from './modules/sensor-history/sensor-history.mysql.js'
+import { createOperationalMetricsService } from './modules/operational-metrics/operational-metrics.service.js'
 import { createControlRepository } from './modules/control/control.mysql.js'
 import { createControlService } from './modules/control/control.service.js'
 import { parseDeviceReport } from './modules/control/device-report.js'
@@ -93,6 +94,11 @@ const waterFlowService = createWaterFlowService({
   repository: createWaterFlowRepository(pool),
   loadPipeDiameter: createPipeDiameterLoader(pool),
 })
+const operationalMetricsService = createOperationalMetricsService({
+  loadDataTimeoutSeconds: async () => (
+    await loadMonitoringConfig()
+  ).dataTimeoutSeconds,
+})
 automationManager = createAutomationManager({
   loadConfig: createAutomationConfigLoader(pool),
   waterFlow: waterFlowService,
@@ -135,6 +141,7 @@ const app = createApp({
   controlService,
   automationManager,
   waterFlowService,
+  operationalMetricsService,
 })
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)
@@ -146,6 +153,14 @@ const handleSensorReading = createSensorRealtimeHandler({
     async (message) => {
       const receivedAt = Date.now()
       const reading = normalizeAutomationReading(message.values, receivedAt)
+      const operationalMetrics = await operationalMetricsService.handleReading(
+        message.deviceNumber,
+        reading,
+      )
+      realtimeWebSocket.broadcast({
+        type: 'operational-metrics.realtime',
+        data: operationalMetrics,
+      })
       if (reading.flowRate !== null && reading.flowRate >= 0) {
         const snapshot = await waterFlowService.handleReading(
           message.deviceNumber,

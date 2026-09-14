@@ -1,4 +1,5 @@
 import type { FaultItem } from './fault.js'
+import type { OperationalMetricsRealtimeMessage } from './operational-metrics.js'
 import type {
   AutomationStatusMessage,
   WaterFlowRealtimeMessage,
@@ -70,3 +71,4 @@ export type RealtimeMessage =
   | FaultAlertMessage
   | AutomationStatusMessage
   | WaterFlowRealtimeMessage
+  | OperationalMetricsRealtimeMessage

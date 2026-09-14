@@ -18,6 +18,7 @@ import type { ControlService } from './modules/control/control.service.js'
 import type { AutomationManager } from './modules/automation/automation-manager.js'
 import { createAutomationRouter } from './modules/automation/automation.routes.js'
 import type { WaterFlowService } from './modules/water-flow/water-flow.service.js'
+import type { OperationalMetricsService } from './modules/operational-metrics/operational-metrics.service.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository
@@ -29,6 +30,7 @@ interface AppDependencies {
   controlService?: ControlService
   automationManager?: AutomationManager
   waterFlowService?: WaterFlowService
+  operationalMetricsService?: OperationalMetricsService
 }
 
 export const createApp = ({
@@ -41,6 +43,7 @@ export const createApp = ({
   controlService,
   automationManager,
   waterFlowService,
+  operationalMetricsService,
 }: AppDependencies): Express => {
   const app = express()
 
@@ -67,6 +70,7 @@ export const createApp = ({
         controlService,
         controlRepository,
         waterFlowService,
+        operationalMetricsService,
       ),
     )
   }

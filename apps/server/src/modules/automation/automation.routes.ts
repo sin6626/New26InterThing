@@ -10,6 +10,7 @@ import {
   type ControlService,
 } from '../control/control.service.js'
 import type { WaterFlowService } from '../water-flow/water-flow.service.js'
+import type { OperationalMetricsService } from '../operational-metrics/operational-metrics.service.js'
 import type { AutomationManager } from './automation-manager.js'
 import { AutomationError } from './automation.types.js'
 
@@ -18,6 +19,7 @@ export const createAutomationRouter = (
   controls: ControlService,
   controlRepository: ControlRepository,
   waterFlow: WaterFlowService,
+  operationalMetrics?: OperationalMetricsService,
 ) => {
   const router = Router()
 
@@ -114,6 +116,14 @@ export const createAutomationRouter = (
     catch (error) {
       handleKnownError(error, response, next)
     }
+  })
+
+  router.get('/:deviceNumber/operational-metrics', (request, response) => {
+    response.json({
+      code: 0,
+      message: '操作成功',
+      data: operationalMetrics?.getSnapshot(request.params.deviceNumber) ?? null,
+    })
   })
 
   return router
