@@ -62,16 +62,16 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
         if (safety.locked && !dependencies.isDebugMode()) {
           throw new AutomationError(safety.detail || '故障已锁定，无法启动自动模式')
         }
-        const reading = dependencies.getLatestReading()
-        if (!hasUsableReading(reading, config, dependencies.clock())) {
-          throw new AutomationError('最近传感器数据不可用，无法启动自动模式')
-        }
-        const decision = dependencies.isDebugMode()
-          ? null
-          : dependencies.evaluateReading(reading)
-        if (decision) {
-          await dependencies.applySafetyDecision(decision)
-          throw new AutomationError(decision.detail)
+        if (!dependencies.isDebugMode()) {
+          const reading = dependencies.getLatestReading()
+          if (!hasUsableReading(reading, config, dependencies.clock())) {
+            throw new AutomationError('最近传感器数据不可用，无法启动自动模式')
+          }
+          const decision = dependencies.evaluateReading(reading)
+          if (decision) {
+            await dependencies.applySafetyDecision(decision)
+            throw new AutomationError(decision.detail)
+          }
         }
         dependencies.enterModeState(true, 'building-flow', '等待设备建流')
         try {

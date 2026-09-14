@@ -259,6 +259,34 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenCalledWith('pump', 'on')
   })
 
+  it('allows automatic mode without a recent reading while debug mode is enabled', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      initialDebugMode: true,
+      clock: () => 5_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await expect(engine.setEnabled(true)).resolves.toMatchObject({
+      enabled: true,
+      state: 'building-flow',
+    })
+    expect(execute).toHaveBeenCalledWith('pump', 'on')
+  })
+
   it('refuses to start when the recent reading lacks control values', async () => {
     const execute = vi.fn().mockResolvedValue(undefined)
     const engine = createAutomationEngine({
