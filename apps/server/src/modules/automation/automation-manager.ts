@@ -97,6 +97,13 @@ export const createAutomationManager = ({
     ) {
       return getEngine(deviceNumber).handleCommandFailure(action, message)
     },
+    tripFault(
+      deviceNumber: string,
+      faultCode: SafetyFaultCode,
+      detail: string,
+    ) {
+      return getEngine(deviceNumber).tripFault(faultCode, detail)
+    },
     resetFault(deviceNumber: string) {
       return getEngine(deviceNumber).resetFault()
     },

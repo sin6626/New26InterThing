@@ -36,7 +36,7 @@ export const createSensorRepository = (pool: Pool): SensorRepository => ({
       message.deviceNumber,
       ...mappings.map((mapping) => message.values[mapping.p_name] ?? null),
       message.recordedAt,
-      '实时数据',
+      message.dataKind === 'backfill' ? '1' : '0',
       0,
     ]
     const placeholders = columns.map(() => '?').join(', ')
@@ -52,6 +52,7 @@ export const createSensorRepository = (pool: Pool): SensorRepository => ({
     return {
       deviceNumber: message.deviceNumber,
       recordedAt: message.recordedAt,
+      dataKind: message.dataKind,
       fields: Object.fromEntries(
         visibleMappings.map((mapping) => [
           mapping.p_name,

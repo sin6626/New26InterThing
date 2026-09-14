@@ -54,6 +54,9 @@ export const useRealtimeTrends = (
         latestReading.value = {
           deviceNumber,
           recordedAt: latestItem.recordedAt,
+          dataKind: String(latestItem.online) === '1' || latestItem.online === '保存数据'
+            ? 'backfill'
+            : 'realtime',
           fields: latestItem.fields,
         }
       }

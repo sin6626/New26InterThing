@@ -6,7 +6,7 @@ describe('parseSensorMessage', () => {
   it('parses the compatible device/sensor payload', () => {
     const result = parseSensorMessage(
       'device/sensor',
-      Buffer.from('{"d_no":"202111","temp_out":28.7,"flow_rate":2.4,"c_time":"2026-09-11 09:30:00"}'),
+      Buffer.from('{"d_no":"202111","temp_out":28.7,"flow_rate":2.4,"c_time":"2026-09-11 09:30:00","online":"0"}'),
     )
 
     expect(result).toEqual({
@@ -14,9 +14,19 @@ describe('parseSensorMessage', () => {
       message: {
         deviceNumber: '202111',
         recordedAt: '2026-09-11 09:30:00',
+        dataKind: 'realtime',
         values: { temp_out: 28.7, flow_rate: 2.4 },
       },
     })
+  })
+
+  it('marks online 1 as backfill data', () => {
+    const result = parseSensorMessage(
+      'device/sensor',
+      Buffer.from('{"d_no":"202111","flow_rate":2.4,"online":1}'),
+    )
+
+    expect(result.accepted && result.message.dataKind).toBe('backfill')
   })
 
   it.each([

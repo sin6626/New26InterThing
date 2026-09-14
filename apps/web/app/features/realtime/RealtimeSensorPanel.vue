@@ -26,7 +26,7 @@ const fieldLabels = computed(() => new Map(
         </p>
       </div>
       <el-tag v-if="reading" type="success" effect="light">
-        {{ realtime ? '实时更新' : '最近记录' }}
+        {{ reading.dataKind === 'backfill' ? '断网补发 (1)' : realtime ? '正常联网 (0)' : '最近实时记录' }}
       </el-tag>
     </div>
 

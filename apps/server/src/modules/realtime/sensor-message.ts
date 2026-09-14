@@ -1,6 +1,7 @@
 export interface ParsedSensorMessage {
   deviceNumber: string
   recordedAt: string
+  dataKind: 'realtime' | 'backfill'
   values: Record<string, string | number | null>
 }
 
@@ -64,6 +65,11 @@ export const parseSensorMessage = (
 
   return {
     accepted: true,
-    message: { deviceNumber, recordedAt, values },
+    message: {
+      deviceNumber,
+      recordedAt,
+      dataKind: String(record.online) === '1' ? 'backfill' : 'realtime',
+      values,
+    },
   }
 }

@@ -1,5 +1,7 @@
 import type {
   AutomationSnapshot,
+  DevicePresence,
+  HydraulicDiagnosis,
   RealtimeMessage,
   SensorRealtimeData,
   WaterFlowSnapshot,
@@ -21,6 +23,14 @@ export function useRealtimeSocket() {
   const socketStatus = useState<SocketStatus>('realtime-socket-status', () => 'connecting')
   const mqttConnected = useState('realtime-mqtt-connected', () => false)
   const readings = useState<Record<string, SensorRealtimeData>>('realtime-readings', () => ({}))
+  const devicePresence = useState<Record<string, DevicePresence>>(
+    'device-presence',
+    () => ({}),
+  )
+  const hydraulicDiagnoses = useState<Record<string, HydraulicDiagnosis>>(
+    'hydraulic-diagnoses',
+    () => ({}),
+  )
   const automationSnapshots = useState<Record<string, AutomationSnapshot>>(
     'automation-snapshots',
     () => ({}),
@@ -63,6 +73,18 @@ export function useRealtimeSocket() {
             ),
           }
         }
+        if (message.type === 'device.presence') {
+          devicePresence.value = {
+            ...devicePresence.value,
+            [message.data.deviceNumber]: message.data,
+          }
+        }
+        if (message.type === 'hydraulic.diagnosis') {
+          hydraulicDiagnoses.value = {
+            ...hydraulicDiagnoses.value,
+            [message.data.deviceNumber]: message.data,
+          }
+        }
         if (message.type === 'automation.status') {
           automationSnapshots.value = {
             ...automationSnapshots.value,
@@ -101,6 +123,8 @@ export function useRealtimeSocket() {
   return {
     automationSnapshots,
     connectionGeneration,
+    devicePresence,
+    hydraulicDiagnoses,
     mqttConnected,
     readings,
     socketStatus,

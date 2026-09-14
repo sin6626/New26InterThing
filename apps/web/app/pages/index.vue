@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import RealtimeSensorPanel from '~/features/realtime/RealtimeSensorPanel.vue'
 import RealtimeStatusCards from '~/features/realtime/RealtimeStatusCards.vue'
+import HydraulicDiagnosisPanel from '~/features/realtime/HydraulicDiagnosisPanel.vue'
 import RealtimeTrendsPanel from '~/features/realtime/RealtimeTrendsPanel.vue'
 import WaterFlowMetricsPanel from '~/features/realtime/WaterFlowMetricsPanel.vue'
 import { useAutomation } from '~/features/control/use-automation'
@@ -10,6 +11,8 @@ import { useRealtimeTrends } from '~/features/realtime/use-realtime-trends'
 const selectedDevice = ref('')
 const {
   connectionGeneration,
+  devicePresence,
+  hydraulicDiagnoses,
   mqttConnected,
   readings,
   socketStatus,
@@ -92,6 +95,8 @@ onMounted(() => {
       :mqtt-connected="mqttConnected"
       :socket-status="socketStatus"
       :latest-recorded-at="currentReading?.recordedAt"
+      :device-status="devicePresence[selectedDevice]?.status"
+      :data-kind="currentReading?.dataKind"
     />
 
     <RealtimeSensorPanel
@@ -100,6 +105,8 @@ onMounted(() => {
       :reading="currentReading"
       :realtime="Boolean(realtimeReading)"
     />
+
+    <HydraulicDiagnosisPanel :diagnosis="hydraulicDiagnoses[selectedDevice]" />
 
     <WaterFlowMetricsPanel
       :snapshot="automation?.waterFlow"

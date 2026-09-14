@@ -66,6 +66,7 @@ describe('realtime WebSocket', () => {
       data: {
         deviceNumber: '202111',
         recordedAt: '2026-09-11 09:30:00',
+        dataKind: 'realtime' as const,
         fields: { 出水温度: 28.7 },
       },
     }
@@ -115,7 +116,12 @@ describe('realtime WebSocket', () => {
     expect(() =>
       realtime.broadcast({
         type: 'sensor.realtime',
-        data: { deviceNumber: '202111', recordedAt: '2026-09-11 09:30:00', fields: {} },
+        data: {
+          deviceNumber: '202111',
+          recordedAt: '2026-09-11 09:30:00',
+          dataKind: 'realtime',
+          fields: {},
+        },
       }),
     ).not.toThrow()
   })

@@ -73,7 +73,7 @@ GET /sensor-history?page=1&pageSize=20&deviceNumber=202111&status=all&startTime=
 | `endTime` | 否 | `YYYY-MM-DD HH:mm:ss`，包含边界且不得早于开始时间 |
 | `status` | 否 | `all`、`normal` 或 `abnormal`，默认 `all` |
 
-成功响应的 `data` 为 `{ items, total, page, pageSize }`。每条数据包含 `deviceNumber`、动态 `fields`、`status`、`statusCode`、`online` 和 `recordedAt`。
+成功响应的 `data` 为 `{ items, total, page, pageSize }`。每条数据包含 `deviceNumber`、动态 `fields`、`status`、`statusCode`、`online` 和 `recordedAt`。`online=0` 表示正常联网实时数据，`online=1` 表示断网补发数据；两类数据都保留在历史记录中。
 
 ### 历史趋势
 
@@ -84,6 +84,19 @@ GET /sensor-history/trend?deviceNumber=202111&status=all&limit=10
 设备、时间和状态参数与历史分页一致；`limit` 默认为 10，范围为 10 至 500。响应 `data` 包含正序的 `times`，以及带字段键、名称、单位和数值数组的动态 `series`。
 
 三个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
+
+## 实时 WebSocket
+
+浏览器连接 `/ws` 后接收以下消息：
+
+- `system.status`：后端与 MQTT Broker 的连接状态。
+- `sensor.realtime`：只广播 `online=0` 的实时传感器数据，`dataKind` 固定为 `realtime`；补发数据不会通过该消息覆盖当前值。
+- `device.presence`：设备在线状态，包含 `deviceNumber`、`status` 和服务端记录的 `lastSeenAt`。超过控制参数 `device_offline_timeout` 未收到实时数据后变为 `offline`。
+- `hydraulic.diagnosis`：当前水力联合诊断，包含诊断编码、名称、详情和级别。
+- `automation.status`、`water-flow.realtime`：自动控制与累计量状态。
+- `fault.alert`：故障记录成功入库后的全局告警。
+
+断网补发数据仍写入历史，但不刷新设备在线时间，也不驱动实时广播、累计量、自动控制、安全保护或水力诊断。
 
 ## 故障信息页面
 

@@ -1,4 +1,7 @@
-import type { SafetyFaultCode } from '@new26interthing/shared'
+import type {
+  HydraulicDiagnosisCode,
+  SafetyFaultCode,
+} from '@new26interthing/shared'
 
 const faultTypes: Record<SafetyFaultCode, string> = {
   CONTROL_CONFIG_INVALID: '6',
@@ -18,3 +21,16 @@ const faultTypes: Record<SafetyFaultCode, string> = {
 export const getSafetyFaultType = (faultCode: SafetyFaultCode) => (
   faultTypes[faultCode]
 )
+
+const hydraulicFaultTypes: Partial<Record<HydraulicDiagnosisCode, string>> = {
+  HYDRAULIC_BLOCKAGE: '6',
+  HYDRAULIC_PUMP_ABNORMAL: '6',
+  HYDRAULIC_SENSOR_ANOMALY: '3',
+  HYDRAULIC_LEAK_OR_BURST: '6',
+}
+
+export const getHydraulicFaultType = (faultCode: HydraulicDiagnosisCode) => {
+  const type = hydraulicFaultTypes[faultCode]
+  if (!type) throw new Error(`水力诊断 ${faultCode} 没有故障类型映射`)
+  return type
+}

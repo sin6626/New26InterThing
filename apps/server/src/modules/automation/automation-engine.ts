@@ -369,6 +369,13 @@ export const createAutomationEngine = ({
       })
     },
 
+    tripFault(faultCode: SafetyFaultCode, detail: string) {
+      return serialize(async () => {
+        await applySafetyDecision(safety.trip(faultCode, detail))
+        await notify()
+      })
+    },
+
     resetFault() {
       return serialize(async () => {
         config = await loadCheckedConfig()

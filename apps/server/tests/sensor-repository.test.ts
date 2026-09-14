@@ -15,15 +15,17 @@ describe('sensor repository', () => {
     await expect(repository.save({
       deviceNumber: '202111',
       recordedAt: '2026-09-11 09:30:00',
+      dataKind: 'realtime',
       values: { temp_out: 28.7, internal: 2 },
     })).resolves.toEqual({
       deviceNumber: '202111',
       recordedAt: '2026-09-11 09:30:00',
+      dataKind: 'realtime',
       fields: { temp_out: 28.7 },
     })
     expect(query).toHaveBeenLastCalledWith(
       expect.stringContaining('insert into t_sensor_data (d_no, field1, field2, c_time, online, vstatus)'),
-      ['202111', 28.7, 2, '2026-09-11 09:30:00', '实时数据', 0],
+      ['202111', 28.7, 2, '2026-09-11 09:30:00', '0', 0],
     )
   })
 
@@ -36,6 +38,7 @@ describe('sensor repository', () => {
     await expect(repository.save({
       deviceNumber: '202111',
       recordedAt: '2026-09-11 09:30:00',
+      dataKind: 'realtime',
       values: { unknown: 1 },
     })).rejects.toThrow('没有可映射的传感器字段')
     expect(query).toHaveBeenCalledTimes(1)

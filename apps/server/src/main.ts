@@ -6,6 +6,9 @@ import { createDatabasePool } from './infrastructure/database.js'
 import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
 import { createDeviceRepository } from './modules/device/device.repository.js'
+import { createDevicePresenceService } from './modules/device/device-presence.service.js'
+import { createHydraulicDiagnosisManager } from './modules/diagnostics/hydraulic-diagnosis-manager.js'
+import { createMonitoringConfigLoader } from './modules/diagnostics/monitoring-config.js'
 import { createBehaviorRepository } from './modules/behavior/behavior.mysql.js'
 import { createRecognitionService } from './modules/behavior/recognition.service.js'
 import { createFaultRepository } from './modules/fault/fault.mysql.js'
@@ -20,7 +23,10 @@ import { parseDeviceReport } from './modules/control/device-report.js'
 import { createAutomationConfigLoader } from './modules/automation/control-config.js'
 import { createAutomationManager } from './modules/automation/automation-manager.js'
 import { normalizeAutomationReading } from './modules/automation/automation-reading.js'
-import { getSafetyFaultType } from './modules/safety/safety-fault-catalog.js'
+import {
+  getHydraulicFaultType,
+  getSafetyFaultType,
+} from './modules/safety/safety-fault-catalog.js'
 import {
   createPipeDiameterLoader,
   createWaterFlowRepository,
@@ -32,9 +38,44 @@ const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
+const loadMonitoringConfig = createMonitoringConfigLoader(pool)
 const faultReporter = createFaultReporter({
   repository: faultRepository,
   broadcast: message => realtimeWebSocket.broadcast(message),
+})
+const devicePresence = createDevicePresenceService({
+  loadOfflineTimeoutSeconds: async () => (
+    await loadMonitoringConfig()
+  ).deviceOfflineTimeoutSeconds,
+  emit: message => realtimeWebSocket.broadcast(message),
+  reportOffline: async (deviceNumber, detail) => {
+    await faultReporter.reportFault({
+      deviceNumber,
+      errorNumber: 'E002',
+      type: '2',
+      detail,
+    })
+  },
+})
+const hydraulicDiagnosis = createHydraulicDiagnosisManager({
+  loadConfig: loadMonitoringConfig,
+  emit: message => realtimeWebSocket.broadcast(message),
+  protect: async (diagnosis) => {
+    if (diagnosis.code !== 'HYDRAULIC_LEAK_OR_BURST') return
+    await automationManager.tripFault(
+      diagnosis.deviceNumber,
+      'LOW_FLOW',
+      `水力骤降：${diagnosis.detail}`,
+    )
+  },
+  reportFault: async (deviceNumber, code, detail) => {
+    await faultReporter.reportFault({
+      deviceNumber,
+      errorNumber: code,
+      type: getHydraulicFaultType(code),
+      detail,
+    })
+  },
 })
 let sensorMqtt: ReturnType<typeof createSensorMqtt>
 let automationManager: ReturnType<typeof createAutomationManager>
@@ -100,6 +141,7 @@ const realtimeWebSocket = createRealtimeWebSocket(server)
 const handleSensorReading = createSensorRealtimeHandler({
   repository: createSensorRepository(pool),
   broadcast: (message) => realtimeWebSocket.broadcast(message),
+  onRealtimeReceived: message => devicePresence.recordActivity(message.deviceNumber),
   afterSave: [
     async (message) => {
       const receivedAt = Date.now()
@@ -116,6 +158,15 @@ const handleSensorReading = createSensorRealtimeHandler({
         })
       }
       await automationManager.handleReading(message.deviceNumber, reading)
+    },
+    async (message) => {
+      const reading = normalizeAutomationReading(message.values, Date.now())
+      const automation = await automationManager.getSnapshot(message.deviceNumber)
+      await hydraulicDiagnosis.handleReading(
+        message.deviceNumber,
+        reading,
+        automation.state,
+      )
     },
   ],
 })
@@ -152,6 +203,9 @@ server.listen(env.SERVER_PORT, env.SERVER_HOST, () => {
 const automationTimer = setInterval(() => {
   void automationManager.tick().catch((error) => {
     console.error('自动控制定时推进失败', error)
+  })
+  void devicePresence.tick().catch((error) => {
+    console.error('设备离线巡检失败', error)
   })
 }, 1_000)
 

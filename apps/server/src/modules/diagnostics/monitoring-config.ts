@@ -1,0 +1,52 @@
+import type { Pool, RowDataPacket } from 'mysql2/promise'
+
+export interface MonitoringConfig {
+  deviceOfflineTimeoutSeconds: number
+  minSafeFlow: number
+  minOperatingPressure: number
+  maxSafePressure: number
+  diagnosisConfirmSeconds: number
+}
+
+export const createMonitoringConfigLoader = (
+  pool: Pool,
+  clock: () => number = Date.now,
+) => {
+  let cached: { value: MonitoringConfig; loadedAt: number } | undefined
+  return async (): Promise<MonitoringConfig> => {
+    const now = clock()
+    if (cached && now - cached.loadedAt < 2_000) return cached.value
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `select c.topic, g.value
+       from t_direct_config c
+       left join t_direct_global g on g.config_id = c.id
+       where c.topic in (
+         'device_offline_timeout',
+         'min_safe_flow',
+         'min_operating_pressure',
+         'max_safe_pressure',
+         'pressure_flow_diagnosis_confirm_time'
+       )`,
+    )
+    const values = new Map(rows.map(row => [String(row.topic), Number(row.value)]))
+    const positive = (topic: string) => {
+      const value = values.get(topic)
+      if (value === undefined || !Number.isFinite(value) || value <= 0) {
+        throw new Error(`监控参数 ${topic} 必须是大于 0 的数字`)
+      }
+      return value
+    }
+    const config = {
+      deviceOfflineTimeoutSeconds: positive('device_offline_timeout'),
+      minSafeFlow: positive('min_safe_flow'),
+      minOperatingPressure: positive('min_operating_pressure'),
+      maxSafePressure: positive('max_safe_pressure'),
+      diagnosisConfirmSeconds: positive('pressure_flow_diagnosis_confirm_time'),
+    }
+    if (config.minOperatingPressure >= config.maxSafePressure) {
+      throw new Error('参考最低压力必须小于最大安全压力')
+    }
+    cached = { value: config, loadedAt: now }
+    return config
+  }
+}

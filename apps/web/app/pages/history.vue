@@ -10,6 +10,8 @@ const {
 } = useSensorHistory()
 
 onMounted(() => void initialize())
+
+const isBackfill = (value: unknown) => String(value) === '1' || value === '保存数据'
 </script>
 
 <template>
@@ -75,7 +77,13 @@ onMounted(() => void initialize())
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="online" label="数据类型" width="110" />
+        <el-table-column label="数据类型" width="140">
+          <template #default="scope">
+            <el-tag :type="isBackfill(scope.row.online) ? 'warning' : 'success'" size="small">
+              {{ isBackfill(scope.row.online) ? '断网补发 (1)' : '正常联网 (0)' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="recordedAt" label="采集时间" width="180" />
         <template #empty><el-empty description="暂无历史数据" /></template>
       </el-table>
