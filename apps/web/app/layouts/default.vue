@@ -9,9 +9,11 @@ import {
   StarFilled,
 } from '@element-plus/icons-vue'
 import { useRealtimeSocket } from '~/features/realtime/use-realtime-socket'
+import { useDebugMode } from '~/features/control/use-debug-mode'
 
 const route = useRoute()
 useRealtimeSocket()
+const { enabled: debugMode, loading: debugModeLoading, change: changeDebugMode } = useDebugMode()
 </script>
 
 <template>
@@ -79,7 +81,22 @@ useRealtimeSocket()
       <el-container class="h-screen flex flex-col overflow-hidden">
         <el-header height="64px" class="shrink-0 flex items-center justify-between border-b border-slate-200 bg-white px-6">
           <span class="text-sm text-slate-500">水循环物联网应用系统</span>
-          <el-tag type="success" effect="plain">系统就绪</el-tag>
+          <div class="flex items-center gap-3">
+            <span class="text-sm" :class="debugMode ? 'text-red-600 font-semibold' : 'text-slate-500'">
+              调试模式
+            </span>
+            <el-switch
+              :model-value="debugMode"
+              :loading="debugModeLoading"
+              inline-prompt
+              active-text="开"
+              inactive-text="关"
+              @change="value => changeDebugMode(Boolean(value))"
+            />
+            <el-tag :type="debugMode ? 'danger' : 'success'" effect="plain">
+              {{ debugMode ? '安全锁已跳过' : '系统就绪' }}
+            </el-tag>
+          </div>
         </el-header>
         <el-main class="flex-1 overflow-y-auto p-6">
           <slot />

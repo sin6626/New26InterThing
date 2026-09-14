@@ -31,6 +31,7 @@ export type {
 
 interface Dependencies {
   deviceNumber: string
+  initialDebugMode?: boolean
   clock?: () => number
   loadConfig(): Promise<AutomationConfig>
   execute(topic: 'pump' | 'heater', value: ActuatorValue): Promise<void>
@@ -42,6 +43,7 @@ interface Dependencies {
 
 export const createAutomationEngine = ({
   deviceNumber,
+  initialDebugMode = false,
   clock = Date.now,
   loadConfig,
   execute,
@@ -65,6 +67,7 @@ export const createAutomationEngine = ({
   let operationTail = Promise.resolve()
   let manualPumpStartedAt: number | null = null
   let readingGeneration = 0
+  let debugMode = initialDebugMode
 
   const safetyBridge = createAutomationSafetyBridge({
     safety,
@@ -78,7 +81,9 @@ export const createAutomationEngine = ({
   const temperatureDemand = createAutomationTemperatureDemand({
     clock,
     getDesiredHeater: () => actuator.desiredHeater,
-    authorize: value => safetyBridge.authorize({ topic: 'heater', value }),
+    authorize: value => debugMode
+      ? { allowed: true, reason: null }
+      : safetyBridge.authorize({ topic: 'heater', value }),
     run: value => actuator.run('heater', value),
     setLimitation: reason => {
       limitationReason = reason
@@ -190,11 +195,13 @@ export const createAutomationEngine = ({
       if (!config) await loadCheckedConfig()
     },
     evaluateLatestSafety: async () => {
-      if (!latestReading) return
+      if (!latestReading || debugMode) return
       const decision = safetyBridge.evaluateReading(latestReading)
       if (decision) await applySafetyDecision(decision)
     },
-    authorize: action => safetyBridge.authorize(action, 'manual'),
+    authorize: action => debugMode
+      ? { allowed: true, reason: null }
+      : safetyBridge.authorize(action, 'manual'),
     failCommand: async (action, message) => {
       await applySafetyDecision(safety.trip(
         'COMMAND_PUBLISH_FAILED',
@@ -211,6 +218,7 @@ export const createAutomationEngine = ({
     clock,
     runExclusive: serialize,
     isEnabled: () => enabled,
+    isDebugMode: () => debugMode,
     loadConfig: loadCheckedConfig,
     getLatestReading: () => latestReading,
     getSafetySnapshot: () => safety.getSnapshot(),
@@ -231,6 +239,20 @@ export const createAutomationEngine = ({
   })
 
   return {
+    setDebugMode(nextDebugMode: boolean) {
+      return serialize(async () => {
+        debugMode = nextDebugMode
+        if (debugMode && safety.getSnapshot().locked) {
+          safety.reset()
+          protection.reset()
+          state = 'stopped'
+          enabled = false
+          limitationReason = null
+          enteredAt = clock()
+        }
+        await notify()
+      })
+    },
     setEnabled(nextEnabled: boolean) {
       return modeControl.setEnabled(nextEnabled)
     },
@@ -253,7 +275,7 @@ export const createAutomationEngine = ({
             return
           }
         }
-        const decision = safetyBridge.evaluateReading(reading)
+        const decision = debugMode ? null : safetyBridge.evaluateReading(reading)
         if (decision) {
           await applySafetyDecision(decision)
           await notify()
@@ -287,7 +309,7 @@ export const createAutomationEngine = ({
           }
         }
         if (!config) return
-        const safetyDecision = safetyBridge.tick()
+        const safetyDecision = debugMode ? null : safetyBridge.tick()
         if (safetyDecision) {
           await applySafetyDecision(safetyDecision)
         }
@@ -340,10 +362,12 @@ export const createAutomationEngine = ({
       return serialize(async () => {
         if (!config) await loadCheckedConfig()
         if (latestReading) {
-          const decision = safetyBridge.evaluateReading(latestReading)
+          const decision = debugMode ? null : safetyBridge.evaluateReading(latestReading)
           if (decision) await applySafetyDecision(decision)
         }
-        return safetyBridge.authorize(action, 'manual')
+        return debugMode
+          ? { allowed: true, reason: null }
+          : safetyBridge.authorize(action, 'manual')
       })
     },
 

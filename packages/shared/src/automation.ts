@@ -7,6 +7,10 @@ export type AutomationState =
 
 export type ActuatorValue = 'on' | 'off'
 
+export interface AutomationDebugMode {
+  enabled: boolean
+}
+
 export interface PidSnapshot {
   outputPercent: number
   plannedDutyPercent: number

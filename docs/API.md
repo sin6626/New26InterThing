@@ -215,6 +215,18 @@ Content-Type: application/json
 
 ## 自动水循环
 
+### 调试模式
+
+```http
+GET /api/automation/debug-mode
+POST /api/automation/debug-mode
+Content-Type: application/json
+
+{ "enabled": true }
+```
+
+调试模式仅保存在当前后端进程中，默认关闭。开启后会清除模拟故障锁并允许切换自动/手动模式；此时安全锁定被跳过，只能用于现场模拟。关闭后从下一条实时数据开始恢复全部保护。
+
 ### 获取自动控制快照
 
 ```http

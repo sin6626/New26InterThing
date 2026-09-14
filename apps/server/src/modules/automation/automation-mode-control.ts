@@ -16,6 +16,7 @@ interface Dependencies {
   clock(): number
   runExclusive<T>(operation: () => Promise<T>): Promise<T>
   isEnabled(): boolean
+  isDebugMode(): boolean
   loadConfig(): Promise<AutomationConfig>
   getLatestReading(): AutomationReading | null
   getSafetySnapshot(): SafetySnapshot
@@ -58,14 +59,16 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
       const config = await dependencies.loadConfig()
       if (nextEnabled) {
         const safety = dependencies.getSafetySnapshot()
-        if (safety.locked) {
+        if (safety.locked && !dependencies.isDebugMode()) {
           throw new AutomationError(safety.detail || '故障已锁定，无法启动自动模式')
         }
         const reading = dependencies.getLatestReading()
         if (!hasUsableReading(reading, config, dependencies.clock())) {
           throw new AutomationError('最近传感器数据不可用，无法启动自动模式')
         }
-        const decision = dependencies.evaluateReading(reading)
+        const decision = dependencies.isDebugMode()
+          ? null
+          : dependencies.evaluateReading(reading)
         if (decision) {
           await dependencies.applySafetyDecision(decision)
           throw new AutomationError(decision.detail)

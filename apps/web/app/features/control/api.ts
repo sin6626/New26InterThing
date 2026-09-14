@@ -8,6 +8,7 @@ import type {
   OperationalMetricsSnapshot,
   PaginatedOperationLogs,
   AutomationSnapshot,
+  AutomationDebugMode,
   WaterFlowSnapshot,
 } from '@new26interthing/shared'
 
@@ -33,6 +34,19 @@ export const useControlApi = () => {
     async getAutomationSnapshot(deviceNumber: string) {
       const response = await http.get<ApiResponse<AutomationSnapshot>>(
         `/automation/${encodeURIComponent(deviceNumber)}`,
+      )
+      return unwrap(response.data)
+    },
+    async getDebugMode() {
+      const response = await http.get<ApiResponse<AutomationDebugMode>>(
+        '/automation/debug-mode',
+      )
+      return unwrap(response.data)
+    },
+    async setDebugMode(enabled: boolean) {
+      const response = await http.post<ApiResponse<AutomationDebugMode>>(
+        '/automation/debug-mode',
+        { enabled },
       )
       return unwrap(response.data)
     },

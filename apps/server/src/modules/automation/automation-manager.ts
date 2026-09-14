@@ -42,6 +42,7 @@ export const createAutomationManager = ({
   reportFault,
 }: Dependencies) => {
   let engine: AutomationEngine | undefined
+  let debugMode = false
   let activeDeviceNumber: string | undefined
 
   const getEngine = (deviceNumber: string) => {
@@ -52,6 +53,7 @@ export const createAutomationManager = ({
     activeDeviceNumber = deviceNumber
     engine = createAutomationEngine({
       deviceNumber,
+      initialDebugMode: debugMode,
       clock,
       loadConfig,
       execute: (topic, value) => execute(deviceNumber, topic, value),
@@ -68,8 +70,18 @@ export const createAutomationManager = ({
   }
 
   return {
-    setEnabled(deviceNumber: string, enabled: boolean) {
-      return getEngine(deviceNumber).setEnabled(enabled)
+    async setEnabled(deviceNumber: string, enabled: boolean) {
+      const currentEngine = getEngine(deviceNumber)
+      if (debugMode) await currentEngine.setDebugMode(true)
+      return currentEngine.setEnabled(enabled)
+    },
+    getDebugMode() {
+      return { enabled: debugMode }
+    },
+    async setDebugMode(enabled: boolean) {
+      debugMode = enabled
+      await engine?.setDebugMode(enabled)
+      return { enabled: debugMode }
     },
     getSnapshot(deviceNumber: string) {
       return getEngine(deviceNumber).getSnapshot()

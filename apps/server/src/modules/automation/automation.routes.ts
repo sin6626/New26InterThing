@@ -23,6 +23,16 @@ export const createAutomationRouter = (
 ) => {
   const router = Router()
 
+  router.get('/debug-mode', (_request, response) => {
+    response.json({ code: 0, message: '操作成功', data: manager.getDebugMode() })
+  })
+
+  router.post('/debug-mode', (request, response, next) => {
+    void manager.setDebugMode(request.body?.enabled === true)
+      .then(data => response.json({ code: 0, message: '调试模式已更新', data }))
+      .catch(next)
+  })
+
   const handleKnownError = (
     error: unknown,
     response: Response,

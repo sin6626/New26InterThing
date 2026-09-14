@@ -35,6 +35,83 @@ const config = {
 }
 
 describe('automation engine', () => {
+  it('honors debug mode from the first realtime reading', async () => {
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      initialDebugMode: true,
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn().mockResolvedValue(undefined),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 0,
+      pressure: 130,
+      inletTemperature: 30,
+      outletTemperature: 45,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'stopped',
+      safety: { locked: false },
+    })
+  })
+
+  it('clears test faults and suppresses safety locking while debug mode is enabled', async () => {
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      execute: vi.fn().mockResolvedValue(undefined),
+      reportFault: vi.fn().mockResolvedValue(undefined),
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+    const unsafeReading = {
+      recordedAt: 1_000,
+      flowRate: 0,
+      pressure: 130,
+      inletTemperature: 30,
+      outletTemperature: 45,
+      actualPump: 'on' as const,
+      actualHeater: 'on' as const,
+    }
+
+    await engine.handleReading(unsafeReading)
+    expect((await engine.getSnapshot()).state).toBe('fault')
+
+    await engine.setDebugMode(true)
+    await engine.handleReading(unsafeReading)
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'stopped',
+      safety: { locked: false },
+    })
+  })
+
   it('loads safety configuration on the first reading and protects immediately', async () => {
     const loadConfig = vi.fn().mockResolvedValue(config)
     const execute = vi.fn().mockResolvedValue(undefined)
