@@ -7,6 +7,8 @@ import type {
 
 import { createAutomationActuator } from './automation-actuator.js'
 import { createAutomationSafetyBridge } from './automation-safety-bridge.js'
+import { createAutomationManualControl } from './automation-manual-control.js'
+import { createAutomationModeControl } from './automation-mode-control.js'
 import { createAutomationProtection } from './automation-protection.js'
 import { createAutomationTemperatureDemand } from './automation-temperature-demand.js'
 import { buildAutomationSnapshot } from './automation-snapshot.js'
@@ -63,8 +65,6 @@ export const createAutomationEngine = ({
   let operationTail = Promise.resolve()
   let manualPumpStartedAt: number | null = null
   let readingGeneration = 0
-  let emergencyOffGeneration = 0
-  const emergencyOffPublishers = new Map<'pump' | 'heater', () => Promise<void>>()
 
   const safetyBridge = createAutomationSafetyBridge({
     safety,
@@ -183,69 +183,56 @@ export const createAutomationEngine = ({
     outletTemperature,
   )
 
+  const manualControl = createAutomationManualControl({
+    clock,
+    runExclusive: serialize,
+    ensureConfig: async () => {
+      if (!config) await loadCheckedConfig()
+    },
+    evaluateLatestSafety: async () => {
+      if (!latestReading) return
+      const decision = safetyBridge.evaluateReading(latestReading)
+      if (decision) await applySafetyDecision(decision)
+    },
+    authorize: action => safetyBridge.authorize(action, 'manual'),
+    failCommand: async (action, message) => {
+      await applySafetyDecision(safety.trip(
+        'COMMAND_PUBLISH_FAILED',
+        `${action.topic}=${action.value} 指令发布失败：${message}`,
+      ))
+    },
+    adoptPublished: (topic, value) => actuator.adoptPublished(topic, value),
+    setManualPumpStartedAt: value => {
+      manualPumpStartedAt = value
+    },
+    notify,
+  })
+  const modeControl = createAutomationModeControl({
+    clock,
+    runExclusive: serialize,
+    isEnabled: () => enabled,
+    loadConfig: loadCheckedConfig,
+    getLatestReading: () => latestReading,
+    getSafetySnapshot: () => safety.getSnapshot(),
+    evaluateReading: reading => safetyBridge.evaluateReading(reading),
+    applySafetyDecision,
+    desiredPump: () => actuator.desiredPump,
+    runPump: value => actuator.run('pump', value),
+    runHeater: value => actuator.run('heater', value),
+    handleDemandFailure,
+    enterModeState(nextEnabled, nextState, reason) {
+      enabled = nextEnabled
+      state = nextState
+      enteredAt = clock()
+      limitationReason = reason
+    },
+    notify,
+    getSnapshot,
+  })
+
   return {
     setEnabled(nextEnabled: boolean) {
-      return serialize(async () => {
-        if (enabled === nextEnabled) return getSnapshot()
-        config = await loadCheckedConfig()
-        if (nextEnabled) {
-          if (safety.getSnapshot().locked) {
-            throw new AutomationError(safety.getSnapshot().detail || '故障已锁定，无法启动自动模式')
-          }
-          const currentReading = latestReading
-          const readingAge = currentReading === null
-            ? Number.POSITIVE_INFINITY
-            : clock() - currentReading.recordedAt
-          const readingValuesAvailable = currentReading !== null
-            && currentReading.flowRate !== null
-            && currentReading.pressure !== null
-            && currentReading.inletTemperature !== null
-            && currentReading.outletTemperature !== null
-            && currentReading.actualPump !== 'unknown'
-            && currentReading.actualHeater !== 'unknown'
-          if (
-            !readingValuesAvailable
-            || readingAge < 0
-            || readingAge > config.dataTimeoutSeconds * 1_000
-          ) {
-            throw new AutomationError('最近传感器数据不可用，无法启动自动模式')
-          }
-          const initialDecision = safetyBridge.evaluateReading(currentReading as AutomationReading)
-          if (initialDecision) {
-            await applySafetyDecision(initialDecision)
-            throw new AutomationError(initialDecision.detail)
-          }
-          enabled = true
-          state = 'building-flow'
-          enteredAt = clock()
-          limitationReason = '等待设备建流'
-          try {
-            await actuator.run('pump', 'on')
-          }
-          catch (error) {
-            await handleDemandFailure(error)
-            await notify()
-            throw new AutomationError(error instanceof Error ? error.message : String(error))
-          }
-        }
-        else {
-          enabled = false
-          state = actuator.desiredPump === 'on' ? 'cooling' : 'stopped'
-          enteredAt = clock()
-          limitationReason = state === 'cooling' ? '正在冷却' : null
-          try {
-            await actuator.run('heater', 'off')
-          }
-          catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            await handleDemandFailure(error)
-            await notify()
-            throw new AutomationError(message)
-          }
-        }
-        await notify()
-        return getSnapshot()
-      })
+      return modeControl.setEnabled(nextEnabled)
     },
 
     handleReading(reading: AutomationReading) {
@@ -364,72 +351,11 @@ export const createAutomationEngine = ({
       action: SafetyAction,
       publish: () => Promise<void>,
     ) {
-      if (action.value === 'off') {
-        emergencyOffGeneration += 1
-        emergencyOffPublishers.set(action.topic, publish)
-        return publish()
-          .then(() => {
-            actuator.adoptPublished(action.topic, 'off')
-            if (action.topic === 'pump') manualPumpStartedAt = null
-          })
-          .catch((error) => {
-            const message = error instanceof Error ? error.message : String(error)
-            void serialize(async () => {
-              await applySafetyDecision(safety.trip(
-                'COMMAND_PUBLISH_FAILED',
-                `${action.topic}=off 指令发布失败：${message}`,
-              ))
-              await notify()
-            })
-            throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
-          })
-      }
-      return serialize(async () => {
-        const startingEmergencyOffGeneration = emergencyOffGeneration
-        if (action.value === 'on') {
-          if (!config) await loadCheckedConfig()
-          if (latestReading) {
-            const decision = safetyBridge.evaluateReading(latestReading)
-            if (decision) await applySafetyDecision(decision)
-          }
-          const authorization = safetyBridge.authorize(action, 'manual')
-          if (!authorization.allowed) {
-            throw new AutomationError(authorization.reason || '安全条件不满足')
-          }
-        }
-        try {
-          await publish()
-        }
-        catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          await applySafetyDecision(safety.trip(
-            'COMMAND_PUBLISH_FAILED',
-            `${action.topic}=${action.value} 指令发布失败：${message}`,
-          ))
-          await notify()
-          throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
-        }
-        if (startingEmergencyOffGeneration !== emergencyOffGeneration) {
-          const emergencyPublisher = emergencyOffPublishers.get(action.topic)
-          if (emergencyPublisher) await emergencyPublisher()
-          actuator.adoptPublished(action.topic, 'off')
-          if (action.topic === 'pump') manualPumpStartedAt = null
-          await notify()
-          return
-        }
-        actuator.adoptPublished(action.topic, action.value)
-        if (action.topic === 'pump') {
-          manualPumpStartedAt = action.value === 'on' ? clock() : null
-        }
-        await notify()
-      })
+      return manualControl.execute(action, publish)
     },
 
     recordCommand(action: SafetyAction) {
-      actuator.adoptPublished(action.topic, action.value)
-      if (action.topic === 'pump') {
-        manualPumpStartedAt = action.value === 'on' ? clock() : null
-      }
+      manualControl.adopt(action)
     },
 
     handleCommandFailure(action: SafetyAction, message: string) {

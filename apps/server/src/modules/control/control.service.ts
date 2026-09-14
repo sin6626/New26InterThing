@@ -88,8 +88,8 @@ export const createControlService = (
       if (definition.max !== null && number > Number(definition.max)) throw new ControlError(`配置值不能大于 ${definition.max}`, 400)
     }
 
-    if (definition.fieldType === '4' && !/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(value)) {
-      throw new ControlError('时间值必须使用 HH:mm:ss 格式', 400)
+    if (definition.fieldType === '4' && !/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(value)) {
+      throw new ControlError('时间值必须使用 YYYY-MM-DD HH:mm:ss 格式', 400)
     }
 
     if (['5', '6'].includes(definition.fieldType)) {

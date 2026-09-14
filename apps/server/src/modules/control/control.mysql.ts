@@ -20,7 +20,7 @@ const fieldTypes: Record<string, ControlField['type']> = {
   '1': 'switch',
   '2': 'input',
   '3': 'slider',
-  '4': 'time',
+  '4': 'datetime',
   '5': 'radio',
   '6': 'checkbox',
 }
@@ -136,7 +136,7 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
               coalesce(g.value, 'off') as value
        from t_direct_config c
        left join t_direct_global g on g.config_id = c.id
-       order by cast(c.order as unsigned), c.id`,
+       order by c.id`,
     )
     return {
       deviceNumber,

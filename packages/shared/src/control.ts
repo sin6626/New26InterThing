@@ -1,4 +1,4 @@
-export type ControlFieldType = 'switch' | 'input' | 'slider' | 'time' | 'radio' | 'checkbox'
+export type ControlFieldType = 'switch' | 'input' | 'slider' | 'datetime' | 'radio' | 'checkbox'
 
 export interface ControlOption {
   label: string

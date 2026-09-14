@@ -286,6 +286,27 @@ describe('control service', () => {
     expect(publish).not.toHaveBeenCalled()
   })
 
+  it('uses the same full datetime format as contest_admin for type 4', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      fieldType: '4',
+      topic: 'start_time',
+    })
+    const service = createControlService(repo, { publish: vi.fn() })
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 23,
+      value: '2026-09-14 08:30:00',
+    })).resolves.toMatchObject({ status: 'saved' })
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 23,
+      value: '08:30:00',
+    })).rejects.toMatchObject({ status: 400 })
+  })
+
   it('rejects unknown control types instead of guessing the input', async () => {
     const repo = repository()
     vi.mocked(repo.getDefinition).mockResolvedValue({

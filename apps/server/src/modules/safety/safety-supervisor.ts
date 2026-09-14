@@ -12,21 +12,20 @@ import {
   createSensorFreshness,
   type SensorKey,
 } from './sensor-freshness.js'
-
-const decisionDetails: Record<SafetyFaultCode, string> = {
-  CONTROL_CONFIG_INVALID: '控制配置无效',
-  BUILD_FLOW_TIMEOUT: '水泵启动后未在限定时间内建立安全流量',
-  COMMAND_PUBLISH_FAILED: '控制指令发布失败',
-  LOW_FLOW: '运行流量持续低于安全阈值',
-  PUMP_IDLING: '人工开启水泵后未建立安全流量',
-  OVER_PRESSURE: '管路压力达到或超过安全上限',
-  OVER_TEMPERATURE: '水温达到或超过安全上限',
-  SENSOR_FLOW_TIMEOUT: '流量传感器数据超时或无效',
-  SENSOR_PRESSURE_TIMEOUT: '压力传感器数据超时或无效',
-  SENSOR_TEMPERATURE_TIMEOUT: '温度传感器数据超时或无效',
-  TEMP_SENSOR_REVERSED: '入口温度持续高于出口温度，温度探头疑似装反',
-  DRY_HEATING_NO_TEMP_RISE: '有效加热时间内出口温度没有达到最低温升',
-}
+import {
+  hasBuildFlowTimeout,
+  hasPumpIdling,
+} from './rules/build-flow.rule.js'
+import { hasHeatingNoRise } from './rules/heating-no-rise.rule.js'
+import {
+  hasConfirmedLowFlow,
+  hasImmediateCoolingLowFlow,
+} from './rules/low-flow.rule.js'
+import { hasOverPressure } from './rules/over-pressure.rule.js'
+import { hasOverTemperature } from './rules/over-temperature.rule.js'
+import { getSensorTimeoutFault } from './rules/sensor-timeout.rule.js'
+import { hasConfirmedReversedTemperature } from './rules/temperature-reversed.rule.js'
+import { safetyFaultDetails } from './safety-fault-definitions.js'
 
 export const createSafetySupervisor = (clock: () => number = Date.now) => {
   const sensors = createSensorFreshness(clock)
@@ -107,7 +106,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     if (lockedDecision) return lockedDecision
     lockedDecision = {
       faultCode,
-      detail: options.detail ?? decisionDetails[faultCode],
+      detail: options.detail ?? safetyFaultDetails[faultCode],
       closeHeater: options.closeHeater ?? true,
       stopPump: options.stopPump ?? true,
     }
@@ -142,18 +141,13 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
 
   const evaluateInitialBuildTimeouts = (context: SafetyContext) => {
     const now = clock()
-    if (context.state === 'building-flow' && context.stateEnteredAt !== undefined) {
-      if (now - context.stateEnteredAt >= context.config.buildFlowTimeoutSeconds * 1_000) {
-        return latch('BUILD_FLOW_TIMEOUT')
-      }
-    }
-    if (
-      context.manualPumpStartedAt !== undefined
-      && context.manualPumpStartedAt !== null
-      && !manualFlowEstablished
-      && (sensors.value('flow') ?? 0) < context.config.minSafeFlow
-      && now - context.manualPumpStartedAt >= context.config.buildFlowTimeoutSeconds * 1_000
-    ) return latch('PUMP_IDLING')
+    if (hasBuildFlowTimeout(now, context)) return latch('BUILD_FLOW_TIMEOUT')
+    if (hasPumpIdling(
+      now,
+      context,
+      manualFlowEstablished,
+      sensors.value('flow'),
+    )) return latch('PUMP_IDLING')
     return null
   }
 
@@ -163,25 +157,30 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     const buildDecision = evaluateInitialBuildTimeouts(context)
     if (buildDecision) return buildDecision
     if (!active(context)) return null
-    if (!isFresh('pressure', context)) return latch('SENSOR_PRESSURE_TIMEOUT')
-    if (!isFresh('flow', context)) return latch('SENSOR_FLOW_TIMEOUT')
-    if (!isFresh('inletTemperature', context) || !isFresh('outletTemperature', context)) {
-      return latch('SENSOR_TEMPERATURE_TIMEOUT', { stopPump: false })
-    }
-    if (lowFlowSince !== null && now - lowFlowSince >= context.config.lowFlowConfirmSeconds * 1_000) {
+    const sensorFault = getSensorTimeoutFault({
+      active: true,
+      pressureFresh: isFresh('pressure', context),
+      flowFresh: isFresh('flow', context),
+      inletTemperatureFresh: isFresh('inletTemperature', context),
+      outletTemperatureFresh: isFresh('outletTemperature', context),
+    })
+    if (sensorFault) return latch(sensorFault, {
+      stopPump: sensorFault !== 'SENSOR_TEMPERATURE_TIMEOUT',
+    })
+    if (hasConfirmedLowFlow(now, lowFlowSince, context.config)) {
       return latch(context.state === 'building-flow' ? 'BUILD_FLOW_TIMEOUT' : 'LOW_FLOW')
     }
-    if (reversedSince !== null && now - reversedSince >= context.config.temperatureReversedConfirmSeconds * 1_000) {
+    if (hasConfirmedReversedTemperature(now, reversedSince, context.config)) {
       return latch('TEMP_SENSOR_REVERSED', { stopPump: false })
     }
-    if (
-      heatingBaseline !== null
-      && effectiveHeatingMilliseconds + (
-        lastEffectiveHeatingAt === null ? 0 : now - lastEffectiveHeatingAt
-      ) >= context.config.dryHeatingTimeoutSeconds * 1_000
-      && (sensors.value('outletTemperature') ?? heatingBaseline) - heatingBaseline
-        < context.config.dryHeatingTemperatureDifference
-    ) {
+    if (hasHeatingNoRise({
+      now,
+      heatingBaseline,
+      outletTemperature: sensors.value('outletTemperature'),
+      effectiveHeatingMilliseconds,
+      lastEffectiveHeatingAt,
+      config: context.config,
+    })) {
       return latch('DRY_HEATING_NO_TEMP_RISE', { stopPump: false })
     }
     return null
@@ -193,32 +192,27 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     context: SafetyContext,
   ) => {
     const concurrentFacts = [
-      !isFresh('pressure', context) ? decisionDetails.SENSOR_PRESSURE_TIMEOUT : null,
-      !isFresh('flow', context) ? decisionDetails.SENSOR_FLOW_TIMEOUT : null,
+      !isFresh('pressure', context) ? safetyFaultDetails.SENSOR_PRESSURE_TIMEOUT : null,
+      !isFresh('flow', context) ? safetyFaultDetails.SENSOR_FLOW_TIMEOUT : null,
       !isFresh('inletTemperature', context) || !isFresh('outletTemperature', context)
-        ? decisionDetails.SENSOR_TEMPERATURE_TIMEOUT
+        ? safetyFaultDetails.SENSOR_TEMPERATURE_TIMEOUT
         : null,
-      reading.actualPump === 'on'
-        && reading.pressure !== null
-        && reading.pressure >= context.config.maxSafePressure
-        ? decisionDetails.OVER_PRESSURE
+      hasOverPressure(reading, context.config)
+        ? safetyFaultDetails.OVER_PRESSURE
         : null,
-      (reading.inletTemperature !== null
-        && reading.inletTemperature >= context.config.maxSafeTemperature)
-        || (reading.outletTemperature !== null
-          && reading.outletTemperature >= context.config.maxSafeTemperature)
-        ? decisionDetails.OVER_TEMPERATURE
+      hasOverTemperature(reading, context.config)
+        ? safetyFaultDetails.OVER_TEMPERATURE
         : null,
       reading.flowRate !== null && reading.flowRate < context.config.minSafeFlow
         ? '当前流量低于安全阈值'
         : null,
     ].filter((fact): fact is string => fact !== null)
     const additionalFacts = concurrentFacts.filter(
-      fact => fact !== decisionDetails[faultCode],
+      fact => fact !== safetyFaultDetails[faultCode],
     )
     return additionalFacts.length === 0
-      ? decisionDetails[faultCode]
-      : `${decisionDetails[faultCode]}；同时检测到：${additionalFacts.join('、')}`
+      ? safetyFaultDetails[faultCode]
+      : `${safetyFaultDetails[faultCode]}；同时检测到：${additionalFacts.join('、')}`
   }
 
   const evaluateRequiredSensors = (
@@ -230,21 +224,21 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     const withFacts = (faultCode: SafetyFaultCode) => {
       return { detail: detailWithConcurrentFacts(faultCode, reading, context) }
     }
-    if (!isFresh('pressure', context)) {
-      return latch('SENSOR_PRESSURE_TIMEOUT', withFacts('SENSOR_PRESSURE_TIMEOUT'))
-    }
-    if (!isFresh('flow', context)) {
-      return latch('SENSOR_FLOW_TIMEOUT', withFacts('SENSOR_FLOW_TIMEOUT'))
-    }
-    if (
-      includeTemperature
-      && (!isFresh('inletTemperature', context) || !isFresh('outletTemperature', context))
-    ) {
-      return latch('SENSOR_TEMPERATURE_TIMEOUT', {
-        ...withFacts('SENSOR_TEMPERATURE_TIMEOUT'),
-        stopPump: false,
-      })
-    }
+    const faultCode = getSensorTimeoutFault({
+      active: true,
+      pressureFresh: isFresh('pressure', context),
+      flowFresh: isFresh('flow', context),
+      inletTemperatureFresh: includeTemperature
+        ? isFresh('inletTemperature', context)
+        : true,
+      outletTemperatureFresh: includeTemperature
+        ? isFresh('outletTemperature', context)
+        : true,
+    })
+    if (faultCode) return latch(faultCode, {
+      ...withFacts(faultCode),
+      stopPump: faultCode !== 'SENSOR_TEMPERATURE_TIMEOUT',
+    })
     return null
   }
 
@@ -274,11 +268,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       if (lockedDecision) {
         return upgradeLockedProtection(context)
       }
-      if (
-        reading.actualPump === 'on'
-        && reading.pressure !== null
-        && reading.pressure >= context.config.maxSafePressure
-      ) {
+      if (hasOverPressure(reading, context.config)) {
         return latch('OVER_PRESSURE', {
           detail: detailWithConcurrentFacts('OVER_PRESSURE', reading, context),
         })
@@ -291,19 +281,12 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
         false,
       )
       if (missingHydraulicSensorDecision) return missingHydraulicSensorDecision
-      if (
-        (context.state === 'cooling' || context.state === 'fault')
-        && reading.flowRate !== null
-        && reading.flowRate < context.config.minSafeFlow
-      ) {
+      if (hasImmediateCoolingLowFlow(reading, context.state, context.config)) {
         return latch('LOW_FLOW', {
           detail: detailWithConcurrentFacts('LOW_FLOW', reading, context),
         })
       }
-      if (
-        (reading.inletTemperature !== null && reading.inletTemperature >= context.config.maxSafeTemperature)
-        || (reading.outletTemperature !== null && reading.outletTemperature >= context.config.maxSafeTemperature)
-      ) {
+      if (hasOverTemperature(reading, context.config)) {
         const hydraulicsSafe = reading.actualPump === 'on'
           && isFresh('flow', context)
           && isFresh('pressure', context)

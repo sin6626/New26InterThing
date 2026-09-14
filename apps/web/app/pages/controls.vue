@@ -59,7 +59,7 @@ const faultOccurredAt = computed(() => {
 
 const switchValue = (field: ControlField) => field.value === 'on'
 
-const updateTime = (
+const updateDateTime = (
   field: ControlField,
   value: unknown,
 ) => {
@@ -330,13 +330,14 @@ onMounted(() => void initialize())
                   :value="option.value"
                 />
               </el-select>
-              <el-time-picker
-                v-else-if="field.type === 'time'"
+              <el-date-picker
+                v-else-if="field.type === 'datetime'"
                 :model-value="field.value"
                 :disabled="savingId !== undefined"
-                value-format="HH:mm:ss"
-                placeholder="选择时间"
-                @change="updateTime(field, $event)"
+                type="datetime"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                placeholder="选择日期时间"
+                @change="updateDateTime(field, $event)"
               />
               <el-checkbox-group
                 v-else-if="field.type === 'checkbox'"

@@ -5,10 +5,10 @@ import type {
 import { ElMessage } from 'element-plus'
 
 import { useControlApi } from './api'
-
-export interface ControlTreeNode extends ControlField {
-  children: ControlTreeNode[]
-}
+import {
+  buildVisibleControlTree,
+  type ControlTreeNode,
+} from './control-tree'
 
 export const useControls = () => {
   const api = useControlApi()
@@ -20,32 +20,9 @@ export const useControls = () => {
   const errorMessage = ref('')
   const syncingTime = ref(false)
 
-  const controlTree = computed<ControlTreeNode[]>(() => {
-    const fields = snapshot.value.fields
-
-    const buildChildren = (
-      parent: ControlField,
-      ancestors: Set<number>,
-    ): ControlTreeNode[] => fields
-      .filter(field => field.parentId === parent.configId)
-      .filter(field => field.parentValue === null || field.parentValue === parent.value)
-      .filter(field => !ancestors.has(field.configId))
-      .map((field) => {
-        const nextAncestors = new Set(ancestors)
-        nextAncestors.add(field.configId)
-        return {
-          ...field,
-          children: buildChildren(field, nextAncestors),
-        }
-      })
-
-    return fields
-      .filter(field => field.parentId === null)
-      .map(field => ({
-        ...field,
-        children: buildChildren(field, new Set([field.configId])),
-      }))
-  })
+  const controlTree = computed<ControlTreeNode[]>(() => (
+    buildVisibleControlTree(snapshot.value.fields)
+  ))
 
   const load = async () => {
     if (!selectedDevice.value) return
