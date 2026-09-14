@@ -1,78 +1,96 @@
 <script setup lang="ts">
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import {
+  Promotion,
+  Bell,
+  Warning,
+  ChatLineRound,
+  Tickets,
+  StarFilled,
+} from '@element-plus/icons-vue'
 import { useRealtimeSocket } from '~/features/realtime/use-realtime-socket'
 
 const route = useRoute()
 useRealtimeSocket()
-
-const menuGroups: Array<{ title: string, items: Array<{ label: string, to?: string }> }> = [
-  {
-    title: '监控中心',
-    items: [
-      { label: '实时监控', to: '/' },
-      { label: '历史数据', to: '/history' },
-      { label: '行为数据', to: '/behaviors' },
-      { label: '故障信息', to: '/faults' },
-    ],
-  },
-  {
-    title: '设备与控制',
-    items: [
-      // todo 设备管理应该不用, 因为比赛的时候应该只有一个设备, 这里先隐藏
-      // { label: '设备管理', to: '/device' },
-      { label: '指令控制', to: '/controls' },
-      { label: '操作日志', to: '/operation-logs' },
-    ],
-  },
-]
-
-function isActive(to: string) {
-  return to === '/' ? route.path === '/' : route.path.startsWith(to)
-}
 </script>
 
 <template>
   <el-config-provider :locale="zhCn">
-  <el-container class="min-h-screen bg-[#f3f5f8]">
-    <el-aside width="220px" class="border-r border-slate-200 bg-slate-950 text-white">
-      <div class="flex h-16 items-center border-b border-slate-800 px-5">
-        <div>
-          <p class="m-0 text-base font-semibold tracking-wide">物联网控制平台</p>
-          <p class="mt-1 mb-0 text-xs text-slate-400">New26InterThing</p>
+    <el-container class="min-h-screen bg-[#f3f5f8]">
+      <el-aside width="220px" class="bg-[#232323] text-white">
+        <div class="flex h-16 items-center border-b border-[#333] px-5">
+          <div>
+            <p class="m-0 text-base font-semibold tracking-wide text-white">物联网控制平台</p>
+            <p class="mt-1 mb-0 text-xs text-slate-400">New26InterThing</p>
+          </div>
         </div>
-      </div>
 
-      <nav class="px-3 py-4">
-        <section v-for="group in menuGroups" :key="group.title" class="mb-6">
-          <p class="mb-2 px-3 text-xs font-medium tracking-widest text-slate-500">
-            {{ group.title }}
-          </p>
-          <template v-for="item in group.items" :key="item.label">
-            <NuxtLink
-              v-if="item.to"
-              :to="item.to"
-              class="mb-1 block rounded-lg px-3 py-2.5 text-sm no-underline transition-colors"
-              :class="isActive(item.to) ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-900'"
-            >
-              {{ item.label }}
-            </NuxtLink>
-            <div v-else class="mb-1 rounded-lg px-3 py-2.5 text-sm text-slate-600">
-              {{ item.label }}
-            </div>
-          </template>
-        </section>
-      </nav>
-    </el-aside>
+        <el-menu
+          class="sidebar-menu"
+          :default-active="route.path"
+          :default-openeds="['sensors']"
+          background-color="#232323"
+          text-color="#fff"
+          active-text-color="#ffd04b"
+          router
+        >
+          <el-sub-menu index="sensors">
+            <template #title>
+              <el-icon><Promotion /></el-icon>
+              <span>传感器数据</span>
+            </template>
+            <el-menu-item index="/">
+              <el-icon><Promotion /></el-icon>
+              <span>实时数据</span>
+            </el-menu-item>
+            <el-menu-item index="/history">
+              <el-icon><Promotion /></el-icon>
+              <span>历史数据</span>
+            </el-menu-item>
+          </el-sub-menu>
 
-    <el-container>
-      <el-header height="64px" class="flex items-center justify-between border-b border-slate-200 bg-white px-6">
-        <span class="text-sm text-slate-500">水循环物联网应用系统</span>
-        <el-tag type="info" effect="plain">第五里程碑</el-tag>
-      </el-header>
-      <el-main class="p-6">
-        <slot />
-      </el-main>
+          <el-menu-item index="/behaviors">
+            <el-icon><Bell /></el-icon>
+            <span>行为数据</span>
+          </el-menu-item>
+
+          <el-menu-item index="/faults">
+            <el-icon><Warning /></el-icon>
+            <span>错误信息</span>
+          </el-menu-item>
+
+          <el-menu-item index="/controls">
+            <el-icon><ChatLineRound /></el-icon>
+            <span>指令信息</span>
+          </el-menu-item>
+
+          <el-menu-item index="/operation-logs">
+            <el-icon><Tickets /></el-icon>
+            <span>操作历史</span>
+          </el-menu-item>
+
+          <el-menu-item index="/device">
+            <el-icon><StarFilled /></el-icon>
+            <span>设备管理</span>
+          </el-menu-item>
+        </el-menu>
+      </el-aside>
+
+      <el-container>
+        <el-header height="64px" class="flex items-center justify-between border-b border-slate-200 bg-white px-6">
+          <span class="text-sm text-slate-500">水循环物联网应用系统</span>
+          <el-tag type="success" effect="plain">系统就绪</el-tag>
+        </el-header>
+        <el-main class="p-6">
+          <slot />
+        </el-main>
+      </el-container>
     </el-container>
-  </el-container>
   </el-config-provider>
 </template>
+
+<style scoped>
+.sidebar-menu {
+  border-right: none;
+}
+</style>

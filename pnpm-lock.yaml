@@ -59,6 +59,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@element-plus/icons-vue':
+        specifier: ^2.3.2
+        version: 2.3.2(vue@3.5.42(typescript@5.9.3))
       '@element-plus/nuxt':
         specifier: 1.1.5
         version: 1.1.5(@element-plus/icons-vue@2.3.2(vue@3.5.42(typescript@5.9.3)))(element-plus@2.14.5(vue@3.5.42(typescript@5.9.3)))(esbuild@0.28.2)(magicast@0.5.4)(rolldown@1.2.8)(rollup@4.63.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13))
