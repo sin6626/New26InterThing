@@ -14,6 +14,7 @@ if (!Number.isInteger(webPort) || webPort < 1 || webPort > 65535) {
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devServer: {
+    host: '0.0.0.0',
     port: webPort,
   },
   
@@ -23,8 +24,9 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3001/api',
-      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws',
+      serverPort: Number(process.env.SERVER_PORT || 3001),
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || '',
+      wsUrl: process.env.NUXT_PUBLIC_WS_URL || '',
     },
   },
   vite: {

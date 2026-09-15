@@ -64,7 +64,10 @@ export const createHydraulicDiagnosisManager = ({
         type: 'hydraulic.diagnosis',
         data: { deviceNumber, ...result },
       })
-      await protect({ deviceNumber, ...result })
+      // 仅确定的泄漏/爆管要求紧急停机；其他诊断只上报，不擅自改变设备状态。
+      if (result.code === 'HYDRAULIC_LEAK_OR_BURST') {
+        await protect({ deviceNumber, ...result })
+      }
       if (!reportableCodes.has(result.code)) {
         reportedCodes.delete(deviceNumber)
       }

@@ -8,6 +8,7 @@ import type {
   WaterFlowSnapshot,
 } from '@new26interthing/shared'
 import { ElNotification } from 'element-plus'
+import { backendEndpoints } from '~/utils/backend-endpoints'
 
 import {
   appendRealtimePoint,
@@ -65,7 +66,11 @@ export function useRealtimeSocket() {
   const connect = () => {
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return
     socketStatus.value = 'connecting'
-    socket = new WebSocket(config.public.wsUrl)
+    socket = new WebSocket(backendEndpoints(
+      config.public.apiBase,
+      config.public.wsUrl,
+      config.public.serverPort,
+    ).wsUrl)
 
     socket.addEventListener('open', () => {
       socketStatus.value = 'connected'
