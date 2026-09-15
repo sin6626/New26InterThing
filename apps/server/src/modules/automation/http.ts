@@ -25,7 +25,7 @@ export const createAutomationRouter = (
   controlRepository: ControlRepository,
   waterFlow: WaterFlowService,
   operationalMetrics?: OperationalMetricsService,
-) => {
+): Router => {
   const router = Router()
 
   router.get('/debug-mode', (_request, response) => {
