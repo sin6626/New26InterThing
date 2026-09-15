@@ -47,10 +47,12 @@ const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
 const loadMonitoringConfig = createMonitoringConfigLoader(pool)
 const loadAutomationConfig = createAutomationConfigLoader(pool)
+// 注册故障告警, 入库 + websocket推送
 const faultReporter = createFaultReporter({
   repository: faultRepository,
   broadcast: message => realtimeWebSocket.broadcast(message),
 })
+// 注册设备各个传感器状态, 离线推送
 const devicePresence = createDevicePresenceService({
   loadOfflineTimeoutSeconds: async () => (
     await loadMonitoringConfig()
@@ -65,6 +67,7 @@ const devicePresence = createDevicePresenceService({
     })
   },
 })
+// 注册水力联合诊断
 const hydraulicDiagnosis = createHydraulicDiagnosisManager({
   loadConfig: loadMonitoringConfig,
   emit: message => realtimeWebSocket.broadcast(message),
@@ -76,6 +79,7 @@ const hydraulicDiagnosis = createHydraulicDiagnosisManager({
       `水力骤降：${diagnosis.detail}`,
     )
   },
+  // 推送报错, 上文的告警
   reportFault: async (deviceNumber, code, detail) => {
     await faultReporter.reportFault({
       deviceNumber,
@@ -85,32 +89,44 @@ const hydraulicDiagnosis = createHydraulicDiagnosisManager({
     })
   },
 })
+
+// 自动推导类型, 单纯两个方法, 一个推送, 一个关闭的方法
 let sensorMqtt: ReturnType<typeof createSensorMqtt>
 let automationManager: ReturnType<typeof createAutomationManager>
+// 
 const controlService = createControlService(controlRepository, {
   publish: (topic, payload) => sensorMqtt.publish(topic, payload),
 }, {
+  // 控制模式下, 控制手动和自动模式
+  // 手动模式enable是true, 自动为false
   setEnabled: (deviceNumber, enabled) => (
     automationManager.setEnabled(deviceNumber, enabled)
   ),
+  // 模式下的发送数据, 手动模式就是两个指令开关, 自动模式自动控制
   executeAction: (deviceNumber, action, publish) => (
     automationManager.executeAction(deviceNumber, action, publish)
   ),
-})
+}) 
+// 累计流量相关Service层
 const waterFlowService = createWaterFlowService({
+  // 注册流量库, 查累计流量表
   repository: createWaterFlowRepository(pool),
+  // 指令表查内径 
   loadPipeDiameter: createPipeDiameterLoader(pool),
 })
+// 水泵, 加热时间累计, 内存算, 跟指令控制层的配置联动, 内部会查表
 const operationalMetricsService = createOperationalMetricsService({
   loadDataTimeoutSeconds: async () => (
     await loadMonitoringConfig()
   ).dataTimeoutSeconds,
 })
+// 自动模式逻辑层
 automationManager = createAutomationManager({
   loadConfig: loadAutomationConfig,
   waterFlow: waterFlowService,
   emit: message => realtimeWebSocket.broadcast(message),
   async disableMaster(deviceNumber, reason) {
+    // 对控制模式控制
     const definition = await controlRepository.getDefinitionByTopic?.('master')
     if (!definition) throw new Error('未配置 master 自动模式')
     await controlRepository.saveSuccess(
@@ -120,6 +136,7 @@ automationManager = createAutomationManager({
       `自动启动失败：${reason}`,
     )
   },
+  // 自动模式下指令, 还是复用之前的control发指令
   async execute(deviceNumber, topic, value) {
     const definition = await controlRepository.getDefinitionByTopic?.(topic)
     if (!definition) throw new Error(`未配置 ${topic} 设备指令`)
@@ -129,6 +146,7 @@ automationManager = createAutomationManager({
       value,
     })
   },
+  // 推送错误, 也是复用之前
   async reportFault(deviceNumber, errorNumber, detail) {
     await faultReporter.reportFault({
       deviceNumber,
@@ -138,6 +156,7 @@ automationManager = createAutomationManager({
     })
   },
 })
+// 服务都挂在到主应用, 下面都是挂在服务和关闭
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
   faultRepository,

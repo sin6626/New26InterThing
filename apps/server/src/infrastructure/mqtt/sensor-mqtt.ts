@@ -17,12 +17,12 @@ export interface SensorMqtt {
   publish(topic: string, payload: Record<string, unknown>): Promise<void>
   close(): Promise<void>
 }
-
 export const createSensorMqtt = ({
   env,
   onMessage,
   onConnectionChange,
 }: SensorMqttDependencies): SensorMqtt => {
+  // 创建mqttClint
   const client = mqtt.connect(`mqtt://${env.MQTT_HOST}:${env.MQTT_PORT}`, {
     clientId: `${env.MQTT_CLIENT_ID}-new26`,
     username: env.MQTT_USERNAME || undefined,
