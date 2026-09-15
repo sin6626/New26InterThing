@@ -73,6 +73,7 @@ const mapItem = (row: RowDataPacket, mappings: FieldMapping[]): SensorHistoryIte
   recordedAt: row.c_time ?? null,
 })
 
+/** 历史查询适配器：负责动态列、条件分页和按分钟归并趋势。 */
 export const createSensorHistoryRepository = (pool: Pool): SensorHistoryRepository => ({
   async getOptions() {
     const [mappings, [deviceRows]] = await Promise.all([

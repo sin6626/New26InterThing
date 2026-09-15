@@ -18,6 +18,7 @@ interface Dependencies {
   notify(): Promise<void>
 }
 
+/** 将人工开关同样接入后端安全门，避免手动模式绕过保护规则。 */
 export const createAutomationManualControl = ({
   clock,
   runExclusive,

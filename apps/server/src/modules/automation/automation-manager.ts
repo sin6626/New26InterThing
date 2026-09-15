@@ -32,6 +32,7 @@ interface Dependencies {
   ): Promise<void>
 }
 
+/** 按设备编号延迟创建并缓存状态机，对 HTTP、MQTT 和定时器提供统一入口。 */
 export const createAutomationManager = ({
   clock,
   loadConfig,

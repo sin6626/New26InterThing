@@ -41,6 +41,7 @@ const replaceTemplate = (
   return value
 }
 
+/** 把数据库中的控制定义转换成旧设备仍能识别的 MQTT 指令信封。 */
 export const buildCommandEnvelope = (definition: CommandDefinition) => {
   const valueMap = parseObject(definition.valueMap, 'value_map')
   const mappedValue = valueMap && Object.hasOwn(valueMap, definition.value)

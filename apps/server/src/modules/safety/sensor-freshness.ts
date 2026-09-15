@@ -18,6 +18,7 @@ const createFact = (): SensorFact => ({
   invalid: false,
 })
 
+/** 分别记录四类传感器的值和到达时间，避免一类新数据掩盖另一类超时。 */
 export const createSensorFreshness = (clock: () => number) => {
   const facts: Record<SensorKey, SensorFact> = {
     flow: createFact(),

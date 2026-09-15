@@ -27,6 +27,7 @@ interface Dependencies {
   reportFault(errorNumber: SafetyFaultCode, detail: string): Promise<void> | void
 }
 
+/** 把安全判定转换为关热、延时停泵、故障上报等确定性保护动作。 */
 export const createAutomationProtection = ({
   clock,
   actuator,

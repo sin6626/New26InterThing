@@ -18,6 +18,7 @@ export type EvaluateSensorVstatus = (message: ParsedSensorMessage) => Promise<nu
 
 const sensorColumns = new Set(Array.from({ length: 10 }, (_, index) => `field${index + 1}`))
 
+/** 按字段映射把设备 JSON 写入 field1~field10，并返回前端可读的动态字段。 */
 export const createSensorRepository = (
   pool: Pool,
   evaluateVstatus: EvaluateSensorVstatus,

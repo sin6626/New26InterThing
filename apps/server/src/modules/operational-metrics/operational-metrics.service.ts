@@ -31,6 +31,10 @@ export const createOperationalMetricsService = ({
   loadDataTimeoutSeconds = async () => dataTimeoutSeconds,
   temperatureWindowSeconds = 60,
 }: Options = {}) => {
+  /**
+   * 计算进程内现场指标：泵/加热运行秒数和出口温度每分钟变化。
+   * 只认设备实际反馈，不按页面期望状态计时；服务重启后从零统计。
+   */
   const states = new Map<string, OperationalState>()
 
   const getState = (deviceNumber: string) => {

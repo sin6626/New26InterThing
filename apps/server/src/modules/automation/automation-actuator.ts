@@ -9,6 +9,7 @@ interface Dependencies {
   execute(topic: ActuatorTopic, value: ActuatorValue): Promise<void>
 }
 
+/** 统一记录期望状态和最近动作，真正的 MQTT 发布由注入的 execute 完成。 */
 export const createAutomationActuator = ({ execute }: Dependencies) => {
   let desiredPump: ActuatorValue = 'off'
   let desiredHeater: ActuatorValue = 'off'

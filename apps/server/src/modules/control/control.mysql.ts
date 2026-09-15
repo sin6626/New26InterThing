@@ -128,6 +128,10 @@ const buildLogFilters = (query: OperationLogQuery) => {
   }
 }
 
+/**
+ * 控制模块的 MySQL 适配器：动态配置来自 t_direct_config，当前值来自
+ * t_direct_global，所有操作结果写入 t_direct_history。
+ */
 export const createControlRepository = (pool: Pool): ControlRepository => ({
   async getSnapshot(deviceNumber) {
     const [rows] = await pool.query<RowDataPacket[]>(

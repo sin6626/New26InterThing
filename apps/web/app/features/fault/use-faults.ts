@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 
 import { useFaultApi } from './api'
 
+/** 同步加载故障列表、筛选项和统计数据，并统一维护分页状态。 */
 export const useFaults = () => {
   const api = useFaultApi()
   const loading = ref(false)

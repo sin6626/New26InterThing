@@ -20,6 +20,7 @@ export interface FaultReporter {
   reportFault(report: FaultReport): Promise<FaultItem>
 }
 
+/** 统一完成故障去重、中文映射入库和全局 WebSocket 告警。 */
 export const createFaultReporter = ({
   repository,
   broadcast,

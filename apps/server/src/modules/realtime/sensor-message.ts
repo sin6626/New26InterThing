@@ -19,6 +19,10 @@ const formatDateTime = (date: Date) => {
   ].join(' ')
 }
 
+/**
+ * 校验 device/sensor JSON，并把 online=0 解释为实时、online=1 解释为断网补发。
+ * 其他 Topic 或缺少 d_no 的消息在这里明确拒绝。
+ */
 export const parseSensorMessage = (
   topic: string,
   payload: Buffer,

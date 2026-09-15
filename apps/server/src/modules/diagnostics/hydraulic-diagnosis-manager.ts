@@ -29,6 +29,10 @@ export const createHydraulicDiagnosisManager = ({
   protect = async () => {},
   reportFault,
 }: Dependencies) => {
+  /**
+   * 管理水力诊断的去重和副作用。
+   * 纯规则服务只给结论；本层负责 WebSocket 展示、故障入库和必要的安全停机。
+   */
   const service = createHydraulicDiagnosisService()
   const reportedCodes = new Map<string, HydraulicDiagnosisCode>()
 

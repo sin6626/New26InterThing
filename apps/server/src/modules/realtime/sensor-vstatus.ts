@@ -9,6 +9,7 @@ interface SensorVstatusConfig {
 
 type LoadConfig = () => Promise<SensorVstatusConfig>
 
+/** 根据当前安全阈值给历史记录计算 vstatus，不依赖设备上报故障字段。 */
 export const createSensorVstatusEvaluator = (loadConfig: LoadConfig) => (
   async (message: ParsedSensorMessage): Promise<number> => {
     const config = await loadConfig()

@@ -20,6 +20,7 @@ interface Dependencies {
   onFailure(error: unknown): Promise<void>
 }
 
+/** 根据状态机状态和出口温度计算加热需求，并通过安全授权后执行。 */
 export const createAutomationTemperatureDemand = ({
   clock,
   getDesiredHeater,

@@ -61,6 +61,10 @@ const optionValues = (options: unknown) => {
   })
 }
 
+/**
+ * 控制业务门面：校验动态配置、区分运行指令与参数保存，并统一记录操作日志。
+ * pump/heater 会发布 MQTT；master 交给自动状态机；普通参数只写数据库。
+ */
 export const createControlService = (
   repository: ControlRepository,
   publisher: CommandPublisher,

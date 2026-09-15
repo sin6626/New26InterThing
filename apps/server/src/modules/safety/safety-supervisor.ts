@@ -28,6 +28,11 @@ import { hasConfirmedReversedTemperature } from './rules/temperature-reversed.ru
 import { safetyFaultDetails } from './safety-fault-definitions.js'
 
 export const createSafetySupervisor = (clock: () => number = Date.now) => {
+  /**
+   * 安全监督器只做判断，不直接发布 MQTT。
+   * 即时规则随报文判断，持续规则累计时间，tick 在无新报文时检查超时。
+   * 故障一旦锁定，只能在满足恢复条件后人工复位。
+   */
   const sensors = createSensorFreshness(clock)
   let latestReading: SafetyReading | null = null
   let lockedDecision: SafetyDecision | null = null
@@ -48,6 +53,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   )
 
   const refreshActiveZeroObservations = (context: SafetyContext) => {
+    // 运行中的长期 0 值可能是传感器卡死，超时后应视作数据无效。
     const hydraulicallyActive = context.state === 'building-flow'
       || context.state === 'running'
       || context.state === 'cooling'
@@ -87,6 +93,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   }
 
   const upgradeLockedProtection = (context: SafetyContext) => {
+    // 温度故障最初可只关热；水力通道随后变得不安全时再升级为停泵。
     if (!lockedDecision || lockedDecision.stopPump) return lockedDecision
     const hydraulicPathSafe = latestReading?.actualPump === 'on'
       && isFresh('flow', context)
@@ -103,6 +110,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     faultCode: SafetyFaultCode,
     options: Partial<Pick<SafetyDecision, 'detail' | 'closeHeater' | 'stopPump'>> = {},
   ) => {
+    // 一个故障周期只锁定首个主故障，避免重复入库和重复弹窗。
     if (lockedDecision) return lockedDecision
     lockedDecision = {
       faultCode,
@@ -152,6 +160,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   }
 
   const evaluateTimedRules = (context: SafetyContext): SafetyDecision | null => {
+    // 集中处理必须持续一段时间才成立的规则，过滤瞬时波动。
     if (lockedDecision) return lockedDecision
     const now = clock()
     const buildDecision = evaluateInitialBuildTimeouts(context)
@@ -244,6 +253,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
 
   const api = {
     handleReading(reading: SafetyReading, context: SafetyContext): SafetyDecision | null {
+      // 风险优先级：超压/建流 → 关键传感器 → 低流量 → 超温 → 慢规则。
       latestReading = reading
       latestContext = context
       sensors.update('flow', reading.flowRate, reading.recordedAt)
@@ -400,6 +410,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       context: SafetyContext,
       source: SafetyActionSource = 'automation',
     ): SafetyAuthorization {
+      // 关闭动作永远放行，只有开启动作需要经过安全门。
       if (action.value === 'off') return { allowed: true, reason: null }
       if (lockedDecision) {
         return { allowed: false, reason: `故障已锁定：${lockedDecision.detail}` }
@@ -415,6 +426,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     },
 
     canReset(context: SafetyContext): SafetyAuthorization {
+      // 复位只解除故障锁，不恢复运行，所以实际和期望执行器必须全部关闭。
       if (!lockedDecision) return { allowed: false, reason: '当前没有锁定故障' }
       if (context.state !== 'fault') return { allowed: false, reason: '自动状态尚未进入故障' }
       if (

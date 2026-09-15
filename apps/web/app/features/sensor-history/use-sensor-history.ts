@@ -8,6 +8,7 @@ import dayjs from 'dayjs'
 
 import { useSensorHistoryApi } from './api'
 
+/** 封装历史页的筛选、分页、选择识别和趋势加载，页面模板只负责布局。 */
 export const useSensorHistory = () => {
   const api = useSensorHistoryApi()
   const loading = ref(false)

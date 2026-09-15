@@ -1,3 +1,4 @@
+/** 解析 device/direct 回报；该报文确认设备反馈值，不代表传感器数据。 */
 export const parseDeviceReport = (payload: Buffer) => {
   let data: unknown
   try {

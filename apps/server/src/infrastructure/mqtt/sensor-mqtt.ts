@@ -2,6 +2,11 @@ import mqtt from 'mqtt'
 
 import type { AppEnv } from '../../config/env.js'
 
+/**
+ * MQTT 基础设施适配器：只管理连接、订阅与 QoS 发布。
+ * Topic 的业务分流和报文解析统一由后端组合根处理。
+ */
+
 interface SensorMqttDependencies {
   env: AppEnv
   onMessage(topic: string, payload: Buffer): Promise<void>

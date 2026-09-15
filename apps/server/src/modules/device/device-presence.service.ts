@@ -22,6 +22,7 @@ const formatDateTime = (timestamp: number) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
+/** 只用实时传感器活跃时间判断在线；补发数据不会刷新在线状态。 */
 export const createDevicePresenceService = ({
   clock = Date.now,
   loadOfflineTimeoutSeconds,

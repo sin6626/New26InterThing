@@ -35,6 +35,11 @@ import {
 } from './modules/water-flow/water-flow.mysql.js'
 import { createWaterFlowService } from './modules/water-flow/water-flow.service.js'
 
+/**
+ * 后端组合根：只负责把数据库、MQTT、WebSocket 和业务模块连接起来。
+ * 实时主链路为：device/sensor → 解析 → 历史入库 → WebSocket →
+ * 运行指标/累计量 → 自动控制 → 水力诊断。
+ */
 const env = readEnv()
 const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
@@ -155,6 +160,7 @@ const handleSensorReading = createSensorRealtimeHandler({
   broadcast: (message) => realtimeWebSocket.broadcast(message),
   onRealtimeReceived: message => devicePresence.recordActivity(message.deviceNumber),
   afterSave: [
+    // 第一条后处理链维护控制所需的实时状态：运行指标、累计水量和自动状态机。
     async (message) => {
       const receivedAt = Date.now()
       const reading = normalizeAutomationReading(message.values, receivedAt)
@@ -179,6 +185,7 @@ const handleSensorReading = createSensorRealtimeHandler({
       }
       await automationManager.handleReading(message.deviceNumber, reading)
     },
+    // 水力诊断独立于自动状态机，诊断规则不会反向污染传感器入库结果。
     async (message) => {
       const reading = normalizeAutomationReading(message.values, Date.now())
       const automation = await automationManager.getSnapshot(message.deviceNumber)
@@ -194,6 +201,7 @@ sensorMqtt = createSensorMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
+    // device/direct 是设备执行回报，不是传感器数据，因此必须走独立解析器。
     if (topic === 'device/direct') {
       const report = parseDeviceReport(payload)
       await controlRepository.applyDeviceReport(
@@ -221,6 +229,7 @@ server.listen(env.SERVER_PORT, env.SERVER_HOST, () => {
 })
 
 const automationTimer = setInterval(() => {
+  // 没有新报文时，超时保护、冷却计时和设备离线判断仍需每秒推进。
   void automationManager.tick().catch((error) => {
     console.error('自动控制定时推进失败', error)
   })

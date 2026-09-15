@@ -23,6 +23,7 @@ interface Dependencies {
   getManualPumpStartedAt(): number | null
 }
 
+/** 将自动状态机上下文整理成 SafetySupervisor 所需的统一判断输入。 */
 export const createAutomationSafetyBridge = ({
   safety,
   getConfig,

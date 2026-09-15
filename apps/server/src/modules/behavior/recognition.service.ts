@@ -5,6 +5,7 @@ import { createRecognitionAdapter, type RecognitionAdapter } from './recognition
 
 export interface RecognitionService { recognize(rowIds: number[]): Promise<RecognitionResult> }
 
+/** 读取选中历史数据、调用赛方适配器，再按动态字段映射保存识别结果。 */
 export const createRecognitionService = (repository: BehaviorRepository, adapter: RecognitionAdapter = createRecognitionAdapter()): RecognitionService => ({
   async recognize(rowIds) {
     const rows = await repository.getRecognitionRows(rowIds)

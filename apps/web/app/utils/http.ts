@@ -11,6 +11,7 @@ interface LoggedRequestConfig extends AxiosRequestConfig {
   requestSnapshot?: RequestSnapshot
 }
 
+/** 全站 HTTP 客户端；响应拦截器输出完整调用信息，便于比赛现场定位接口问题。 */
 export const createHttpClient = (baseURL: string) => {
   const client = axios.create({ baseURL, timeout: 10_000 })
 

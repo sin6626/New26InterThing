@@ -21,6 +21,10 @@ let socket: WebSocket | undefined
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 
 export function useRealtimeSocket() {
+  /**
+   * 前端唯一的 WebSocket 消息分发入口。
+   * 按消息 type 更新共享响应式状态，页面组件只负责展示，不参与后端控制决策。
+   */
   const config = useRuntimeConfig()
   const socketStatus = useState<SocketStatus>('realtime-socket-status', () => 'connecting')
   const mqttConnected = useState('realtime-mqtt-connected', () => false)

@@ -18,6 +18,10 @@ export const useRealtimeTrends = (
   realtimeDetailPoints: Ref<Record<string, RealtimeTrendPoint[]>>,
   connectionGeneration: Ref<number>,
 ) => {
+  /**
+   * 总览趋势按分钟归并；温度和流量趋势保留每条秒级报文。
+   * 页面先读取历史趋势，再把 WebSocket 新点追加到当前窗口。
+   */
   const api = useSensorHistoryApi()
   const options = ref<SensorHistoryOptions>({
     deviceNumbers: [],

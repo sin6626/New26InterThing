@@ -52,6 +52,10 @@ export const createAutomationEngine = ({
   disableMaster = async () => {},
   reportFault = async () => {},
 }: Dependencies) => {
+  /**
+   * 单台设备的自动水循环状态机。
+   * 状态只在这里变化；执行器负责 MQTT，安全监督器负责判断，保护器负责落实停机。
+   */
   const actuator = createAutomationActuator({ execute })
   const safety = createSafetySupervisor(clock)
   let enabled = false
@@ -117,6 +121,7 @@ export const createAutomationEngine = ({
   })
 
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
+    // MQTT、定时 tick 和页面操作可能同时到达，串行队列防止状态交叉覆盖。
     const current = operationTail.then(operation, operation)
     operationTail = current.then(
       () => undefined,
@@ -166,6 +171,7 @@ export const createAutomationEngine = ({
   }
 
   const loadCheckedConfig = async () => {
+    // 配置非法时不能继续自动运行，因此将其提升为可锁定的安全故障。
     try {
       const loaded = await loadConfig()
       config = loaded
@@ -258,6 +264,7 @@ export const createAutomationEngine = ({
     },
 
     handleReading(reading: AutomationReading) {
+      // 先更新实际反馈，再判断安全，最后计算新的温控需求。
       readingGeneration += 1
       return serialize(async () => {
         latestReading = reading
@@ -298,6 +305,7 @@ export const createAutomationEngine = ({
     },
 
     tick() {
+      // 处理由时间经过触发的规则：数据超时、冷却延时和 PID 时间窗口。
       return serialize(async () => {
         if (!config) {
           try {

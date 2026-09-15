@@ -49,6 +49,7 @@ const hasUsableReading = (
   && now - reading.recordedAt >= 0
   && now - reading.recordedAt <= config.dataTimeoutSeconds * 1_000
 
+/** 只处理自动模式启停；启动先校验数据和安全状态，再按顺序开启水泵。 */
 export const createAutomationModeControl = (dependencies: Dependencies) => ({
   setEnabled(nextEnabled: boolean) {
     return dependencies.runExclusive(async () => {

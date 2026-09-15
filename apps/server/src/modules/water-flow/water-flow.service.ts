@@ -35,6 +35,10 @@ export const createWaterFlowService = ({
   dataTimeoutSeconds = 3,
   persistIntervalMilliseconds = 2_000,
 }: Dependencies) => {
+  /**
+   * 将 L/min 流量按报文间隔积分为累计升数，并按管径换算管内流速。
+   * 报文间隔超过数据超时阈值时不补算，防止断网后产生虚假累计量。
+   */
   const states = new Map<string, FlowState>()
 
   const getState = async (deviceNumber: string) => {

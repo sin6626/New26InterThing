@@ -4,6 +4,7 @@ export interface ControlTreeNode extends ControlField {
   children: ControlTreeNode[]
 }
 
+/** 按 id/ref_id 组装控制项层级，并根据父开关值隐藏当前无效的子项。 */
 export const buildVisibleControlTree = (
   fields: ControlField[],
 ): ControlTreeNode[] => {

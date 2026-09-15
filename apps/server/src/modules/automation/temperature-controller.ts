@@ -15,6 +15,7 @@ export interface PidConfig {
   resumeHysteresis: number
 }
 
+/** 在目标温度附近保留回差区，防止加热继电器频繁抖动。 */
 export const hysteresisDemand = (
   temperature: number,
   target: number,
@@ -26,6 +27,7 @@ export const hysteresisDemand = (
   return current
 }
 
+/** 时间比例 PID：把连续输出百分比转换为一个控制窗口内的开关占空比。 */
 export const createTemperatureController = (
   clock: () => number = Date.now,
 ) => {

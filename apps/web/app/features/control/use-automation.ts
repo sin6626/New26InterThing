@@ -8,6 +8,10 @@ import { useRealtimeSocket } from '../realtime/use-realtime-socket'
 import { useControlApi } from './api'
 
 export const useAutomation = (deviceNumber: Ref<string>) => {
+  /**
+   * 控制页的自动化状态适配层：读取 HTTP 快照并合并 WebSocket 增量状态。
+   * 本层只发送用户意图，是否允许执行始终由后端安全门决定。
+   */
   const api = useControlApi()
   const {
     automationSnapshots,

@@ -10,6 +10,7 @@ import {
   type ControlTreeNode,
 } from './control-tree'
 
+/** 读取后台动态控制树，并把页面操作转换成明确的控制请求。 */
 export const useControls = () => {
   const api = useControlApi()
   const snapshot = ref<ControlSnapshot>({ deviceNumber: '', fields: [] })

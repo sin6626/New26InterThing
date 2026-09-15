@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 
 import { useBehaviorApi } from './api'
 
+/** 行为页依赖动态字段定义，因此赛方字段变化时无需修改固定表头。 */
 export const useBehaviors = () => {
   const api = useBehaviorApi()
   const loading = ref(false); const errorMessage = ref(''); const rows = ref<BehaviorItem[]>([])

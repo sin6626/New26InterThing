@@ -56,6 +56,7 @@ const suddenDrop = (samples: Sample[], pressure: number, flowRate: number) => {
     && averageFlow - flowRate >= 0.3
 }
 
+/** 根据水泵状态、压力与流量组合判断堵塞、空转、传感器异常和泄漏。 */
 export const createHydraulicDiagnosisService = () => {
   const states = new Map<string, State>()
   const stateFor = (deviceNumber: string) => {

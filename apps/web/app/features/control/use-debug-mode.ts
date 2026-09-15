@@ -2,6 +2,7 @@ import { ElMessageBox } from 'element-plus'
 
 import { useControlApi } from './api'
 
+/** 调试模式属于后端进程状态；页面加载时重新读取，不能只相信本地开关。 */
 export const useDebugMode = () => {
   const api = useControlApi()
   const enabled = useState('automation-debug-mode', () => false)
