@@ -5,7 +5,7 @@ import {
   vi,
 } from 'vitest'
 
-import { createWaterFlowService } from '../src/modules/water-flow/water-flow.service.js'
+import { createWaterFlowService } from '../src/modules/water-flow/accumulate.js'
 
 describe('water flow service', () => {
   it('integrates adjacent valid flow samples and ignores long gaps', async () => {

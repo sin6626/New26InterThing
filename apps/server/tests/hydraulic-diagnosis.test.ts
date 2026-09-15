@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createHydraulicDiagnosisService } from '../src/modules/diagnostics/hydraulic-diagnosis.service.js'
+import { createHydraulicDiagnosisService } from '../src/modules/diagnostics/state/confirmation.js'
 
 const config = {
   minSafeFlow: 0.5,

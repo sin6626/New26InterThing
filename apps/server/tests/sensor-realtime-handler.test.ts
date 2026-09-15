@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { SensorRealtimeMessage } from '@new26interthing/shared'
 
-import { createSensorRealtimeHandler } from '../src/modules/realtime/sensor-realtime-handler.js'
-import type { SensorRepository } from '../src/modules/realtime/sensor.repository.js'
+import { createSensorRealtimeHandler } from '../src/modules/realtime/flows/receive.js'
+import type { SensorRepository } from '../src/modules/realtime/adapters/sensor.mysql.js'
 
 describe('sensor realtime handler', () => {
   it('broadcasts the saved reading after the database write succeeds', async () => {

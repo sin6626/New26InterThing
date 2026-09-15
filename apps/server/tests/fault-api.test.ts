@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createApp } from '../src/app.js'
-import type { FaultRepository } from '../src/modules/fault/fault.repository.js'
+import type { FaultRepository } from '../src/modules/fault/ports.js'
 
 const servers: Array<{ close: () => void }> = []
 const deviceRepository = { list: vi.fn() }

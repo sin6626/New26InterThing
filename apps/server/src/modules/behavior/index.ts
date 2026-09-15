@@ -1,0 +1,5 @@
+export { createBehaviorRepository } from './adapters/behavior.mysql.js'
+export { createRecognitionService } from './flows/recognize.js'
+export type { RecognitionService } from './flows/recognize.js'
+export { createBehaviorRouter } from './http.js'
+export type { BehaviorRepository } from './types.js'

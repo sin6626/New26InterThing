@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createBehaviorRepository } from '../src/modules/behavior/behavior.mysql.js'
+import { createBehaviorRepository } from '../src/modules/behavior/adapters/behavior.mysql.js'
 
 const mappings = [
   { f_name: '行为', db_name: 'field2', p_name: 'action', unit: '', type: '2', visible: '1' },

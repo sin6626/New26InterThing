@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createApp } from '../src/app.js'
-import type { DeviceRepository } from '../src/modules/device/device.repository.js'
-import type { SensorHistoryRepository } from '../src/modules/sensor-history/sensor-history.repository.js'
+import type { DeviceRepository } from '../src/modules/device/mysql.js'
+import type { SensorHistoryRepository } from '../src/modules/sensor-history/types.js'
 
 const servers: Array<{ close: () => void }> = []
 const deviceRepository: DeviceRepository = { list: vi.fn() }

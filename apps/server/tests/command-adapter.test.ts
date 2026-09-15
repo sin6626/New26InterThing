@@ -4,7 +4,7 @@ import {
   it,
 } from 'vitest'
 
-import { buildCommandEnvelope } from '../src/modules/control/command.adapter.js'
+import { buildCommandEnvelope } from '../src/modules/control/adapters/command.js'
 
 describe('command adapter', () => {
   it('maps a value into the configured topic and JSON template', () => {

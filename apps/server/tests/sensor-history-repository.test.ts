@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createSensorHistoryRepository } from '../src/modules/sensor-history/sensor-history.mysql.js'
+import { createSensorHistoryRepository } from '../src/modules/sensor-history/mysql.js'
 
 const mappings = [
   { f_name: '压力', db_name: 'field4', p_name: 'pressure', unit: 'kPa', type: '1', visible: '1' },

@@ -5,7 +5,7 @@ import {
   vi,
 } from 'vitest'
 
-import { createAutomationEngine } from '../src/modules/automation/automation-engine.js'
+import { createAutomationEngine } from '../src/modules/automation/flows/engine.js'
 
 const config = {
   strategy: 'hysteresis' as const,

@@ -4,12 +4,12 @@ import {
   it,
 } from 'vitest'
 
-import { createSafetySupervisor } from '../src/modules/safety/safety-supervisor.js'
+import { createSafetySupervisor } from '../src/modules/safety/state/supervisor.js'
 import type {
   SafetyConfig,
   SafetyContext,
   SafetyReading,
-} from '../src/modules/safety/safety.types.js'
+} from '../src/modules/safety/types.js'
 
 const config: SafetyConfig = {
   minSafeFlow: 0.5,

@@ -5,35 +5,34 @@ import { readEnv } from './config/env.js'
 import { createDatabasePool } from './infrastructure/database.js'
 import { createSensorMqtt } from './infrastructure/mqtt/sensor-mqtt.js'
 import { createRealtimeWebSocket } from './infrastructure/websocket/realtime-websocket.js'
-import { createDeviceRepository } from './modules/device/device.repository.js'
-import { createDevicePresenceService } from './modules/device/device-presence.service.js'
-import { createHydraulicDiagnosisManager } from './modules/diagnostics/hydraulic-diagnosis-manager.js'
-import { createMonitoringConfigLoader } from './modules/diagnostics/monitoring-config.js'
-import { createBehaviorRepository } from './modules/behavior/behavior.mysql.js'
-import { createRecognitionService } from './modules/behavior/recognition.service.js'
-import { createFaultRepository } from './modules/fault/fault.mysql.js'
-import { createFaultReporter } from './modules/fault/fault-reporter.js'
-import { createSensorRealtimeHandler } from './modules/realtime/sensor-realtime-handler.js'
-import { parseSensorMessage } from './modules/realtime/sensor-message.js'
-import { createSensorRepository } from './modules/realtime/sensor.repository.js'
-import { createSensorVstatusEvaluator } from './modules/realtime/sensor-vstatus.js'
-import { createSensorHistoryRepository } from './modules/sensor-history/sensor-history.mysql.js'
-import { createOperationalMetricsService } from './modules/operational-metrics/operational-metrics.service.js'
-import { createControlRepository } from './modules/control/control.mysql.js'
-import { createControlService } from './modules/control/control.service.js'
-import { parseDeviceReport } from './modules/control/device-report.js'
-import { createAutomationConfigLoader } from './modules/automation/control-config.js'
-import { createAutomationManager } from './modules/automation/automation-manager.js'
-import { normalizeAutomationReading } from './modules/automation/automation-reading.js'
+import { createDeviceRepository, createDevicePresenceService } from './modules/device/index.js'
+import { createHydraulicDiagnosisManager } from './modules/diagnostics/index.js'
+import { createMonitoringConfigLoader } from './modules/monitoring-config/index.js'
+import { createBehaviorRepository, createRecognitionService } from './modules/behavior/index.js'
+import { createFaultRepository, createFaultReporter } from './modules/fault/index.js'
+import {
+  createSensorRealtimeHandler,
+  parseSensorMessage,
+  createSensorRepository,
+  createSensorVstatusEvaluator,
+} from './modules/realtime/index.js'
+import { createSensorHistoryRepository } from './modules/sensor-history/index.js'
+import { createOperationalMetricsService } from './modules/operational-metrics/index.js'
+import { createControlRepository, createControlService, parseDeviceReport } from './modules/control/index.js'
+import {
+  createAutomationConfigLoader,
+  createAutomationManager,
+  normalizeAutomationReading,
+} from './modules/automation/index.js'
 import {
   getHydraulicFaultType,
   getSafetyFaultType,
-} from './modules/safety/safety-fault-catalog.js'
+} from './modules/safety/index.js'
 import {
   createPipeDiameterLoader,
   createWaterFlowRepository,
-} from './modules/water-flow/water-flow.mysql.js'
-import { createWaterFlowService } from './modules/water-flow/water-flow.service.js'
+  createWaterFlowService,
+} from './modules/water-flow/index.js'
 
 /**
  * 后端组合根：只负责把数据库、MQTT、WebSocket 和业务模块连接起来。

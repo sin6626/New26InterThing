@@ -4,7 +4,7 @@ import {
   it,
 } from 'vitest'
 
-import { parseDeviceReport } from '../src/modules/control/device-report.js'
+import { parseDeviceReport } from '../src/modules/control/adapters/device-report.js'
 
 describe('device command report parser', () => {
   it('parses the legacy device/direct report', () => {

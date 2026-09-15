@@ -7,16 +7,16 @@ import {
 } from 'vitest'
 import express from 'express'
 
-import { createAutomationRouter } from '../src/modules/automation/automation.routes.js'
-import { AutomationError } from '../src/modules/automation/automation.types.js'
-import type { AutomationManager } from '../src/modules/automation/automation-manager.js'
-import type { ControlRepository } from '../src/modules/control/control.repository.js'
+import { createAutomationRouter } from '../src/modules/automation/http.js'
+import { AutomationError } from '../src/modules/automation/types.js'
+import type { AutomationManager } from '../src/modules/automation/flows/manager.js'
+import type { ControlRepository } from '../src/modules/control/types.js'
 import {
   ControlError,
   type ControlService,
-} from '../src/modules/control/control.service.js'
-import type { WaterFlowService } from '../src/modules/water-flow/water-flow.service.js'
-import type { OperationalMetricsService } from '../src/modules/operational-metrics/operational-metrics.service.js'
+} from '../src/modules/control/flows/execute.js'
+import type { WaterFlowService } from '../src/modules/water-flow/accumulate.js'
+import type { OperationalMetricsService } from '../src/modules/operational-metrics/runtime.js'
 
 const servers: Array<{ close(): void }> = []
 

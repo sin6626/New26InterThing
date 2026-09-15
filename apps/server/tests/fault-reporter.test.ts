@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createFaultReporter } from '../src/modules/fault/fault-reporter.js'
+import { createFaultReporter } from '../src/modules/fault/report.js'
 
 const report = { deviceNumber: '202111', errorNumber: 'LOW_FLOW', type: '6', detail: '流量 0.10L/min' }
 

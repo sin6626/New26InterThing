@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createFaultRepository } from '../src/modules/fault/fault.mysql.js'
+import { createFaultRepository } from '../src/modules/fault/mysql.js'
 
 describe('fault repository', () => {
   it('maps database rows and uses the same filters for count and list', async () => {

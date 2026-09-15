@@ -5,8 +5,8 @@ import {
   vi,
 } from 'vitest'
 
-import type { ControlRepository } from '../src/modules/control/control.repository.js'
-import { createControlService } from '../src/modules/control/control.service.js'
+import type { ControlRepository } from '../src/modules/control/types.js'
+import { createControlService } from '../src/modules/control/flows/execute.js'
 
 const definition = {
   configId: 23,

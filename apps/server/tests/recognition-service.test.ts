@@ -1,9 +1,9 @@
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { BehaviorRepository } from '../src/modules/behavior/behavior.repository.js'
-import { createRecognitionAdapter } from '../src/modules/behavior/recognition.adapter.js'
-import { createRecognitionService } from '../src/modules/behavior/recognition.service.js'
+import type { BehaviorRepository } from '../src/modules/behavior/types.js'
+import { createRecognitionAdapter } from '../src/modules/behavior/adapters/recognition.http.js'
+import { createRecognitionService } from '../src/modules/behavior/flows/recognize.js'
 
 const configPath = path.resolve(process.cwd(), 'tests/fixtures/recognition.json')
 const emptyConfigPath = path.resolve(process.cwd(), 'tests/fixtures/recognition-empty.json')

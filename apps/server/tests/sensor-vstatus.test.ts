@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createSensorVstatusEvaluator } from '../src/modules/realtime/sensor-vstatus.js'
-import type { AutomationConfig } from '../src/modules/automation/automation.types.js'
+import { createSensorVstatusEvaluator } from '../src/modules/realtime/rules/vstatus.js'
+import type { AutomationConfig } from '../src/modules/automation/types.js'
 
 const config: AutomationConfig = {
   strategy: 'pid',

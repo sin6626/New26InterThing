@@ -7,8 +7,8 @@ import {
 } from 'vitest'
 
 import { createApp } from '../src/app.js'
-import type { ControlRepository } from '../src/modules/control/control.repository.js'
-import type { ControlService } from '../src/modules/control/control.service.js'
+import type { ControlRepository } from '../src/modules/control/types.js'
+import type { ControlService } from '../src/modules/control/flows/execute.js'
 
 const servers: Array<{ close(): void }> = []
 

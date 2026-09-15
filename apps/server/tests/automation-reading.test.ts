@@ -4,7 +4,7 @@ import {
   it,
 } from 'vitest'
 
-import { normalizeAutomationReading } from '../src/modules/automation/automation-reading.js'
+import { normalizeAutomationReading } from '../src/modules/automation/adapters/reading.js'
 
 describe('automation reading normalization', () => {
   it('uses the confirmed legacy field mapping', () => {

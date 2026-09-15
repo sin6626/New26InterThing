@@ -7,7 +7,7 @@ import {
 import {
   createTemperatureController,
   hysteresisDemand,
-} from '../src/modules/automation/temperature-controller.js'
+} from '../src/modules/automation/rules/temperature.js'
 
 describe('temperature controller', () => {
   it('uses hysteresis without chattering inside the dead band', () => {

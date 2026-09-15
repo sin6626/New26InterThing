@@ -1,0 +1,93 @@
+import type { ActuatorValue } from '@new26interthing/shared'
+
+import type {
+  SafetyAction,
+  SafetyAuthorization,
+} from '../../safety/types.js'
+import { AutomationError } from '../types.js'
+
+interface Dependencies {
+  clock(): number
+  runExclusive<T>(operation: () => Promise<T>): Promise<T>
+  ensureConfig(): Promise<void>
+  evaluateLatestSafety(): Promise<void>
+  authorize(action: SafetyAction): SafetyAuthorization
+  failCommand(action: SafetyAction, message: string): Promise<void>
+  adoptPublished(topic: 'pump' | 'heater', value: ActuatorValue): void
+  setManualPumpStartedAt(value: number | null): void
+  notify(): Promise<void>
+}
+
+/** 将人工开关同样接入后端安全门，避免手动模式绕过保护规则。 */
+export const createAutomationManualControl = ({
+  clock,
+  runExclusive,
+  ensureConfig,
+  evaluateLatestSafety,
+  authorize,
+  failCommand,
+  adoptPublished,
+  setManualPumpStartedAt,
+  notify,
+}: Dependencies) => {
+  let emergencyOffGeneration = 0
+  const emergencyOffPublishers = new Map<'pump' | 'heater', () => Promise<void>>()
+
+  const adopt = (action: SafetyAction) => {
+    adoptPublished(action.topic, action.value)
+    if (action.topic === 'pump') {
+      setManualPumpStartedAt(action.value === 'on' ? clock() : null)
+    }
+  }
+
+  const execute = (
+    action: SafetyAction,
+    publish: () => Promise<void>,
+  ) => {
+    if (action.value === 'off') {
+      emergencyOffGeneration += 1
+      emergencyOffPublishers.set(action.topic, publish)
+      return publish()
+        .then(() => adopt(action))
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error)
+          void runExclusive(async () => {
+            await failCommand(action, message)
+            await notify()
+          })
+          throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
+        })
+    }
+
+    return runExclusive(async () => {
+      const startingEmergencyOffGeneration = emergencyOffGeneration
+      await ensureConfig()
+      await evaluateLatestSafety()
+      const authorization = authorize(action)
+      if (!authorization.allowed) {
+        throw new AutomationError(authorization.reason || '安全条件不满足')
+      }
+      try {
+        await publish()
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        await failCommand(action, message)
+        await notify()
+        throw new AutomationError(message, 503, 'COMMAND_PUBLISH_FAILED')
+      }
+      if (startingEmergencyOffGeneration !== emergencyOffGeneration) {
+        const emergencyPublisher = emergencyOffPublishers.get(action.topic)
+        if (emergencyPublisher) await emergencyPublisher()
+        adopt({ ...action, value: 'off' })
+      }
+      else adopt(action)
+      await notify()
+    })
+  }
+
+  return {
+    execute,
+    adopt,
+  }
+}

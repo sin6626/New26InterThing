@@ -2,23 +2,20 @@ import cors from 'cors'
 // 本质上是两行代码的合并 import express from 'express'; import type { Express } from 'express' // 只导入 TS 类型约束
 import express, { type Express } from 'express'
 
-import type { BehaviorRepository } from './modules/behavior/behavior.repository.js'
-import { createBehaviorRouter } from './modules/behavior/behavior.routes.js'
-import type { RecognitionService } from './modules/behavior/recognition.service.js'
+import { createBehaviorRouter, type BehaviorRepository, type RecognitionService } from './modules/behavior/index.js'
 
-import type { DeviceRepository } from './modules/device/device.repository.js'
-import { createDeviceRouter } from './modules/device/device.routes.js'
-import type { FaultRepository } from './modules/fault/fault.repository.js'
-import { createFaultRouter } from './modules/fault/fault.routes.js'
-import type { SensorHistoryRepository } from './modules/sensor-history/sensor-history.repository.js'
-import { createSensorHistoryRouter } from './modules/sensor-history/sensor-history.routes.js'
-import type { ControlRepository } from './modules/control/control.repository.js'
-import { createControlRouter, createOperationLogRouter } from './modules/control/control.routes.js'
-import type { ControlService } from './modules/control/control.service.js'
-import type { AutomationManager } from './modules/automation/automation-manager.js'
-import { createAutomationRouter } from './modules/automation/automation.routes.js'
-import type { WaterFlowService } from './modules/water-flow/water-flow.service.js'
-import type { OperationalMetricsService } from './modules/operational-metrics/operational-metrics.service.js'
+import { createDeviceRouter, type DeviceRepository } from './modules/device/index.js'
+import { createFaultRouter, type FaultRepository } from './modules/fault/index.js'
+import { createSensorHistoryRouter, type SensorHistoryRepository } from './modules/sensor-history/index.js'
+import {
+  createControlRouter,
+  createOperationLogRouter,
+  type ControlRepository,
+  type ControlService,
+} from './modules/control/index.js'
+import { createAutomationRouter, type AutomationManager } from './modules/automation/index.js'
+import type { WaterFlowService } from './modules/water-flow/index.js'
+import type { OperationalMetricsService } from './modules/operational-metrics/index.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository

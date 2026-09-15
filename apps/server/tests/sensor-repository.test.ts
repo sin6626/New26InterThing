@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createSensorRepository } from '../src/modules/realtime/sensor.repository.js'
+import { createSensorRepository } from '../src/modules/realtime/adapters/sensor.mysql.js'
 
 describe('sensor repository', () => {
   it('maps payload fields into the existing table and returns visible values', async () => {

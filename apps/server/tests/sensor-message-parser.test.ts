@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseSensorMessage } from '../src/modules/realtime/sensor-message.js'
+import { parseSensorMessage } from '../src/modules/realtime/adapters/sensor-message.js'
 
 describe('parseSensorMessage', () => {
   it('parses the compatible device/sensor payload', () => {

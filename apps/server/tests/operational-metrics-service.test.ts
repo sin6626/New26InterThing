@@ -4,7 +4,7 @@ import {
   it,
 } from 'vitest'
 
-import { createOperationalMetricsService } from '../src/modules/operational-metrics/operational-metrics.service.js'
+import { createOperationalMetricsService } from '../src/modules/operational-metrics/runtime.js'
 
 describe('operational metrics service', () => {
   it('accumulates actual pump and heater runtime without counting long gaps', async () => {

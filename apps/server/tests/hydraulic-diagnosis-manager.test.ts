@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createHydraulicDiagnosisManager } from '../src/modules/diagnostics/hydraulic-diagnosis-manager.js'
+import { createHydraulicDiagnosisManager } from '../src/modules/diagnostics/flows/diagnose.js'
 
 describe('hydraulic diagnosis manager', () => {
   it('applies emergency protection before persisting a leak diagnosis', async () => {

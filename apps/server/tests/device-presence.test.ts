@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createDevicePresenceService } from '../src/modules/device/device-presence.service.js'
+import { createDevicePresenceService } from '../src/modules/device/presence.js'
 
 describe('device presence service', () => {
   it('marks realtime activity online and emits offline after configured timeout', async () => {

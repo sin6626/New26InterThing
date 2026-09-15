@@ -1,0 +1,5 @@
+export { createAutomationConfigLoader } from './adapters/config.mysql.js'
+export { normalizeAutomationReading } from './adapters/reading.js'
+export { createAutomationManager } from './flows/manager.js'
+export type { AutomationManager } from './flows/manager.js'
+export { createAutomationRouter } from './http.js'
