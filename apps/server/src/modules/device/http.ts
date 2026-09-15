@@ -1,6 +1,7 @@
 /**
  * 阅读导航：设备列表 HTTP 路由：解析分页和筛选条件，交由 MySQL 适配器查询；不修改设备运行状态。
  * 入口位置：modules/device/http.ts
+ * 设备管理页面的接口(但是单设备没有实际上没有启用)
  */
 
 import type { PaginatedDevices } from '@new26interthing/shared'

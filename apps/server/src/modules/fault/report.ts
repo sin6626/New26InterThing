@@ -31,6 +31,7 @@ export const createFaultReporter = ({
   broadcast,
   now = () => new Date(),
 }: FaultReporterDependencies): FaultReporter => ({
+  // 一个很核心的方法, 所有告警都需要用这个方法往前端推送Websocket, 然后再调用saveFualt方法去把告警数据的错误数据给入库
   async reportFault(report) {
     // contest_admin 的 t_error_code_mapper 用 e_no/type 查出标准中文说明；
     // 如未配置，仍保存带故障编号的兜底文字，避免安全故障消失。

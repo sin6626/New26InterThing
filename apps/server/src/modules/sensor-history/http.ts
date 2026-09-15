@@ -41,6 +41,7 @@ export const createSensorHistoryRouter = (repository: SensorHistoryRepository): 
     }
   })
 
+  // 历史数据的图表接口
   router.get('/trend', async (request, response, next) => {
     const parsed = trendQuerySchema.safeParse(request.query)
     if (!parsed.success) return invalidQuery(response)
@@ -51,6 +52,7 @@ export const createSensorHistoryRouter = (repository: SensorHistoryRepository): 
     }
   })
 
+  // 差分分页列表
   router.get('/', async (request, response, next) => {
     const parsed = listQuerySchema.safeParse(request.query)
     if (!parsed.success) return invalidQuery(response)

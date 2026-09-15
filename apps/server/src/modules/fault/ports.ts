@@ -1,6 +1,7 @@
 /**
  * 阅读导航：故障仓储接口：描述故障记录、映射和查询能力；测试可替换真实 MySQL，业务流程不必知道 SQL 细节。
  * 入口位置：modules/fault/ports.ts
+ * 就是类似于types文件, 只是Ai给文件命名为ports
  */
 
 import type {

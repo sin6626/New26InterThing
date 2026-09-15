@@ -1,6 +1,7 @@
 /**
  * 阅读导航：累计水量流程：按相邻有效 L/min 读数积分为升数，超时间隔不补算，并定时持久化；页面清零需同步数据库。
  * 入口位置：modules/water-flow/accumulate.ts
+ * 主要的计算逻辑地方, 可以理解为Service层
  */
 
 import type { WaterFlowSnapshot } from '@new26interthing/shared'

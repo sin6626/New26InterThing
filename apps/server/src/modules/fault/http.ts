@@ -1,5 +1,6 @@
 /**
  * 阅读导航：故障信息 HTTP 路由：验证时间、设备、故障类型和分页条件；页面故障列表只用 HTTP 查询。
+ * 错误信息页面的接口路由
  * 入口位置：modules/fault/http.ts
  */
 
@@ -39,6 +40,7 @@ const invalidQuery = (response: Response) => {
 export const createFaultRouter = (repository: FaultRepository): ExpressRouter => {
   const router = Router()
 
+  // 错误信息页面的所有下拉框的接口, 设备下拉框和错误类型下拉框都是这个接口, 一个接口返回两个下拉框所需的值
   router.get('/options', async (_request, response, next) => {
     try {
       response.json({ code: 0, message: '查询成功', data: await repository.getOptions() })
@@ -47,6 +49,7 @@ export const createFaultRouter = (repository: FaultRepository): ExpressRouter =>
     }
   })
 
+  // 错误信息页面的图表的数据, 方便饼图渲染的格式
   router.get('/statistics', async (request, response, next) => {
     const parsed = filterSchema.safeParse(request.query)
     if (!parsed.success) return invalidQuery(response)
@@ -57,6 +60,7 @@ export const createFaultRouter = (repository: FaultRepository): ExpressRouter =>
     }
   })
 
+  // 错误信息页面上多条件分页查询的接口
   router.get('/', async (request, response, next) => {
     const parsed = listSchema.safeParse(request.query)
     if (!parsed.success) return invalidQuery(response)

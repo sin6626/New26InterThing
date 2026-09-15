@@ -1,6 +1,7 @@
 /**
  * 阅读导航：故障 MySQL 适配：按 t_error_code_mapper 取得中文语义，再写 t_error_msg；同时提供过滤、统计与分页查询。
  * 入口位置：modules/fault/mysql.ts
+ * 所有有关数据库的操作, 报错的数据入库, 查询数据给前端页面渲染都在这里
  */
 
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise'
@@ -50,6 +51,7 @@ const typeLabel = (type: string | null) => type ? `类型 ${type}` : '未知类�
 
 const formatDateTime = (value: string | Date) => {
   if (typeof value === 'string') return value
+  // 字符串长度不够往前补0逻辑
   const pad = (part: number) => String(part).padStart(2, '0')
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`
 }

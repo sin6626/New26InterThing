@@ -62,11 +62,11 @@ export const createOperationalMetricsService = ({
     const state = getState(deviceNumber)
     return {
       deviceNumber,
-      pumpRuntimeSeconds: Number(state.pumpRuntimeSeconds.toFixed(1)),
-      heaterRuntimeSeconds: Number(state.heaterRuntimeSeconds.toFixed(1)),
+      pumpRuntimeSeconds: Number(state.pumpRuntimeSeconds.toFixed(1)), // 水泵累计运行时间
+      heaterRuntimeSeconds: Number(state.heaterRuntimeSeconds.toFixed(1)), // 加热累计运行时间
       actualPump: state.lastPumpState,
       actualHeater: state.lastHeaterState,
-      outletHeatingRatePerMinute: state.outletHeatingRatePerMinute,
+      outletHeatingRatePerMinute: state.outletHeatingRatePerMinute, // 出口水温上升的速率
       updatedAt: state.lastCalculatedAt
         ? new Date(state.lastCalculatedAt).toISOString()
         : null,
