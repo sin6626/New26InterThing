@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --no-qr",
     "preview": "nuxt preview",
     "test": "vitest run",
     "typecheck": "nuxt typecheck",
