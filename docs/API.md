@@ -99,6 +99,16 @@ GET /sensor-history/trend?deviceNumber=202111&status=all&limit=10
 
 断网补发数据仍写入历史，但不刷新设备在线时间，也不驱动实时广播、累计量、自动控制、安全保护或水力诊断。
 
+## MQTT 边界
+
+| Topic | 方向 | 用途 |
+|---|---|---|
+| `device/sensor` | 设备 → 后端 | 传感器 JSON，必须包含 `d_no`；`online=1` 表示补发 |
+| `device/direct` | 双向 | 后端发布水泵/加热指令，设备回报执行结果 |
+| `device/updateTime` | 后端 → 设备 | 人工发起的时间同步 |
+
+新后端不订阅 `device/behavior`、`device/error`、`device/heartbeat`、`team/Data` 或 `team/command`。行为数据由 HTTP 识别链路产生，故障由后端本地规则产生，设备在线由实时传感器报文判定。
+
 ## 故障信息页面
 
 故障页面只使用以下 HTTP 接口，不通过 WebSocket 推送或自动轮询。接口固定读取 `t_error_msg`、`t_error_code_mapper` 和 `t_device`。
@@ -218,19 +228,19 @@ Content-Type: application/json
 ### 调试模式
 
 ```http
-GET /api/automation/debug-mode
-POST /api/automation/debug-mode
+GET /automation/debug-mode
+POST /automation/debug-mode
 Content-Type: application/json
 
 { "enabled": true }
 ```
 
-调试模式仅保存在当前后端进程中，默认关闭。开启后会清除模拟故障锁并允许切换自动/手动模式；此时安全锁定被跳过，只能用于现场模拟。关闭后从下一条实时数据开始恢复全部保护。
+调试模式仅保存在当前后端进程中，默认关闭。开启后会清除模拟故障锁，并跳过安全锁定与自动启动数据可用性校验；只能用于现场模拟。关闭后从下一条实时数据开始恢复全部保护。调试模式不改变历史数据 `vstatus` 判定。
 
 ### 获取自动控制快照
 
 ```http
-GET /api/automation/:deviceNumber
+GET /automation/:deviceNumber
 ```
 
 返回状态机状态、实际与期望执行器状态、PID 诊断、累计水量以及 `safety` 安全快照。`safety` 包含故障锁定、故障码、中文事实详情、发生时间、保护动作、故障入库状态、四类传感器新鲜度以及复位条件。页面首次进入必须调用该接口，WebSocket 只补充后续的 `automation.status` 和 `water-flow.realtime` 更新。
@@ -238,7 +248,7 @@ GET /api/automation/:deviceNumber
 ### 获取运行指标快照
 
 ```http
-GET /api/automation/:deviceNumber/operational-metrics
+GET /automation/:deviceNumber/operational-metrics
 ```
 
 返回进程内累计的水泵和加热运行秒数、设备实际开关状态、出口水温每分钟变化速度及更新时间。运行时长不持久化，服务重启后从零统计；页面后续通过 `operational-metrics.realtime` 实时更新。
@@ -246,8 +256,8 @@ GET /api/automation/:deviceNumber/operational-metrics
 ### 启停自动模式
 
 ```http
-POST /api/automation/:deviceNumber/start
-POST /api/automation/:deviceNumber/stop
+POST /automation/:deviceNumber/start
+POST /automation/:deviceNumber/stop
 ```
 
 启停接口与指令页面的 `master` 开关进入同一个自动控制引擎。`master` 不发布 MQTT；启动时状态机只先发布水泵开启。水泵、加热和自动模式开启均经过后端统一安全门；关闭动作始终允许。故障锁定时启动返回 HTTP 409 和具体原因。
@@ -255,7 +265,7 @@ POST /api/automation/:deviceNumber/stop
 ### 人工复位安全故障
 
 ```http
-POST /api/automation/:deviceNumber/fault/reset
+POST /automation/:deviceNumber/fault/reset
 ```
 
 只有配置有效、四类传感器数据新鲜、温压恢复安全且实际与期望水泵/加热均已关闭时才能复位。失败返回 HTTP 409 和不满足条件；成功仅解除故障锁定并返回 `stopped` 快照，不恢复 `master`，也不自动开启设备。
@@ -263,7 +273,7 @@ POST /api/automation/:deviceNumber/fault/reset
 ### 清零累计水量
 
 ```http
-POST /api/automation/:deviceNumber/water-flow/reset
+POST /automation/:deviceNumber/water-flow/reset
 ```
 
 将 `t_water_flow_accumulator` 中该设备的累计水量清零，并向 `t_direct_history` 写入审计记录，不发送 MQTT。
