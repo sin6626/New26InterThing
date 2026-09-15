@@ -12,9 +12,9 @@ import { classifyHydraulicReading } from '../rules/hydraulic.js'
 type DiagnosisResult = Omit<HydraulicDiagnosis, 'deviceNumber'>
 
 interface HydraulicFacts {
-  pumpRunning: boolean
-  buildingFlow: boolean
-  sensorsValid: boolean
+  pumpRunning: boolean // 水泵当前是否在运转
+  buildingFlow: boolean // 是否处理建流时期
+  sensorsValid: boolean // 传感器是否有效
   pressure: number | null
   flowRate: number | null
 }
@@ -23,7 +23,7 @@ interface HydraulicConfig {
   minSafeFlow: number
   minOperatingPressure: number
   maxSafePressure: number
-  confirmSeconds: number
+  confirmSeconds: number // 确认的持续时间(水压联合诊断就是看这个时间)
 }
 
 const definitions: Record<HydraulicDiagnosisCode, Omit<DiagnosisResult, 'code'>> = {
@@ -41,13 +41,14 @@ const diagnosis = (code: HydraulicDiagnosisCode): DiagnosisResult => ({
   code,
   ...definitions[code],
 })
-
+// 单个采样点
 interface Sample { time: number; pressure: number; flowRate: number }
+// 给下方算法用的, 好复杂不想看
 interface State {
-  candidate: HydraulicDiagnosisCode | null
-  candidateSince: number
-  active: DiagnosisResult
-  samples: Sample[]
+  candidate: HydraulicDiagnosisCode | null // 正在观察中的"候选异常"
+  candidateSince: number // 候选异常首次出现的时间戳
+  active: DiagnosisResult // 结果
+  samples: Sample[] // 采样点
 }
 
 /** 根据水泵状态、压力与流量组合判断堵塞、空转、传感器异常和泄漏。 */

@@ -28,7 +28,7 @@ const hasSuddenDrop = (
   const averagePressure = baseline.reduce((sum, item) => sum + item.pressure, 0) / baseline.length
   const averageFlow = baseline.reduce((sum, item) => sum + item.flowRate, 0) / baseline.length
   if (averagePressure < 30 || averageFlow < 0.6) return false
-  // 本来就接近零的压力/流量不适合按百分比判“骤降”。
+  // 本来就接近零的压力/流量不适合按百分比判“骤降”。急速下降35%的比例就是骤降
   return (averagePressure - pressure) / averagePressure >= 0.35
     && averagePressure - pressure >= 20
     && (averageFlow - flowRate) / averageFlow >= 0.35

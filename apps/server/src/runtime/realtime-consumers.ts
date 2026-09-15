@@ -28,6 +28,7 @@ export function createRealtimeConsumers({
       const receivedAt = Date.now()
       const reading = normalizeAutomationReading(message.values, receivedAt)
       const metrics = await operationalMetrics.handleReading(message.deviceNumber, reading)
+      // 收到合法mqtt, 推送各个所需状态, 这个是operational-metrics是水泵运行时长, 加热运行时长, 速率的推送
       websocket.broadcast({ type: 'operational-metrics.realtime', data: metrics })
 
       if (reading.flowRate !== null && reading.flowRate >= 0) {
@@ -36,12 +37,14 @@ export function createRealtimeConsumers({
           reading.flowRate,
           receivedAt,
         )
+        // 推送累计水量的计算
         websocket.broadcast({ type: 'water-flow.realtime', data: snapshot })
       }
       await automation.handleReading(message.deviceNumber, reading)
     },
     async (message: ParsedSensorMessage) => {
       // 诊断使用同一设备的自动状态快照，但不改写历史传感器记录。
+      // 改变设备的自动模式下的各个状态
       const reading = normalizeAutomationReading(message.values, Date.now())
       const snapshot = await automation.getSnapshot(message.deviceNumber)
       await hydraulicDiagnosis.handleReading(

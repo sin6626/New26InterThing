@@ -39,7 +39,7 @@ const isValidDateTime = (value: string) => {
   ].join(' ')
   return normalized === value
 }
-
+// refine zod中的自定义校验规则
 const dateTime = z.string().refine(isValidDateTime)
 const logSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -67,6 +67,7 @@ export const createControlRouter = (
 ): ExpressRouter => {
   const router = Router()
 
+  // 校验时间的接口, 但是没有用了, 因为设备端他们能自己校准时间
   router.post('/time-sync', async (request, response, next) => {
     const parsed = timeSyncSchema.safeParse(request.body)
     if (!parsed.success) return invalid(response)
@@ -88,7 +89,8 @@ export const createControlRouter = (
       next(error)
     }
   })
-
+  
+  // 指令信息页面打开就调用的接口, tree组件直接渲染各个配置项和指令的状态
   router.get('/:deviceNumber', async (request, response, next) => {
     const deviceNumber = String(request.params.deviceNumber || '').trim()
     if (!deviceNumber) return invalid(response)
@@ -104,6 +106,7 @@ export const createControlRouter = (
     }
   })
 
+  // 修改配置项或者下发指令的接口
   router.post('/commands', async (request, response, next) => {
     const parsed = commandSchema.safeParse(request.body)
     if (!parsed.success) return invalid(response)
@@ -129,10 +132,12 @@ export const createControlRouter = (
   return router
 }
 
+// 操作日志相关的接口
 export const createOperationLogRouter = (
   repository: ControlRepository,
 ): ExpressRouter => {
   const router = Router()
+  // 操作历史页面的下拉框
   router.get('/options', async (_request, response, next) => {
     try {
       response.json({
@@ -145,6 +150,7 @@ export const createOperationLogRouter = (
       next(error)
     }
   })
+  //分页查询列表
   router.get('/', async (request, response, next) => {
     const parsed = logSchema.safeParse(request.query)
     if (!parsed.success) return invalid(response)

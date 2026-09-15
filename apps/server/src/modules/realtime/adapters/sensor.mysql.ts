@@ -55,6 +55,7 @@ export const createSensorRepository = (
       vstatus,
     ]
     const placeholders = columns.map(() => '?').join(', ')
+    // 数据入库
     const [result] = await pool.query<ResultSetHeader>(
       `insert into t_sensor_data (${columns.join(', ')}) values (${placeholders})`,
       values,
@@ -64,6 +65,7 @@ export const createSensorRepository = (
     }
 
     const visibleMappings = mappings.filter((mapping) => mapping.visible !== '0')
+    // 入库完返回一个对象, 方便后面的Websocket去推送, 是../flows/receive里面推送, 总的调用都在那, 在更外层的runtime层传参
     return {
       deviceNumber: message.deviceNumber,
       recordedAt: message.recordedAt,

@@ -14,6 +14,7 @@ export type SensorMessageParseResult =
   | { accepted: true; message: ParsedSensorMessage }
   | { accepted: false; reason: string }
 
+  // 隔离出系统层数据的名单
 const reservedFields = new Set(['d_no', 'c_time', 'time', 'online', 'vstatus'])
 
 const formatDateTime = (date: Date) => {
@@ -27,6 +28,7 @@ const formatDateTime = (date: Date) => {
 /**
  * 校验 device/sensor JSON，并把 online=0 解释为实时、online=1 解释为断网补发。
  * 其他 Topic 或缺少 d_no 的消息在这里明确拒绝。
+ * 主要就是对数据进行解析, 主题不对或者解析, 少d_no都认为错误
  */
 export const parseSensorMessage = (
   topic: string,

@@ -22,10 +22,10 @@ interface Dependencies {
 }
 
 const reportableCodes = new Set<HydraulicDiagnosisCode>([
-  'HYDRAULIC_BLOCKAGE',
-  'HYDRAULIC_PUMP_ABNORMAL',
-  'HYDRAULIC_SENSOR_ANOMALY',
-  'HYDRAULIC_LEAK_OR_BURST',
+  'HYDRAULIC_BLOCKAGE', // 高压 + 低流 堵塞
+  'HYDRAULIC_PUMP_ABNORMAL', // 低压 + 低流 水泵空转
+  'HYDRAULIC_SENSOR_ANOMALY', // 正常压力 + 低流 疑似流量计异常, 流量计被卡住
+  'HYDRAULIC_LEAK_OR_BURST', // 压力 + 流量骤降 水管爆了
 ])
 
 export const createHydraulicDiagnosisManager = ({
@@ -61,6 +61,7 @@ export const createHydraulicDiagnosisManager = ({
         confirmSeconds: config.diagnosisConfirmSeconds,
       }, reading.recordedAt)
       emit({
+        // 就是Websocket的broadcast因为在runtime层调用的时候传递的就是这个
         type: 'hydraulic.diagnosis',
         data: { deviceNumber, ...result },
       })

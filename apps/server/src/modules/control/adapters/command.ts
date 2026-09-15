@@ -1,6 +1,7 @@
 /**
  * 阅读导航：指令协议适配：按数据库 publish_topic、value_map、payload_template 形成最终 MQTT topic/payload；页面 on/off 不一定是设备真正认识的 mb。
  * 入口位置：modules/control/adapters/command.ts
+ * 把发送的指令转换为设备端需要的格式
  */
 
 interface CommandDefinition {
@@ -30,6 +31,7 @@ const parseObject = (
   }
 }
 
+// 根据开关on/off 正确的映射成为他们设备端能识别的指令
 const replaceTemplate = (
   value: unknown,
   context: Record<string, unknown>,
@@ -53,9 +55,10 @@ export const buildCommandEnvelope = (definition: CommandDefinition) => {
   // 例：后台 value_map 把 pump=on 映射成 Modbus mb，模板再生成
   // {mb, sn, ack, crc, uart}；最终 topic 可能是 team/command 而非默认主题。
   const valueMap = parseObject(definition.valueMap, 'value_map')
-  const mappedValue = valueMap && Object.hasOwn(valueMap, definition.value)
+  const mappedValue = valueMap && Object.hasOwn(valueMap, definition.value) // hasOwn判断对象上有没有一个属性, in检查原型链, hasOwn不会
     ? valueMap[definition.value]
     : definition.value
+  // 主题的替换, 如果指令有定义主题, 那么就替换, 否则就是兜底主题
   const topic = definition.publishTopic?.trim() || 'device/direct'
   const template = parseObject(definition.payloadTemplate, 'payload_template')
 

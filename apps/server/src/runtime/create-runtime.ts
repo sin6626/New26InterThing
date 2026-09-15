@@ -1,6 +1,6 @@
 /**
  * 阅读导航：程序组合根：创建 MySQL、MQTT、WebSocket，再把业务模块接成实时链路。重点区分 Broker 发布成功、设备真实反馈和安全决策，它们不是同一件事。
- * 入口位置：main.ts
+ * 
  */
 
 import { createServer } from 'node:http'

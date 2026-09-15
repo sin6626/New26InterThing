@@ -3,7 +3,7 @@
  * 入口位置：modules/control/adapters/device-report.ts
  */
 
-/** 解析 device/direct 回报；该报文确认设备反馈值，不代表传感器数据。 */
+/** 解析 device/direct 回报；该报文确认设备反馈值(但是现在设备端不能发送指令)，不代表传感器数据。 */
 export const parseDeviceReport = (payload: Buffer) => {
   let data: unknown
   try {

@@ -15,6 +15,7 @@ interface SensorVstatusConfig {
 type LoadConfig = () => Promise<SensorVstatusConfig>
 
 /** 根据当前安全阈值给历史记录计算 vstatus，不依赖设备上报故障字段。 */
+// 很简单的处理而已, 没有超过阈值就认为是正常的数据(残留逻辑, 不用删, 可兼容)
 export const createSensorVstatusEvaluator = (loadConfig: LoadConfig) => (
   async (message: ParsedSensorMessage): Promise<number> => {
     const config = await loadConfig()
