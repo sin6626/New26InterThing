@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：监控阈值 MySQL 读取：从后台配置取得离线时长和水力参数，短时缓存避免每条实时消息都查询数据库。
+ * 入口位置：modules/monitoring-config/mysql.ts
+ */
+
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 
 export interface MonitoringConfig {

@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：安全监督器：按优先级执行即时规则、传感器新鲜度、持续确认、故障锁存与动作授权；判断结论由保护流程执行。
+ * 入口位置：modules/safety/state/supervisor.ts
+ */
+
 import type {
   SafetyAction,
   SafetyActionSource,
@@ -38,6 +43,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let lockedDecision: SafetyDecision | null = null
   let occurredAt: number | null = null
   let latestContext: SafetyContext | null = null
+  // “Since” 保存某条件第一次成立的时间：条件连续成立足够久才触发慢规则；
+  // 一旦读数恢复，下面的 handleReading 会清空起点重新计时。
   let lowFlowSince: number | null = null
   let reversedSince: number | null = null
   let heatingBaseline: number | null = null
@@ -131,6 +138,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   )
 
   const currentUnsafeReason = (context: SafetyContext): string | null => {
+    // 加热开启需要设备实际水泵、流量、压力与两路温度都有效；
+    // 页面希望泵开启(desiredPump)不能代替设备反馈(actualPump)。
     if (lockedDecision) return `故障已锁定：${lockedDecision.detail}`
     if (!latestReading) return '尚未收到传感器数据'
     for (const key of ['flow', 'pressure', 'inletTemperature', 'outletTemperature'] as const) {
@@ -276,6 +285,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       }
 
       if (lockedDecision) {
+        // 已锁故障不因一包正常数据自动恢复；只允许把“先关热”升级为“也停泵”。
         return upgradeLockedProtection(context)
       }
       if (hasOverPressure(reading, context.config)) {
@@ -353,6 +363,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
         && reading.actualHeater === 'on'
         && reading.flowRate !== null
         && reading.flowRate >= context.config.minSafeFlow
+      // 装反与无温升都只在“设备实际有效加热”时观察。入口温度高于出口温度
+      // 并不会立刻报警，而是持续达到 temp_reversed_confirm_time 才锁故障。
       if (
         heatingEffective
         && reading.inletTemperature !== null
@@ -362,6 +374,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       else reversedSince = null
 
       if (heatingEffective && reading.outletTemperature !== null) {
+        // 无温升规则累计的是有效加热时间；停热或建流阶段不应把墙上时间算进去。
         if (heatingBaseline === null) {
           heatingBaseline = reading.outletTemperature
           effectiveHeatingMilliseconds = 0

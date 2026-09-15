@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：人工操作流程：人工开关也走后端安全门；人工关闭优先于自动需求，人工开启必须满足安全授权。
+ * 入口位置：modules/automation/flows/manual.ts
+ */
+
 import type { ActuatorValue } from '@new26interthing/shared'
 
 import type {

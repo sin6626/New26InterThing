@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：行为识别流程：按 ID 重查真实历史数据，检查是否同一设备，再调用 AI 并保存映射结果；不能信任前端直接传来的传感器值。
+ * 入口位置：modules/behavior/flows/recognize.ts
+ */
+
 import type { RecognitionResult } from '@new26interthing/shared'
 
 import type { BehaviorRepository } from '../types.js'

@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：自动控制 HTTP 路由：校验页面请求并调用自动控制管理器；页面只发送意图，真正状态转换和安全决策在后端。
+ * 入口位置：modules/automation/http.ts
+ */
+
 import {
   Router,
   type NextFunction,

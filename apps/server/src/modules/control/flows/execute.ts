@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：指令执行主流程：规范化控件值→验证→安全门→按模板发布→写控制值与日志；master 和参数通常只存库，泵/加热才发布。
+ * 入口位置：modules/control/flows/execute.ts
+ */
+
 import type {
   ControlCommandIntent,
   ControlCommandResult,
@@ -74,6 +79,8 @@ export const createControlService = (
     intent: ControlCommandIntent,
     trustedAutomation = false,
   ): Promise<ControlCommandResult> => {
+    // 前端只给设备编号、配置 ID 和新值；真正的控件类型、取值范围和 MQTT 模板
+    // 必须从后台配置读取，不能直接相信页面传来的“这是一条泵指令”。
     const definition = await repository.getDefinition(intent.deviceNumber, intent.configId)
     if (!definition) throw new ControlError('未找到对应的指令配置', 404)
 
@@ -85,6 +92,7 @@ export const createControlService = (
     }
 
     const hasNumericRange = definition.min !== null || definition.max !== null
+    // 数据库的 min/max 是字符串：先转为数字验证，防止非法参数保存后使状态机无法启动。
     if (definition.fieldType === '3' || hasNumericRange) {
       const number = Number(value)
       if (!Number.isFinite(number)) throw new ControlError('配置值必须是有效数字', 400)
@@ -106,6 +114,8 @@ export const createControlService = (
       }
     }
     const shouldPublish = isDeviceCommand(definition.topic)
+    // master 切换的是后端自动模式；PID、阈值等参数只保存；只有运行执行器发布 MQTT。
+    // 因而 shouldPublish 与“配置里填了 publish_topic”并不等价。
     const action = shouldPublish
       ? {
           topic: definition.topic as 'pump' | 'heater',
@@ -113,6 +123,8 @@ export const createControlService = (
         }
       : null
     if (!trustedAutomation && action) {
+      // 人工开启不能绕过自动控制模块维护的安全状态。trustedAutomation 只表示
+      // 这次动作已经来自后端状态机，并非允许页面声明自己是“可信自动动作”。
       if (!automation?.executeAction) {
         throw new ControlError('安全控制服务尚未初始化', 503)
       }
@@ -129,6 +141,8 @@ export const createControlService = (
     }
 
     if (shouldPublish) {
+      // value_map 把 on/off 翻译为设备编码；payload_template 再组成真正的 MQTT JSON。
+      // 编码和 topic 来自数据库，所以换设备协议时不应改这里的业务判断。
       const envelope = buildCommandEnvelope({
         deviceNumber: intent.deviceNumber,
         configId: intent.configId,
@@ -146,6 +160,7 @@ export const createControlService = (
         else await publish()
       }
       catch (error) {
+        // MQTT 或安全授权失败时仍写失败日志。日志保存自身失败不应吞掉原始发布错误。
         const message = error instanceof Error ? error.message : String(error)
         await Promise.resolve(repository.saveFailure(
           definition,
@@ -164,6 +179,8 @@ export const createControlService = (
     }
 
     try {
+      // 先发布设备命令，再保存控制值。若第二步失败，设备“可能已收到指令”，
+      // 所以下面的错误信息明确提示不能把数据库值当作设备执行结果。
       await repository.saveSuccess(
         definition,
         intent.deviceNumber,
@@ -183,6 +200,7 @@ export const createControlService = (
 
   return {
     async syncTime(deviceNumber: string, requestedTime?: string) {
+      // 时间同步是固定协议的特殊指令，不从普通控制配置树选择 pump/heater 模板。
       const date = requestedTime ? new Date(requestedTime.replace(' ', 'T')) : new Date()
       if (Number.isNaN(date.getTime())) throw new ControlError('时间格式错误', 400)
       const pad = (value: number) => String(value).padStart(2, '0')

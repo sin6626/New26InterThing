@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：自动控制配置读取：从 t_direct_config 与 t_direct_global 取得现场参数，再校验范围；非法配置不能让自动模式带病启动。
+ * 入口位置：modules/automation/adapters/config.mysql.ts
+ */
+
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 
 import type { AutomationConfig } from '../types.js'

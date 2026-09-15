@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：WebSocket 广播适配器：把后端已形成的实时消息推给浏览器；它不生成故障判断，也不保存历史。客户端断开连接不应影响设备控制。
+ * 入口位置：infrastructure/websocket/realtime-websocket.ts
+ */
+
 import type { Server } from 'node:http'
 
 import type { RealtimeMessage } from '@new26interthing/shared'

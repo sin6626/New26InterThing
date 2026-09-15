@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：安全事实与决定类型：区分实际设备反馈、期望动作、传感器值、保护结论和复位授权；类型关系决定安全输入边界。
+ * 入口位置：modules/safety/types.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationState,

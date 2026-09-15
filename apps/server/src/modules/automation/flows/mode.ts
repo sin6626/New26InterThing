@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：模式切换流程：master 改的是后端自动状态机，不是直接发 MQTT；自动启动先校验数据与安全，再启动水泵。
+ * 入口位置：modules/automation/flows/mode.ts
+ */
+
 import type {
   AutomationSnapshot,
 } from '@new26interthing/shared'
@@ -59,6 +64,8 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
 
       const config = await dependencies.loadConfig()
       if (nextEnabled) {
+        // 自动启动需要一包完整、足够新的设备实际读数；历史/补发读数不能满足条件。
+        // 调试模式允许现场模拟跳过安全限制，但正常模式必须执行全部检查。
         const safety = dependencies.getSafetySnapshot()
         if (safety.locked && !dependencies.isDebugMode()) {
           throw new AutomationError(safety.detail || '故障已锁定，无法启动自动模式')
@@ -75,6 +82,8 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
           }
         }
         dependencies.enterModeState(true, 'building-flow', '等待设备建流')
+        // 开泵后先处于 building-flow；只有设备确认开泵且流量达到阈值，
+        // engine.handleReading 才会转为 running，随后才可能开启加热。
         try {
           await dependencies.runPump('on')
         }
@@ -85,6 +94,8 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
         }
       }
       else {
+        // 退出自动模式时先关加热。若泵仍期望开启，保留 cooling 状态，
+        // tick 会在冷却延时后停泵，而不是这里立刻切断水循环。
         const state = dependencies.desiredPump() === 'on' ? 'cooling' : 'stopped'
         dependencies.enterModeState(
           false,

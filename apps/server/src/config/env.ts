@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：环境变量入口：从项目 .env 读取并用 Zod 校验；AppEnv 是校验后配置的 TypeScript 类型。不要在业务文件里重复解析环境变量。
+ * 入口位置：config/env.ts
+ */
+
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 

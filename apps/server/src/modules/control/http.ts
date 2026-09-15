@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：指令与操作日志路由：校验请求格式、调用控制流程并返回明确状态码；这里只接收人工意图，不自行发 MQTT。
+ * 入口位置：modules/control/http.ts
+ */
+
 import type { PaginatedOperationLogs } from '@new26interthing/shared'
 import {
   Router,

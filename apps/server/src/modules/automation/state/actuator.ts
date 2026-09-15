@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：执行器状态：记录期望泵/加热状态、最近动作与顺序；注入的 execute 才负责真正发布，期望值不能冒充设备实际反馈。
+ * 入口位置：modules/automation/state/actuator.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationSnapshot,

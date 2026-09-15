@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：控制定义与仓储接口：一条控制项包含控件类型、配置值及可选设备指令模板；旧值用于操作日志。
+ * 入口位置：modules/control/types.ts
+ */
+
 import type {
   ControlSnapshot,
   OperationLogOptions,

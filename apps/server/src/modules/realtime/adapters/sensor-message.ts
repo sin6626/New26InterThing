@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：传感器上行报文解析：识别 d_no、时间与 online；当前实现将 online=1 视作补发，其余视作实时，并剔除非传感器字段。
+ * 入口位置：modules/realtime/adapters/sensor-message.ts
+ */
+
 export interface ParsedSensorMessage {
   deviceNumber: string
   recordedAt: string
@@ -50,6 +55,7 @@ export const parseSensorMessage = (
   }
 
   const values = Object.fromEntries(
+    // d_no、时间、online、vstatus 是报文元数据，不是后台传感器字段映射的读数。
     Object.entries(record).filter(
       ([key, value]) =>
         !reservedFields.has(key) &&
@@ -62,6 +68,7 @@ export const parseSensorMessage = (
   }
 
   const reportedTime = record.c_time ?? record.time
+  // 历史表保留设备声称的采样时间；自动控制另用后端接收时间判断新鲜度。
   const recordedAt =
     typeof reportedTime === 'string' && reportedTime.trim()
       ? reportedTime.trim()
@@ -72,6 +79,7 @@ export const parseSensorMessage = (
     message: {
       deviceNumber,
       recordedAt,
+      // 当前协议仅把 online=1 认作补发，其余值按实时处理；现场必须核对设备是否只发 0/1。
       dataKind: String(record.online) === '1' ? 'backfill' : 'realtime',
       values,
     },

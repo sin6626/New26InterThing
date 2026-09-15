@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：控制 MySQL 适配：将后台配置组成页面控制树，读写 t_direct_global 并维护 t_direct_history；SQL 参数化，配置负责渲染顺序。
+ * 入口位置：modules/control/adapters/mysql.ts
+ */
+
 import type {
   Pool,
   RowDataPacket,
@@ -134,6 +139,8 @@ const buildLogFilters = (query: OperationLogQuery) => {
  */
 export const createControlRepository = (pool: Pool): ControlRepository => ({
   async getSnapshot(deviceNumber) {
+    // 控制树的 id/ref_id/ref_value/f_type 都来自后台配置，前端据此决定
+    // 父子顺序、当前模式分支和控件种类；后端不写死页面只显示文本框。
     const [rows] = await pool.query<RowDataPacket[]>(
       `select c.id as config_id, c.ref_id, c.ref_value, c.t_name, c.f_type,
               c.min, c.max, c.topic, c.options,
@@ -191,6 +198,8 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
   },
 
   async saveSuccess(definition, deviceNumber, value, remark) {
+    // 控制值和“成功操作日志”放在同一事务：其中一条 SQL 失败就整体回滚。
+    // 注意事务不能回滚已经发出去的 MQTT，所以调用方需要区分这两种失败。
     const connection = await pool.getConnection()
     try {
       await connection.beginTransaction()
@@ -225,6 +234,7 @@ export const createControlRepository = (pool: Pool): ControlRepository => ({
   },
 
   async saveFailure(definition, deviceNumber, value, remark) {
+    // 失败只记日志，不把未发布成功的新值写成当前控制值。
     await pool.query(
       `insert into t_direct_history
        (direct_type, d_no, config_id, direct_name, old_value, new_value, result, remark)

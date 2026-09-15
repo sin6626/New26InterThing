@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：自动控制快照组装：把模式、期望/实际状态、安全与水量事实整理成页面能显示的结构；不改变状态机。
+ * 入口位置：modules/automation/state/snapshot.ts
+ */
+
 import type {
   AutomationSnapshot,
   SafetySnapshot,

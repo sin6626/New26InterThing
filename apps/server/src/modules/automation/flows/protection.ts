@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：保护动作流程：把安全结论落实成关加热、冷却停泵和故障上报；规则只给结论，真正的设备动作在这里排序。
+ * 入口位置：modules/automation/flows/protection.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationState,
@@ -54,6 +59,8 @@ export const createAutomationProtection = ({
     topic: 'pump' | 'heater',
     firstEntry: boolean,
   ) => {
+    // 故障期间定时器会反复要求保护。若设备已反馈关闭或刚重试过，
+    // 就避免每个 tick 重发同一条关机指令；首次进入故障仍强制尝试。
     const actual = topic === 'pump' ? getActualPump() : getActualHeater()
     if (!firstEntry && actual === 'off') return
     const lastAttempt = topic === 'pump'
@@ -67,11 +74,14 @@ export const createAutomationProtection = ({
 
   return {
     async apply(decision: SafetyDecision) {
+      // 先在内存中锁定故障并把期望状态转为关闭，再发布设备关机指令。
+      // 即使 MQTT 发布失败，也不能把状态机恢复成“正常运行”。
       const firstEntry = getState() !== 'fault'
       enterFault(decision.detail)
       resetTemperatureControl()
       actuator.adoptDesired('heater', 'off')
       if (decision.stopPump) actuator.adoptDesired('pump', 'off')
+      // 部分温度故障水力通道仍安全，可保留泵限时散热；超压/低流等则立即停泵。
       else faultPumpStopAt ??= clock() + getCoolingDelaySeconds() * 1_000
       refreshSafetyContext()
 
@@ -93,6 +103,8 @@ export const createAutomationProtection = ({
         void Promise.resolve(disableMaster(decision.detail)).catch(() => undefined)
       }
       if (reportedFaultCode !== decision.faultCode) {
+        // 相同故障码只上报一次。异步入库失败会留在快照中提示用户，
+        // 但故障保护动作不等待数据库写入成功才执行。
         const generation = ++reportingGeneration
         reportedFaultCode = decision.faultCode
         faultRecorded = false
@@ -111,6 +123,7 @@ export const createAutomationProtection = ({
       }
     },
     async stopPumpAfterCooling() {
+      // 只有限时散热故障进入这里；一到截止时间，尝试关泵直到设备反馈关闭。
       if (faultPumpStopAt === null || clock() < faultPumpStopAt) return
       actuator.adoptDesired('pump', 'off')
       if (getActualPump() === 'off') {

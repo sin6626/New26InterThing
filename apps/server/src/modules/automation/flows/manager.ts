@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：自动控制管理器：延迟创建单设备状态机，并向 HTTP、MQTT 和定时器提供共同入口；避免多个调用方各自维护状态。
+ * 入口位置：modules/automation/flows/manager.ts
+ */
+
 import type { AutomationStatusMessage } from '@new26interthing/shared'
 import type {
   SafetyAction,

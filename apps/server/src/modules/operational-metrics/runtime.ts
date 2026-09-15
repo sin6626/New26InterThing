@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：进程内运行指标：只根据设备实际泵/加热反馈累计时间，超时不补算；服务重启后从零开始。
+ * 入口位置：modules/operational-metrics/runtime.ts
+ */
+
 interface OperationalReading {
   recordedAt: number
   actualPump: 'on' | 'off' | 'unknown'

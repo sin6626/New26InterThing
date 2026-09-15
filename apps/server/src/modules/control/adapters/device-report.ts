@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：设备指令反馈解析：从 device/direct 回报读出设备状态；Broker 发布成功与这个设备回报不能混为一谈。
+ * 入口位置：modules/control/adapters/device-report.ts
+ */
+
 /** 解析 device/direct 回报；该报文确认设备反馈值，不代表传感器数据。 */
 export const parseDeviceReport = (payload: Buffer) => {
   let data: unknown

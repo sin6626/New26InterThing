@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：HTTP 应用入口：把各业务路由挂到 Express；它只连接模块，不决定设备如何运行。阅读时从 createApp 的依赖开始，看每条路由由哪个模块负责。
+ * 入口位置：app.ts
+ */
+
 import cors from 'cors'
 // 本质上是两行代码的合并 import express from 'express'; import type { Express } from 'express' // 只导入 TS 类型约束
 import express, { type Express } from 'express'

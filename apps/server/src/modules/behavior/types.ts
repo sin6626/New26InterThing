@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：行为模块接口类型：历史识别输入与仓储能力；字段列由后台数据库映射决定，不写死赛方结果字段。
+ * 入口位置：modules/behavior/types.ts
+ */
+
 import type { BehaviorOptions, BehaviorQuery, PaginatedBehaviors } from '@new26interthing/shared'
 
 export interface RecognitionInputRow {

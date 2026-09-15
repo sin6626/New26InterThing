@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：故障码类型目录：安全与水力诊断的错误语义映射到后台 type；不在判断规则中散落数据库数字。
+ * 入口位置：modules/safety/faults/catalog.ts
+ */
+
 import type {
   HydraulicDiagnosisCode,
   SafetyFaultCode,

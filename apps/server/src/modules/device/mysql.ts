@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：设备 MySQL 查询：按编号或名称筛选并分页 t_device；返回页面使用的清晰字段名而不是数据库原字段名。
+ * 入口位置：modules/device/mysql.ts
+ */
+
 import type { Device, DeviceListQuery } from '@new26interthing/shared'
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 

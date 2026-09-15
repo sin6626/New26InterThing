@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：历史数据 HTTP 路由：解析时间、设备、分页和趋势参数，查询交给 MySQL 适配器。
+ * 入口位置：modules/sensor-history/http.ts
+ */
+
 import type { PaginatedSensorHistory } from '@new26interthing/shared'
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import { z } from 'zod'

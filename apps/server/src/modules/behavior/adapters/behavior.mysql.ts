@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：行为 MySQL 适配：读取 t_behavior_field_mapper，动态查询/写入 t_behavior_data；只允许白名单 field1~field10 防止配置值进入 SQL 列名。
+ * 入口位置：modules/behavior/adapters/behavior.mysql.ts
+ */
+
 import type { BehaviorField, BehaviorItem, BehaviorQuery } from '@new26interthing/shared'
 import type { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise'
 
@@ -56,6 +61,8 @@ export const createBehaviorRepository = (pool: Pool): BehaviorRepository => ({
     }))
   },
   async saveRecognitionResult(result, deviceNumber) {
+    // p_name 可写嵌套路径，例如 classification.action；只有实际命中的后台
+    // 字段才参与写库。db_name 已在 getMappings 通过 field1~field10 白名单过滤。
     const mappings = await getMappings(pool, 't_behavior_field_mapper')
     const matched = mappings.filter(mapping => valueAtPath(result, mapping.p_name) !== undefined)
     if (!matched.length) throw new Error('识别结果没有匹配任何行为字段，请检查行为字段映射')

@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：水力诊断流程：读取阈值、调用诊断状态、广播结论、故障去重并在泄漏时请求保护；结论与故障入库不是同一步。
+ * 入口位置：modules/diagnostics/flows/diagnose.ts
+ */
+
 import type {
   AutomationState,
   HydraulicDiagnosis,

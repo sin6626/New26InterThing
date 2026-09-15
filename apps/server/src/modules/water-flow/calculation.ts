@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：水量纯公式：梯形积分算升数，流量与管径算管内流速；不维护设备状态或读取 MySQL。
+ * 入口位置：modules/water-flow/calculation.ts
+ */
+
 /** L/min 与管径毫米换算为管内流速 m/s。 */
 export const calculateVelocity = (
   flowLitersPerMinute: number,

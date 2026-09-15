@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：历史数据 MySQL 适配：按后台传感器字段映射动态查询、筛选和按分钟趋势聚合；字段列名只使用白名单。
+ * 入口位置：modules/sensor-history/mysql.ts
+ */
+
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 
 import type {

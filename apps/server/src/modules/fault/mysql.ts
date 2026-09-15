@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：故障 MySQL 适配：按 t_error_code_mapper 取得中文语义，再写 t_error_msg；同时提供过滤、统计与分页查询。
+ * 入口位置：modules/fault/mysql.ts
+ */
+
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise'
 
 import type { FaultItem, FaultQuery } from '@new26interthing/shared'

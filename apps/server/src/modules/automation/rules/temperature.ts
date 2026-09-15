@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：纯温控计算：回差防止频繁抖动，时间比例 PID 把连续占空比转换为继电器开关窗口；不接数据库或 MQTT。
+ * 入口位置：modules/automation/rules/temperature.ts
+ */
+
 import type {
   ActuatorValue,
   PidSnapshot,
@@ -24,6 +29,7 @@ export const hysteresisDemand = (
 ): ActuatorValue => {
   if (temperature <= target - hysteresis) return 'on'
   if (temperature >= target) return 'off'
+  // 落在两条阈值之间时沿用当前开关，避免温度微小波动导致继电器反复切换。
   return current
 }
 
@@ -59,6 +65,8 @@ export const createTemperatureController = (
       }
 
       const error = config.targetTemperature - temperature
+      // 比例项看当前误差，积分项记长期误差，微分项看温度变化速度；
+      // 这里微分对测量温度取负号，升温过快时会降低加热需求。
       const elapsedSeconds = previousAt === undefined
         ? 0
         : Math.max(0, (now - previousAt) / 1_000)
@@ -67,6 +75,8 @@ export const createTemperatureController = (
         : -(temperature - previousTemperature) / elapsedSeconds
 
       if (elapsedSeconds > 0) {
+        // 只在候选输出仍处于 0~100% 时接受新的积分，避免积分无限累积后
+        // 即使温度恢复也长期无法退出加热（积分饱和）。
         const candidate = integral + error * elapsedSeconds
         const candidateOutput = config.kp * error
           + config.ki * candidate
@@ -78,6 +88,7 @@ export const createTemperatureController = (
       previousAt = now
 
       if (temperature >= config.targetTemperature + config.overshootAllowance) {
+        // 超调后强制关热；必须降到较低的恢复阈值才解除，形成安全回差。
         overshootBlocked = true
       }
       if (temperature <= config.targetTemperature - config.resumeHysteresis) {
@@ -93,6 +104,8 @@ export const createTemperatureController = (
       let plannedDutyPercent = outputPercent
       let limitationReason: string | null = overshootBlocked ? '温度超调，暂停加热' : null
       const onSeconds = config.cycleSeconds * outputPercent / 100
+      // PID 的百分比最后会变成一个周期内“开几秒”；继电器不能接受
+      // 太短的开/关时间，因此下面按配置裁剪占空比。
       if (onSeconds > 0 && onSeconds < config.minOnSeconds) {
         plannedDutyPercent = 0
         limitationReason = '低于最短开启时间'
@@ -107,6 +120,7 @@ export const createTemperatureController = (
         limitationReason = '保留最短关闭时间'
       }
       const elapsedInWindow = (now - windowStartedAt) / 1_000
+      // 只在本周期前 plannedOnSeconds 内要求开启，余下时间要求关闭。
       const plannedOnSeconds = config.cycleSeconds * plannedDutyPercent / 100
 
       return {

@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：温控需求流程：按回差或 PID 计算想要的加热状态，先请求安全授权再调用执行器；想开加热不等于可以开加热。
+ * 入口位置：modules/automation/flows/demand.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationState,

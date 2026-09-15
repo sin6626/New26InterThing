@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：实时接收流程：先保存历史，只有 online=0 才刷新在线、广播并驱动自动控制；补发不能倒放旧数据改变设备动作。
+ * 入口位置：modules/realtime/flows/receive.ts
+ */
+
 import type { SensorRealtimeMessage } from '@new26interthing/shared'
 
 import type { ParsedSensorMessage } from '../adapters/sensor-message.js'

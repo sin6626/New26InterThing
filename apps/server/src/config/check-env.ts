@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：启动前环境检查：验证必需环境变量是否齐全；不处理业务请求。环境不合法时应在启动阶段暴露问题。
+ * 入口位置：config/check-env.ts
+ */
+
 import { ZodError } from 'zod'
 
 import { readEnv } from './env.js'

@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：单设备状态机：串行处理页面操作、设备数据与定时 tick；这里拥有模式和运行状态，但安全判断委托 safety，设备发布委托执行器。
+ * 入口位置：modules/automation/flows/engine.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationSnapshot,
@@ -58,10 +63,14 @@ export const createAutomationEngine = ({
    */
   const actuator = createAutomationActuator({ execute })
   const safety = createSafetySupervisor(clock)
+  // enabled 表示“自动模式是否被请求”；state 表示“当前走到哪一步”。
+  // 例如停止自动模式后，enabled=false 但 state 仍可能是 cooling，需要继续让泵散热。
   let enabled = false
   let state: AutomationSnapshot['state'] = 'stopped'
   let actualPump: AutomationSnapshot['actualPump'] = 'unknown'
   let actualHeater: AutomationSnapshot['actualHeater'] = 'unknown'
+  // actual* 来自设备上行反馈；actuator.desired* 是后端希望设备达到的状态。
+  // 两者可能不同，尤其在 MQTT 刚发布、设备尚未执行或反馈丢失时。
   let enteredAt = clock()
   let config: AutomationConfig | null = null
   let outletTemperature: number | null = null
@@ -131,6 +140,7 @@ export const createAutomationEngine = ({
   }
 
   const getSnapshot = () => buildAutomationSnapshot({
+    // 快照是给页面看的只读事实，不触发模式转换或设备操作。
     deviceNumber,
     enabled,
     state,
@@ -158,6 +168,8 @@ export const createAutomationEngine = ({
   }
 
   const handleDemandFailure = async (error: unknown) => {
+    // 指令发送失败会进入可锁定故障；“安全门拒绝开启”已经记录为 blocked，
+    // 不应再次伪装为 MQTT 发布失败。
     const message = error instanceof Error ? error.message : String(error)
     if (actuator.lastAction?.status === 'blocked') return
     await applySafetyDecision(safety.trip(
@@ -266,6 +278,8 @@ export const createAutomationEngine = ({
     handleReading(reading: AutomationReading) {
       // 先更新实际反馈，再判断安全，最后计算新的温控需求。
       readingGeneration += 1
+      // readingGeneration 用于复位期间检查设备数据是否变化；复位前后的安全事实
+      // 必须一致，不能在发关机命令的间隙忽略新来的异常读数。
       return serialize(async () => {
         latestReading = reading
         actualPump = reading.actualPump
@@ -295,6 +309,7 @@ export const createAutomationEngine = ({
           && reading.flowRate !== null
           && reading.flowRate >= config.minSafeFlow
         ) {
+          // 不能只凭“已发开泵指令”就宣布运行：必须看到设备实际开泵且流量已建立。
           state = 'running'
           enteredAt = clock()
           limitationReason = null
@@ -344,12 +359,14 @@ export const createAutomationEngine = ({
         }
         const latestFingerprint = JSON.stringify(latestConfig)
         if (latestFingerprint !== configFingerprint) {
+          // 后台参数可在运行期间改变；PID 积分依赖旧参数，配置变化时清除旧积分。
           config = latestConfig
           configFingerprint = latestFingerprint
           temperatureDemand.reset()
         }
         const elapsed = (clock() - enteredAt) / 1_000
         if (state === 'cooling' && elapsed >= config.coolingDelaySeconds) {
+          // 先关加热再保留水泵循环，冷却时间结束才真正停泵。
           try {
             await actuator.run('pump', 'off')
             state = 'stopped'
@@ -410,6 +427,8 @@ export const createAutomationEngine = ({
 
     resetFault() {
       return serialize(async () => {
+        // 复位是“先确认→发送关闭→再次确认→清锁”，不是点击按钮就直接清故障。
+        // 这样可防止设备尚在运行或复位过程中收到新读数时错误恢复自动模式。
         config = await loadCheckedConfig()
         const resetGeneration = readingGeneration
         const authorization = safetyBridge.canReset()

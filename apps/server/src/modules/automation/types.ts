@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：自动控制事实类型：配置、规范化读数和可返回给 HTTP 的错误；类型字段体现状态机需要哪些数据，不在这里执行规则。
+ * 入口位置：modules/automation/types.ts
+ */
+
 import type { ActuatorValue } from '@new26interthing/shared'
 
 import type { PidConfig } from './rules/temperature.js'

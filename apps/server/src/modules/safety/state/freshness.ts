@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：传感器新鲜度状态：四类读数各自记录值与最后有效时间；同一个 MQTT 包不一定包含所有字段。
+ * 入口位置：modules/safety/state/freshness.ts
+ */
+
 import type { SensorSafetyStatus } from '@new26interthing/shared'
 
 export type SensorKey =

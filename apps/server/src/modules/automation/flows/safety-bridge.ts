@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：安全衔接层：将自动状态、期望执行器状态和设备读数整理为 safety 模块统一事实；避免安全规则读取页面状态。
+ * 入口位置：modules/automation/flows/safety-bridge.ts
+ */
+
 import type {
   ActuatorValue,
   AutomationState,

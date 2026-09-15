@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：故障信息 HTTP 路由：验证时间、设备、故障类型和分页条件；页面故障列表只用 HTTP 查询。
+ * 入口位置：modules/fault/http.ts
+ */
+
 import type { PaginatedFaults } from '@new26interthing/shared'
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import { z } from 'zod'

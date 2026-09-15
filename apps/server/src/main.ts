@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：程序组合根：创建 MySQL、MQTT、WebSocket，再把业务模块接成实时链路。重点区分 Broker 发布成功、设备真实反馈和安全决策，它们不是同一件事。
+ * 入口位置：main.ts
+ */
+
 import { createServer } from 'node:http'
 
 import { createApp } from './app.js'
@@ -41,6 +46,8 @@ import {
  */
 const env = readEnv()
 const pool = createDatabasePool(env)
+// MySQL 仓储是“读写数据”的适配器；下面的业务流程通过仓储接口使用数据，
+// 不需要知道连接池、SQL 表名或字段映射的具体细节。
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const controlRepository = createControlRepository(pool)
@@ -171,6 +178,8 @@ const app = createApp({
 const server = createServer(app)
 const realtimeWebSocket = createRealtimeWebSocket(server)
 const handleSensorReading = createSensorRealtimeHandler({
+  // 设备包首先保存进历史表。vstatus 是后端根据当前阈值计算的历史标记，
+  // 与设备是否在线、自动控制是否要动作是不同用途。
   repository: createSensorRepository(
     pool,
     createSensorVstatusEvaluator(loadMonitoringConfig),
@@ -178,9 +187,12 @@ const handleSensorReading = createSensorRealtimeHandler({
   broadcast: (message) => realtimeWebSocket.broadcast(message),
   onRealtimeReceived: message => devicePresence.recordActivity(message.deviceNumber),
   afterSave: [
+    // afterSave 只针对 online=0 的实时包执行；online=1 的补发包停在历史入库。
+    // 这是安全隔离：过去的温度和流量不能回放成“现在”的控制输入。
     // 第一条后处理链维护控制所需的实时状态：运行指标、累计水量和自动状态机。
     async (message) => {
       const receivedAt = Date.now()
+      // 控制判断使用“后端收到实时包的时间”，不是设备报文里可能很旧的采样时间。
       const reading = normalizeAutomationReading(message.values, receivedAt)
       const operationalMetrics = await operationalMetricsService.handleReading(
         message.deviceNumber,
@@ -219,6 +231,8 @@ sensorMqtt = createSensorMqtt({
   env,
   onConnectionChange: (connected) => realtimeWebSocket.setMqttConnected(connected),
   async onMessage(topic, payload) {
+    // 同一个 MQTT 连接接收不同业务报文，所以先按 topic 分流。
+    // 指令反馈更新控制值；传感器包则走历史保存和实时派生链路。
     // device/direct 是设备执行回报，不是传感器数据，因此必须走独立解析器。
     if (topic === 'device/direct') {
       const report = parseDeviceReport(payload)
@@ -258,6 +272,8 @@ const automationTimer = setInterval(() => {
 
 let stopping = false
 const stop = async () => {
+  // 停止顺序很重要：先关闭自动动作，再断开 MQTT；否则停机指令可能无法发布。
+  // stopping 保护多种退出信号同时到达时不重复关闭同一资源。
   if (stopping) return
   stopping = true
   clearInterval(automationTimer)

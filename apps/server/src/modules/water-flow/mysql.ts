@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：累计水量 MySQL 适配：载入、保存、清零水量和读取后台管径配置；公式不应放在 SQL 适配中。
+ * 入口位置：modules/water-flow/mysql.ts
+ */
+
 import type {
   Pool,
   RowDataPacket,

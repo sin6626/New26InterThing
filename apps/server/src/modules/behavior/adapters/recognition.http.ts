@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：赛方 AI HTTP 适配：从 recognition.json 构造请求、设置超时并解析响应路径；真实协议未配置时明确失败，不猜赛方字段。
+ * 入口位置：modules/behavior/adapters/recognition.http.ts
+ */
+
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -36,6 +41,8 @@ export interface RecognitionAdapter { recognize(rows: RecognitionInputRow[]): Pr
 
 export const createRecognitionAdapter = (options: { configPath?: string; fetchImpl?: typeof fetch } = {}): RecognitionAdapter => ({
   async recognize(rows) {
+    // 比赛 AI 的地址、请求方法和响应位置都留在现场配置，不能假设它永远
+    // 接受固定的 rows JSON。没有正式文档时 url 保持空，调用会明确报错。
     const configPath = options.configPath || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../config/recognition.json')
     let rawConfig: unknown
     try { rawConfig = JSON.parse(await fs.readFile(configPath, 'utf8')) } catch (error) {
@@ -46,18 +53,21 @@ export const createRecognitionAdapter = (options: { configPath?: string; fetchIm
     const config = parsedConfig.data
     if (!config.url) throw new Error('智能识别接口尚未配置，请填写 apps/server/config/recognition.json')
     const payload = applyTemplate(config.requestTemplate, rows)
+    // $rows 等模板变量在这里替换成已从数据库重查的历史数据，而非浏览器原样值。
     const entries: Array<[string, unknown]> = payload && typeof payload === 'object' && !Array.isArray(payload) ? Object.entries(payload) : [['data', payload]]
     const parameters = new URLSearchParams()
     entries.forEach(([key, value]) => parameters.set(key, typeof value === 'string' ? value : JSON.stringify(value)))
     const url = config.bodyType === 'query' ? `${config.url}${config.url.includes('?') ? '&' : '?'}${parameters}` : config.url
     const body = config.bodyType === 'json' ? JSON.stringify(payload) : config.bodyType === 'form' ? parameters : undefined
     const response = await (options.fetchImpl || fetch)(url, {
+      // timeoutMs 防止赛方接口无响应时一直占住后端请求。
       method: config.method, headers: config.headers, body,
       signal: AbortSignal.timeout(config.timeoutMs),
     })
     if (!response.ok) throw new Error(`智能识别接口调用失败：HTTP ${response.status}`)
     const responsePayload: unknown = await response.json()
     const result = valueAtPath(responsePayload, config.responseDataPath)
+    // 只将 responseDataPath 指向的对象交给行为字段映射；数组或路径缺失拒绝入库。
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('智能识别响应路径没有得到对象，请检查 responseDataPath')
     return result as Record<string, unknown>
   },

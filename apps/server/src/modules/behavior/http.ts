@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：行为 HTTP 路由：查询字段和结果，接收选中的历史记录 ID 发起识别；参数错误在进入识别流程前拒绝。
+ * 入口位置：modules/behavior/http.ts
+ */
+
 import type { PaginatedBehaviors } from '@new26interthing/shared'
 import { Router, type Response, type Router as ExpressRouter } from 'express'
 import { z } from 'zod'

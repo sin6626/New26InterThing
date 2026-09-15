@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：历史数据状态规则：用当前后台安全阈值给传感器记录标记正常或异常；调试模式不能修改历史事实。
+ * 入口位置：modules/realtime/rules/vstatus.ts
+ */
+
 import { normalizeAutomationReading } from '../../automation/adapters/reading.js'
 import type { ParsedSensorMessage } from '../adapters/sensor-message.js'
 

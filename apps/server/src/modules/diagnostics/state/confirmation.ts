@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：水力确认状态：保存近时段样本与候选故障起点，立即规则和持续确认规则在这里排序；防止一次噪声就入库。
+ * 入口位置：modules/diagnostics/state/confirmation.ts
+ */
+
 import type {
   HydraulicDiagnosis,
   HydraulicDiagnosisCode,

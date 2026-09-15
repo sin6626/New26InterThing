@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：设备读数适配：把 MQTT 上行字段转为自动控制统一读数；temp_out/field2 是出口温度，temp_in/field3 是入口温度。
+ * 入口位置：modules/automation/adapters/reading.ts
+ */
+
 import type { AutomationReading } from '../types.js'
 
 type SensorValues = Record<string, string | number | null>

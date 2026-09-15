@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：传感器历史入库：依 t_sensor_field_mapper 将上行字段写进 field1~field10，再返回页面动态字段；所有数据先保存历史。
+ * 入口位置：modules/realtime/adapters/sensor.mysql.ts
+ */
+
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise'
 
 import type { ParsedSensorMessage } from './sensor-message.js'
@@ -24,6 +29,8 @@ export const createSensorRepository = (
   evaluateVstatus: EvaluateSensorVstatus,
 ): SensorRepository => ({
   async save(message) {
+    // 传感器 p_name 是设备报文字段，db_name 是历史表列名：
+    // 例如 temp_out → field2。SQL 列名不能用参数占位符，必须先经过列白名单。
     const vstatus = await evaluateVstatus(message)
     const [mappingRows] = await pool.query<SensorFieldMapping[]>(
       `select f_name, db_name, p_name, visible
@@ -40,6 +47,7 @@ export const createSensorRepository = (
 
     const columns = ['d_no', ...mappings.map((mapping) => mapping.db_name), 'c_time', 'online', 'vstatus']
     const values = [
+      // 缺失的某个传感器字段写 null，而不是沿用上次读数伪造一条完整记录。
       message.deviceNumber,
       ...mappings.map((mapping) => message.values[mapping.p_name] ?? null),
       message.recordedAt,

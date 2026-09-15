@@ -1,3 +1,8 @@
+/**
+ * 阅读导航：MQTT 传输适配器：负责连接 Broker、订阅设备主题和发布 JSON；不判断泵或加热是否安全。publish 回调仅证明 Broker 接收，不证明设备执行。
+ * 入口位置：infrastructure/mqtt/sensor-mqtt.ts
+ */
+
 import mqtt from 'mqtt'
 
 import type { AppEnv } from '../../config/env.js'
@@ -31,6 +36,8 @@ export const createSensorMqtt = ({
     clean: true,
   })
   let connected = false
+  // 自己发布的 device/direct 消息可能因订阅同主题又被本进程收到。
+  // 这张短期指纹表用于过滤“自己发给自己的回声”，不能当设备执行确认。
   const outboundFingerprints = new Map<string, number>()
 
   const fingerprint = (topic: string, payload: string) => `${topic}\n${payload}`
@@ -42,6 +49,8 @@ export const createSensorMqtt = ({
   }
 
   client.on('connect', () => {
+    // device/sensor 是传感器上行；device/direct 是设备指令回报。
+    // 出站设备控制 topic 可由数据库配置，不在这里硬编码订阅为传感器消息。
     updateConnection(true)
     client.subscribe(['device/sensor', 'device/direct'], { qos: 0 }, (error) => {
       if (error) console.error('MQTT 订阅失败:', error.message)
@@ -97,10 +106,12 @@ export const createSensorMqtt = ({
           }
         }
         const timer = setTimeout(
+          // Broker 卡住时不能让 HTTP 指令请求无限等待。
           () => finish(new Error('MQTT 发布超时')),
           2_000,
         )
         client.publish(topic, payloadText, { qos: 1, retain: false }, (error) => {
+          // QoS 1 的回调只说明发布链路得到 Broker 确认；设备实际开关仍看上行反馈。
           finish(error || undefined)
         })
       })
