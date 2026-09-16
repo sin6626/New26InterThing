@@ -38,6 +38,10 @@ import {
 } from '../modules/water-flow/index.js'
 import { createRealtimeConsumers } from './realtime-consumers.js'
 import { createMqttDispatcher } from './dispatch-mqtt.js'
+import {
+  createDeviceActuatorHistory,
+  createOperationHistoryRepository,
+} from '../modules/operation-history/index.js'
 
 /**
  * 后端组合根：只负责把数据库、MQTT、WebSocket 和业务模块连接起来。
@@ -51,7 +55,8 @@ const pool = createDatabasePool(env)
 // 不需要知道连接池、SQL 表名或字段映射的具体细节。
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
-const controlRepository = createControlRepository(pool)
+const operationHistory = createOperationHistoryRepository(pool)
+const controlRepository = createControlRepository(pool, operationHistory)
 const loadMonitoringConfig = createMonitoringConfigLoader(pool)
 const loadAutomationConfig = createAutomationConfigLoader(pool)
 // 注册故障告警, 入库 + websocket推送
@@ -116,7 +121,7 @@ const controlService = createControlService(controlRepository, {
 // 累计流量相关Service层
 const waterFlowService = createWaterFlowService({
   // 注册流量库, 查累计流量表
-  repository: createWaterFlowRepository(pool),
+  repository: createWaterFlowRepository(pool, operationHistory),
   // 指令表查内径
   loadPipeDiameter: createPipeDiameterLoader(pool),
 })
@@ -140,6 +145,7 @@ automationManager = createAutomationManager({
       deviceNumber,
       'off',
       `自动启动失败：${reason}`,
+      'automatic',
     )
   },
   // 自动模式下指令, 还是复用之前的control发指令
@@ -168,9 +174,10 @@ const app = createApp({
   faultRepository,
   sensorHistoryRepository: createSensorHistoryRepository(pool),
   behaviorRepository,
-  recognitionService: createRecognitionService(behaviorRepository),
+  recognitionService: createRecognitionService(behaviorRepository, undefined, operationHistory),
   controlRepository,
   controlService,
+  operationHistory,
   automationManager,
   waterFlowService,
   operationalMetricsService,
@@ -192,6 +199,7 @@ const handleSensorReading = createSensorRealtimeHandler({
     operationalMetrics: operationalMetricsService,
     waterFlow: waterFlowService,
     websocket: realtimeWebSocket,
+    deviceActuatorHistory: createDeviceActuatorHistory(operationHistory),
   }),
 })
 sensorMqtt = createSensorMqtt({

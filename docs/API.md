@@ -292,11 +292,11 @@ Content-Type: application/json
 
 `time` 可省略，省略时使用后端当前本地时间。后端负责生成 `device/updateTime` 报文。
 
-### 操作日志
+### 操作历史
 
 ```http
 GET /operation-logs/options
-GET /operation-logs?page=1&pageSize=20&deviceNumber=e46488d793245429&result=success
+GET /operation-logs?page=1&pageSize=20&source=application&deviceNumber=e46488d793245429&result=success
 ```
 
-日志支持按设备编号、指令类型、结果及起止时间筛选，按操作时间和记录编号倒序分页。参数错误返回 HTTP 400，配置不存在返回 HTTP 404，MQTT 不可用返回 HTTP 503，数据库异常返回 HTTP 500。
+新项目只读写空表起步的 `t_operation_history`，旧项目继续使用 `t_direct_history`。`source` 仅允许 `application`（应用层）、`device`（设备）、`recognition`（智能识别）；列表提供操作时间、来源、设备编号、指令名称、类型、原值、新值、结果，不提供备注或原因。支持按来源、设备编号、指令类型、结果及起止时间筛选，按操作时间和记录编号倒序分页。参数错误返回 HTTP 400，配置不存在返回 HTTP 404，MQTT 不可用返回 HTTP 503，数据库异常返回 HTTP 500。

@@ -9,9 +9,11 @@ import type {
 } from 'mysql2/promise'
 
 import type { WaterFlowRepository } from './types.js'
+import type { OperationHistoryRepository } from '../operation-history/index.js'
 
 export const createWaterFlowRepository = (
   pool: Pool,
+  history: OperationHistoryRepository,
 ): WaterFlowRepository => ({
   async load(deviceNumber) {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -56,12 +58,13 @@ export const createWaterFlowRepository = (
          on duplicate key update total_volume = 0`,
         [deviceNumber],
       )
-      await connection.query(
-        `insert into t_direct_history
-         (direct_type, d_no, direct_name, old_value, new_value, result, remark)
-         values ('reset_total_volume', ?, '清零累计水量', ?, '0', 'success', '用户操作清零')`,
-        [deviceNumber, String(oldVolumeLiters)],
-      )
+      await history.record({
+        source: 'application', triggerMode: 'manual',
+        commandType: 'reset_total_volume', deviceNumber,
+        commandName: '清零累计水量',
+        oldValue: String(oldVolumeLiters), newValue: '0',
+        result: 'success',
+      }, connection)
       await connection.commit()
     }
     catch (error) {

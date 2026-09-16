@@ -21,6 +21,7 @@ import {
 import { createAutomationRouter, type AutomationManager } from './modules/automation/index.js'
 import type { WaterFlowService } from './modules/water-flow/index.js'
 import type { OperationalMetricsService } from './modules/operational-metrics/index.js'
+import type { OperationHistoryRepository } from './modules/operation-history/index.js'
 
 interface AppDependencies {
   deviceRepository: DeviceRepository
@@ -30,6 +31,7 @@ interface AppDependencies {
   recognitionService?: RecognitionService
   controlRepository?: ControlRepository
   controlService?: ControlService
+  operationHistory?: OperationHistoryRepository
   automationManager?: AutomationManager
   waterFlowService?: WaterFlowService
   operationalMetricsService?: OperationalMetricsService
@@ -43,6 +45,7 @@ export const createApp = ({
   recognitionService,
   controlRepository,
   controlService,
+  operationHistory,
   automationManager,
   waterFlowService,
   operationalMetricsService,
@@ -57,8 +60,8 @@ export const createApp = ({
   if (behaviorRepository && recognitionService) app.use('/api/behaviors', createBehaviorRouter(behaviorRepository, recognitionService))
   if (controlRepository && controlService) {
     app.use('/api/controls', createControlRouter(controlRepository, controlService))
-    app.use('/api/operation-logs', createOperationLogRouter(controlRepository))
   }
+  if (operationHistory) app.use('/api/operation-logs', createOperationLogRouter(operationHistory))
   if (
     automationManager
     && waterFlowService
@@ -73,6 +76,7 @@ export const createApp = ({
         controlRepository,
         waterFlowService,
         operationalMetricsService,
+        operationHistory,
       ),
     )
   }

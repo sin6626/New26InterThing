@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check:env": "tsx src/config/check-env.ts",
+    "migrate:operation-history": "tsx src/config/migrate-operation-history.ts",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run",

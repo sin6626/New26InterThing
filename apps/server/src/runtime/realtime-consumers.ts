@@ -6,6 +6,7 @@ import type { createOperationalMetricsService } from '../modules/operational-met
 import type { ParsedSensorMessage } from '../modules/realtime/adapters/sensor-message.js'
 import type { createWaterFlowService } from '../modules/water-flow/index.js'
 import type { createRealtimeWebSocket } from '../infrastructure/websocket/realtime-websocket.js'
+import type { createDeviceActuatorHistory } from '../modules/operation-history/index.js'
 
 interface Dependencies {
   automation: ReturnType<typeof createAutomationManager>
@@ -13,6 +14,7 @@ interface Dependencies {
   operationalMetrics: ReturnType<typeof createOperationalMetricsService>
   waterFlow: ReturnType<typeof createWaterFlowService>
   websocket: ReturnType<typeof createRealtimeWebSocket>
+  deviceActuatorHistory: ReturnType<typeof createDeviceActuatorHistory>
 }
 
 export function createRealtimeConsumers({
@@ -21,6 +23,7 @@ export function createRealtimeConsumers({
   operationalMetrics,
   waterFlow,
   websocket,
+  deviceActuatorHistory,
 }: Dependencies) {
   return [
     async (message: ParsedSensorMessage) => {
@@ -52,6 +55,10 @@ export function createRealtimeConsumers({
         reading,
         snapshot.state,
       )
+    },
+    async (message: ParsedSensorMessage) => {
+      const reading = normalizeAutomationReading(message.values, Date.now())
+      await deviceActuatorHistory(message.deviceNumber, reading)
     },
   ]
 }

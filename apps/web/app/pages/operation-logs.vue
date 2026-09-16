@@ -21,8 +21,8 @@ onMounted(() => void initialize())
 <template>
   <div class="mx-auto max-w-[1600px] space-y-4">
     <div>
-      <h1 class="m-0 text-2xl font-semibold text-slate-900">操作日志</h1>
-      <p class="mt-2 mb-0 text-sm text-slate-500">查询应用层下发和设备端上报记录</p>
+      <h1 class="m-0 text-2xl font-semibold text-slate-900">操作历史</h1>
+      <p class="mt-2 mb-0 text-sm text-slate-500">查询应用层、设备和智能识别操作记录</p>
     </div>
     <el-card shadow="never" class="rounded-xl border-slate-200">
       <el-form :inline="true" class="flex flex-wrap gap-y-3">
@@ -39,6 +39,13 @@ onMounted(() => void initialize())
               :label="item"
               :value="item"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="来源" class="mb-0">
+          <el-select v-model="filters.source" clearable placeholder="全部来源" style="width: 150px">
+            <el-option label="应用层" value="application" />
+            <el-option label="设备" value="device" />
+            <el-option label="智能识别" value="recognition" />
           </el-select>
         </el-form-item>
         <el-form-item label="指令类型" class="mb-0">
@@ -103,9 +110,9 @@ onMounted(() => void initialize())
       </template>
       <el-table v-loading="loading" :data="rows" stripe>
         <el-table-column prop="operatedAt" label="操作时间" width="180" />
-        <el-table-column label="方向" width="120">
+        <el-table-column label="来源" width="120">
           <template #default="scope">
-            {{ scope.row.direction === 'device' ? '设备端上报' : '应用层下发' }}
+            {{ scope.row.source === 'device' ? '设备' : scope.row.source === 'recognition' ? '智能识别' : '应用层' }}
           </template>
         </el-table-column>
         <el-table-column prop="deviceNumber" label="设备编号" min-width="165" />
@@ -120,7 +127,6 @@ onMounted(() => void initialize())
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="280" show-overflow-tooltip />
         <template #empty>
           <el-empty description="暂无操作日志" />
         </template>

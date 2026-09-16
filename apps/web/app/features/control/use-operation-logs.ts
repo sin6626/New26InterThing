@@ -16,6 +16,7 @@ export const useOperationLogs = () => {
   })
   const filters = reactive({
     deviceNumber: '',
+    source: '',
     commandType: '',
     result: '',
   })
@@ -34,6 +35,9 @@ export const useOperationLogs = () => {
         page: page.current,
         pageSize: page.size,
         deviceNumber: filters.deviceNumber || undefined,
+        source: filters.source
+          ? filters.source as 'application' | 'device' | 'recognition'
+          : undefined,
         commandType: filters.commandType || undefined,
         result: filters.result || undefined,
         startTime: timeRange.value
@@ -68,6 +72,7 @@ export const useOperationLogs = () => {
   const reset = () => {
     Object.assign(filters, {
       deviceNumber: '',
+      source: '',
       commandType: '',
       result: '',
     })

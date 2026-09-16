@@ -28,7 +28,13 @@ docs              API、里程碑、现场手册和新旧对照
 1. 安装 Node.js 和 pnpm，确保 MySQL 与 MQTT Broker 已启动。
 2. 复制 `.env.example` 为 `.env`，填写本机数据库和 MQTT 参数。
 3. 确保 `DB_NAME` 与 `contest_admin` 指向同一数据库。
-4. 执行：
+4. 首次切换到新项目操作历史时，执行一次幂等建表（新表从 0 条开始，不迁移旧记录）：
+
+```powershell
+pnpm migrate:operation-history
+```
+
+5. 执行：
 
 ```powershell
 pnpm install

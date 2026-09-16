@@ -1,6 +1,7 @@
 /**
  * 阅读导航：自动控制 HTTP 路由：校验页面请求并调用自动控制管理器；页面只发送意图，真正状态转换和安全决策在后端。
  * 入口位置：modules/automation/http.ts
+ * 自动模式下的接口
  */
 
 import {
@@ -18,6 +19,7 @@ import type { WaterFlowService } from '../water-flow/accumulate.js'
 import type { OperationalMetricsService } from '../operational-metrics/runtime.js'
 import type { AutomationManager } from './flows/manager.js'
 import { AutomationError } from './types.js'
+import type { OperationHistoryRepository } from '../operation-history/index.js'
 
 export const createAutomationRouter = (
   manager: AutomationManager,
@@ -25,16 +27,28 @@ export const createAutomationRouter = (
   controlRepository: ControlRepository,
   waterFlow: WaterFlowService,
   operationalMetrics?: OperationalMetricsService,
+  history?: OperationHistoryRepository,
 ): Router => {
   const router = Router()
 
+  // 查询是否是调试模式
   router.get('/debug-mode', (_request, response) => {
     response.json({ code: 0, message: '操作成功', data: manager.getDebugMode() })
   })
 
+  // 启动/关闭调试模式
   router.post('/debug-mode', (request, response, next) => {
+    const oldValue = manager.getDebugMode().enabled ? 'on' : 'off'
     void manager.setDebugMode(request.body?.enabled === true)
-      .then(data => response.json({ code: 0, message: '调试模式已更新', data }))
+      .then(async (data) => {
+        await history?.record({
+          source: 'application', triggerMode: 'manual',
+          commandType: 'debug_mode', commandName: '调试模式',
+          oldValue, newValue: data.enabled ? 'on' : 'off',
+          result: 'success',
+        })
+        response.json({ code: 0, message: '调试模式已更新', data })
+      })
       .catch(next)
   })
 
@@ -80,7 +94,7 @@ export const createAutomationRouter = (
     })
     return manager.getSnapshot(deviceNumber)
   }
-
+  // 旧项目的遗留接口
   router.post('/:deviceNumber/start', async (request, response, next) => {
     try {
       response.json({
@@ -94,6 +108,7 @@ export const createAutomationRouter = (
     }
   })
 
+  // 旧项目的遗留接口
   router.post('/:deviceNumber/stop', async (request, response, next) => {
     try {
       response.json({
@@ -107,19 +122,33 @@ export const createAutomationRouter = (
     }
   })
 
+  // 故障复位按钮的接口
   router.post('/:deviceNumber/fault/reset', async (request, response, next) => {
+    let data: Awaited<ReturnType<AutomationManager['resetFault']>>
     try {
-      response.json({
-        code: 0,
-        message: '故障已复位，系统保持停止',
-        data: await manager.resetFault(request.params.deviceNumber),
-      })
+      data = await manager.resetFault(request.params.deviceNumber)
     }
     catch (error) {
+      await Promise.resolve(history?.record({
+        source: 'application', triggerMode: 'manual',
+        commandType: 'fault_reset', deviceNumber: request.params.deviceNumber,
+        commandName: '故障复位', result: 'failed',
+      })).catch(() => undefined)
       handleKnownError(error, response, next)
+      return
     }
+    try {
+      await history?.record({
+        source: 'application', triggerMode: 'manual',
+        commandType: 'fault_reset', deviceNumber: request.params.deviceNumber,
+        commandName: '故障复位', oldValue: 'fault', newValue: 'stopped',
+        result: 'success',
+      })
+      response.json({ code: 0, message: '故障已复位，系统保持停止', data })
+    } catch (error) { next(error) }
   })
 
+  // 累计水量清零的接口
   router.post('/:deviceNumber/water-flow/reset', async (request, response, next) => {
     try {
       response.json({

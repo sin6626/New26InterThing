@@ -48,14 +48,14 @@ export interface OperationLogItem {
   oldValue: string | null
   newValue: string | null
   result: string
-  direction: 'application' | 'device'
-  remark: string | null
+  source: 'application' | 'device' | 'recognition'
 }
 
 export interface OperationLogQuery {
   page: number
   pageSize: number
   deviceNumber?: string
+  source?: 'application' | 'device' | 'recognition'
   commandType?: string
   result?: string
   startTime?: string

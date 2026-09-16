@@ -3,12 +3,7 @@
  * 入口位置：modules/control/types.ts
  */
 
-import type {
-  ControlSnapshot,
-  OperationLogOptions,
-  OperationLogQuery,
-  PaginatedOperationLogs,
-} from '@new26interthing/shared'
+import type { ControlSnapshot } from '@new26interthing/shared'
 
 export interface ControlDefinition {
   configId: number
@@ -28,10 +23,8 @@ export interface ControlRepository {
   getSnapshot(deviceNumber: string): Promise<ControlSnapshot>
   getDefinition(deviceNumber: string, configId: number): Promise<ControlDefinition | null>
   getDefinitionByTopic?(topic: string): Promise<ControlDefinition | null>
-  saveSuccess(definition: ControlDefinition, deviceNumber: string, value: string, remark: string): Promise<void>
-  saveFailure(definition: ControlDefinition, deviceNumber: string, value: string, remark: string): Promise<void>
+  saveSuccess(definition: ControlDefinition, deviceNumber: string, value: string, remark: string, triggerMode?: 'manual' | 'automatic'): Promise<void>
+  saveFailure(definition: ControlDefinition, deviceNumber: string, value: string, remark: string, triggerMode?: 'manual' | 'automatic'): Promise<void>
   applyDeviceReport(deviceNumber: string, configId: number, value: string): Promise<void>
   saveTimeSync(deviceNumber: string, value: string, result: string, remark: string): Promise<void>
-  getLogOptions(): Promise<OperationLogOptions>
-  listLogs(query: OperationLogQuery): Promise<Omit<PaginatedOperationLogs, 'page' | 'pageSize'>>
 }

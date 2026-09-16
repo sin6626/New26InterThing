@@ -70,6 +70,23 @@ describe('control service', () => {
     expect(repo.saveFailure).not.toHaveBeenCalled()
   })
 
+  it('marks state-machine commands as automatic in operation history', async () => {
+    const repo = repository()
+    const service = createControlService(repo, { publish: vi.fn() })
+
+    await service.executeAutomation({
+      deviceNumber: '202111', configId: 23, value: 'on',
+    })
+
+    expect(repo.saveSuccess).toHaveBeenCalledWith(
+      definition,
+      '202111',
+      'on',
+      '应用层下发；MQTT发布成功',
+      'automatic',
+    )
+  })
+
   it('records a failed publish without saving the expected value', async () => {
     const repo = repository()
     const safety = allowSafety()
@@ -138,6 +155,7 @@ describe('control service', () => {
       '202111',
       '35',
       '应用层配置保存（无需MQTT下发）',
+      'manual',
     )
   })
 

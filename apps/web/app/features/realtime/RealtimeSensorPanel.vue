@@ -11,8 +11,8 @@ const props = defineProps<{
   realtime: boolean
 }>()
 
-const fieldLabels = computed(() => new Map(
-  props.fields.map(field => [field.key, field.label]),
+const fieldDetails = computed(() => new Map(
+  props.fields.map(field => [field.key, field]),
 ))
 </script>
 
@@ -40,10 +40,13 @@ const fieldLabels = computed(() => new Map(
         class="rounded-lg bg-slate-50 p-5"
       >
         <p class="m-0 text-sm text-slate-500">
-          {{ fieldLabels.get(name) || name }}
+          {{ fieldDetails.get(name)?.label || name }}
         </p>
         <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-          {{ value ?? '--' }}
+          {{ value ?? '--' }}<span
+            v-if="value != null && fieldDetails.get(name)?.unit"
+            class="ml-1 text-base font-normal text-slate-500"
+          >{{ fieldDetails.get(name)?.unit }}</span>
         </p>
       </div>
     </div>

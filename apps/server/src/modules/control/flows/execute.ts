@@ -135,6 +135,13 @@ export const createControlService = (
         await automation.setEnabled(intent.deviceNumber, value === 'on')
       }
       catch (error) {
+        await Promise.resolve(repository.saveFailure(
+          definition,
+          intent.deviceNumber,
+          value,
+          '自动模式切换失败',
+          trustedAutomation ? 'automatic' : 'manual',
+        )).catch(() => undefined)
         if (error instanceof ControlError) throw error
         throw new ControlError(error instanceof Error ? error.message : String(error), 409)
       }
@@ -167,6 +174,7 @@ export const createControlService = (
           intent.deviceNumber,
           value,
           `应用层下发失败：${message}`,
+          trustedAutomation ? 'automatic' : 'manual',
         )).catch(() => undefined)
         const status = error
           && typeof error === 'object'
@@ -186,6 +194,7 @@ export const createControlService = (
         intent.deviceNumber,
         value,
         shouldPublish ? '应用层下发；MQTT发布成功' : '应用层配置保存（无需MQTT下发）',
+        trustedAutomation ? 'automatic' : 'manual',
       )
     }
     catch {

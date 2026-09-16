@@ -9,6 +9,7 @@ import {
 import { createApp } from '../src/app.js'
 import type { ControlRepository } from '../src/modules/control/types.js'
 import type { ControlService } from '../src/modules/control/flows/execute.js'
+import type { OperationHistoryRepository } from '../src/modules/operation-history/index.js'
 
 const servers: Array<{ close(): void }> = []
 
@@ -26,6 +27,10 @@ const createRepository = (): ControlRepository => ({
   saveFailure: vi.fn(),
   applyDeviceReport: vi.fn(),
   saveTimeSync: vi.fn(),
+})
+
+const createHistory = (): OperationHistoryRepository => ({
+  record: vi.fn(),
   getLogOptions: vi.fn().mockResolvedValue({
     deviceNumbers: ['e46488d793245429'],
     commandTypes: ['pump'],
@@ -39,6 +44,7 @@ const createRepository = (): ControlRepository => ({
 
 const startServer = async () => {
   const controlRepository = createRepository()
+  const operationHistory = createHistory()
   const controlService = {
     execute: vi.fn().mockResolvedValue({
       configId: 23,
@@ -63,6 +69,7 @@ const startServer = async () => {
     },
     controlRepository,
     controlService,
+    operationHistory,
   })
   const server = app.listen(0)
   servers.push(server)
@@ -75,6 +82,7 @@ const startServer = async () => {
     baseUrl: `http://127.0.0.1:${address.port}`,
     controlRepository,
     controlService,
+    operationHistory,
   }
 }
 
@@ -121,13 +129,13 @@ describe('control HTTP API', () => {
   })
 
   it('returns filtered operation logs in the common envelope', async () => {
-    const { baseUrl, controlRepository } = await startServer()
+    const { baseUrl, operationHistory } = await startServer()
     const response = await fetch(
       `${baseUrl}/api/operation-logs?page=2&pageSize=10&result=success`,
     )
 
     expect(response.status).toBe(200)
-    expect(controlRepository.listLogs).toHaveBeenCalledWith({
+    expect(operationHistory.listLogs).toHaveBeenCalledWith({
       page: 2,
       pageSize: 10,
       result: 'success',
@@ -144,13 +152,25 @@ describe('control HTTP API', () => {
     })
   })
 
+  it('accepts only the three supported operation sources', async () => {
+    const { baseUrl, operationHistory } = await startServer()
+    const accepted = await fetch(`${baseUrl}/api/operation-logs?source=recognition`)
+    const rejected = await fetch(`${baseUrl}/api/operation-logs?source=unknown`)
+
+    expect(accepted.status).toBe(200)
+    expect(operationHistory.listLogs).toHaveBeenCalledWith({
+      page: 1, pageSize: 20, source: 'recognition',
+    })
+    expect(rejected.status).toBe(400)
+  })
+
   it('rejects calendar-invalid operation log dates', async () => {
-    const { baseUrl, controlRepository } = await startServer()
+    const { baseUrl, operationHistory } = await startServer()
     const response = await fetch(
       `${baseUrl}/api/operation-logs?startTime=2026-99-99%2088%3A00%3A00`,
     )
 
     expect(response.status).toBe(400)
-    expect(controlRepository.listLogs).not.toHaveBeenCalled()
+    expect(operationHistory.listLogs).not.toHaveBeenCalled()
   })
 })

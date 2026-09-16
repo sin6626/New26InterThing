@@ -12,6 +12,7 @@ import {
 import { z } from 'zod'
 
 import type { ControlRepository } from './types.js'
+import type { OperationHistoryRepository } from '../operation-history/index.js'
 import {
   ControlError,
   type ControlService,
@@ -45,6 +46,7 @@ const logSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   deviceNumber: z.string().trim().min(1).optional(),
+  source: z.enum(['application', 'device', 'recognition']).optional(),
   commandType: z.string().trim().min(1).optional(),
   result: z.string().trim().min(1).optional(),
   startTime: dateTime.optional(),
@@ -134,7 +136,7 @@ export const createControlRouter = (
 
 // 操作日志相关的接口
 export const createOperationLogRouter = (
-  repository: ControlRepository,
+  repository: OperationHistoryRepository,
 ): ExpressRouter => {
   const router = Router()
   // 操作历史页面的下拉框

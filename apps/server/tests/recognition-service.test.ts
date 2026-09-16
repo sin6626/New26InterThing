@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { BehaviorRepository } from '../src/modules/behavior/types.js'
 import { createRecognitionAdapter } from '../src/modules/behavior/adapters/recognition.http.js'
 import { createRecognitionService } from '../src/modules/behavior/flows/recognize.js'
+import type { OperationHistoryRepository } from '../src/modules/operation-history/types.js'
 
 const configPath = path.resolve(process.cwd(), 'tests/fixtures/recognition.json')
 const emptyConfigPath = path.resolve(process.cwd(), 'tests/fixtures/recognition-empty.json')
@@ -25,6 +26,28 @@ describe('recognition service', () => {
       method: 'POST', body: JSON.stringify({ samples: [{ deviceNumber: '202111', recordedAt: '2026-09-12 10:00:00', pressure: 12 }], count: 1 }),
     }))
     expect(repository.saveRecognitionResult).toHaveBeenCalledWith({ action: '装载' }, '202111')
+  })
+
+  it('separates the manual request from the model result in operation history', async () => {
+    const record = vi.fn()
+    const history = { record } as unknown as OperationHistoryRepository
+    const repository = {
+      getRecognitionRows: vi.fn().mockResolvedValue([{ deviceNumber: '202111' }]),
+      saveRecognitionResult: vi.fn().mockResolvedValue(88),
+    } as unknown as BehaviorRepository
+    const service = createRecognitionService(
+      repository,
+      { recognize: vi.fn().mockResolvedValue({ action: '装载' }) },
+      history,
+    )
+
+    await service.recognize([9])
+    expect(record).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      source: 'application', commandType: 'recognition_request',
+    }))
+    expect(record).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      source: 'recognition', result: 'success', relatedId: 88,
+    }))
   })
 
   it('does not call the external interface when a selected row no longer exists', async () => {
