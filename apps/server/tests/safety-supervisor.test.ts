@@ -402,27 +402,96 @@ describe('safety supervisor', () => {
     })
   })
 
-  it('confirms reversed probes only while inlet stays above outlet', () => {
+  it('ignores reversed temperatures while building flow and starts observing after running', () => {
     let now = 1_000
     const supervisor = createSafetySupervisor(() => now)
     const reversedReading = () => ({
       ...reading(now),
       inletTemperature: 32,
       outletTemperature: 31,
-      actualHeater: 'on' as const,
     })
-    supervisor.handleReading(reversedReading(), context({ desiredHeater: 'on' }))
-    now = 4_000
+
+    supervisor.handleReading(reversedReading(), context({ state: 'building-flow' }))
+    now = 7_000
     expect(supervisor.handleReading(
       reversedReading(),
-      context({ desiredHeater: 'on' }),
+      context({ state: 'building-flow' }),
     )).toBeNull()
+    now = 8_000
+    expect(supervisor.handleReading(reversedReading(), context())).toBeNull()
+    now = 13_000
+
+    expect(supervisor.handleReading(reversedReading(), context())).toMatchObject({
+      faultCode: 'TEMP_SENSOR_REVERSED',
+    })
+  })
+
+  it('accumulates reversed-temperature evidence across dead-band jitter without requiring heat', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const configuredContext = context({
+      config: { ...config, dataTimeoutSeconds: 10 },
+    })
+
+    supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)
+    now = 4_000
+    expect(supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.2,
+      outletTemperature: 31,
+      flowRate: 0.45,
+    }, configuredContext)).toBeNull()
     now = 6_000
 
-    expect(supervisor.handleReading(
-      reversedReading(),
-      context({ desiredHeater: 'on' }),
-    )).toMatchObject({ faultCode: 'TEMP_SENSOR_REVERSED' })
+    expect(supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)).toBeNull()
+    now = 9_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)).toMatchObject({ faultCode: 'TEMP_SENSOR_REVERSED' })
+  })
+
+  it('reduces reversed-temperature evidence only after a clearly normal temperature direction', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const configuredContext = context({
+      config: { ...config, dataTimeoutSeconds: 10 },
+    })
+
+    supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)
+    now = 5_000
+    supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 30.8,
+      outletTemperature: 31,
+    }, configuredContext)
+    now = 6_000
+    expect(supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)).toBeNull()
+    now = 10_000
+
+    expect(supervisor.handleReading({
+      ...reading(now),
+      inletTemperature: 31.4,
+      outletTemperature: 31,
+    }, configuredContext)).toMatchObject({ faultCode: 'TEMP_SENSOR_REVERSED' })
   })
 
   it('detects no outlet temperature rise after effective heating time', () => {

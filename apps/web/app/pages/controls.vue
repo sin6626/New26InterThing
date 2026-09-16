@@ -20,6 +20,7 @@ const {
 
 const {
   loading: automationLoading,
+  operationalMetrics,
   resetting: resettingWaterFlow,
   resettingFault,
   resetFault,
@@ -248,6 +249,7 @@ onMounted(() => void initialize())
 
     <WaterFlowMetricsPanel
       :snapshot="automation?.waterFlow"
+      :operational-metrics="operationalMetrics"
       :loading="automationLoading"
       :resetting="resettingWaterFlow"
       :disabled="!selectedDevice"

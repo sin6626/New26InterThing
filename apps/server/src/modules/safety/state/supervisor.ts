@@ -29,7 +29,10 @@ import {
 import { hasOverPressure } from '../rules/over-pressure.js'
 import { hasOverTemperature } from '../rules/over-temperature.js'
 import { getSensorTimeoutFault } from '../rules/sensor-timeout.js'
-import { hasConfirmedReversedTemperature } from '../rules/temperature-reversed.js'
+import {
+  accumulateReversedTemperatureEvidence,
+  hasConfirmedReversedTemperature,
+} from '../rules/temperature-reversed.js'
 import { safetyFaultDetails } from '../faults/definitions.js'
 
 export const createSafetySupervisor = (clock: () => number = Date.now) => {
@@ -43,10 +46,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let lockedDecision: SafetyDecision | null = null
   let occurredAt: number | null = null
   let latestContext: SafetyContext | null = null
-  // “Since” 保存某条件第一次成立的时间：条件连续成立足够久才触发慢规则；
-  // 一旦读数恢复，下面的 handleReading 会清空起点重新计时。
+  // 低流使用连续起点；装反使用可暂停、可消退的异常证据，分别过滤不同类型的抖动。
   let lowFlowSince: number | null = null
-  let reversedSince: number | null = null
+  let reversedEvidenceMilliseconds = 0
+  let lastReversedObservationAt: number | null = null
   let heatingBaseline: number | null = null
   let effectiveHeatingMilliseconds = 0
   let lastEffectiveHeatingAt: number | null = null
@@ -152,7 +155,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       (sensors.value('inletTemperature') ?? Infinity) >= context.config.maxSafeTemperature
       || (sensors.value('outletTemperature') ?? Infinity) >= context.config.maxSafeTemperature
     ) return '当前水温达到安全上限'
-    if (reversedSince !== null) return '正在确认温度探头方向'
+    if (reversedEvidenceMilliseconds > 0) return '正在确认温度探头方向'
     return null
   }
 
@@ -188,7 +191,7 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     if (hasConfirmedLowFlow(now, lowFlowSince, context.config)) {
       return latch(context.state === 'building-flow' ? 'BUILD_FLOW_TIMEOUT' : 'LOW_FLOW')
     }
-    if (hasConfirmedReversedTemperature(now, reversedSince, context.config)) {
+    if (hasConfirmedReversedTemperature(reversedEvidenceMilliseconds, context.config)) {
       return latch('TEMP_SENSOR_REVERSED', { stopPump: false })
     }
     if (hasHeatingNoRise({
@@ -359,19 +362,41 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
         lowFlowSince = null
       }
 
+      const monitorReversedTemperature = context.state === 'running'
+        || monitorEstablishedManualPump
+      if (
+        monitorReversedTemperature
+        && reading.inletTemperature !== null
+        && Number.isFinite(reading.inletTemperature)
+        && reading.outletTemperature !== null
+        && Number.isFinite(reading.outletTemperature)
+      ) {
+        const observedAt = clock()
+        const elapsedMilliseconds = lastReversedObservationAt === null
+          ? 0
+          : observedAt - lastReversedObservationAt
+        // 报文间隔超过数据超时说明观察不连续，不能把离线空档算作异常证据。
+        if (elapsedMilliseconds > context.config.dataTimeoutSeconds * 1_000) {
+          reversedEvidenceMilliseconds = 0
+        }
+        reversedEvidenceMilliseconds = accumulateReversedTemperatureEvidence(
+          reversedEvidenceMilliseconds,
+          Math.max(0, elapsedMilliseconds),
+          reading.inletTemperature,
+          reading.outletTemperature,
+        )
+        lastReversedObservationAt = observedAt
+      }
+      else {
+        // 建流、停止、冷却和故障阶段都重新开始观察，避免跨状态继承旧证据。
+        reversedEvidenceMilliseconds = 0
+        lastReversedObservationAt = null
+      }
+
       const heatingEffective = reading.actualPump === 'on'
         && reading.actualHeater === 'on'
         && reading.flowRate !== null
         && reading.flowRate >= context.config.minSafeFlow
-      // 装反与无温升都只在“设备实际有效加热”时观察。入口温度高于出口温度
-      // 并不会立刻报警，而是持续达到 temp_reversed_confirm_time 才锁故障。
-      if (
-        heatingEffective
-        && reading.inletTemperature !== null
-        && reading.outletTemperature !== null
-        && reading.inletTemperature > reading.outletTemperature
-      ) reversedSince ??= clock()
-      else reversedSince = null
 
       if (heatingEffective && reading.outletTemperature !== null) {
         // 无温升规则累计的是有效加热时间；停热或建流阶段不应把墙上时间算进去。
@@ -465,7 +490,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       lockedDecision = null
       occurredAt = null
       lowFlowSince = null
-      reversedSince = null
+      reversedEvidenceMilliseconds = 0
+      lastReversedObservationAt = null
       effectiveHeatingMilliseconds = 0
       lastEffectiveHeatingAt = null
       heatingBaseline = null

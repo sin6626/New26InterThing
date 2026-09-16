@@ -1,14 +1,27 @@
 /**
- * 阅读导航：探头装反确认规则：入口温度持续高于出口温度达到配置时间才锁故障；相等属于正常边界。
+ * 阅读导航：探头装反确认规则：用温差死区累计异常证据，避免单包抖动把确认进度清零。
  * 入口位置：modules/safety/rules/temperature-reversed.ts
  */
 
 import type { SafetyConfig } from '../types.js'
 
 export const hasConfirmedReversedTemperature = (
-  now: number,
-  reversedSince: number | null,
+  evidenceMilliseconds: number,
   config: SafetyConfig,
-) => reversedSince !== null
-  // 入口>出口的起点由监督器设置；这里仅判断连续时间是否到达后台确认秒数。
-  && now - reversedSince >= config.temperatureReversedConfirmSeconds * 1_000
+) => evidenceMilliseconds >= config.temperatureReversedConfirmSeconds * 1_000
+
+export const accumulateReversedTemperatureEvidence = (
+  evidenceMilliseconds: number,
+  elapsedMilliseconds: number,
+  inletTemperature: number,
+  outletTemperature: number,
+) => {
+  const difference = inletTemperature - outletTemperature
+  // 入口至少高 0.3℃才累计；-0.1℃～0.3℃属于传感器抖动死区，保留已有进度。
+  if (difference >= 0.3) return evidenceMilliseconds + elapsedMilliseconds
+  // 出口明确高于入口后，以两倍速度消退旧证据，短暂恢复不会立刻清零。
+  if (difference < -0.1) {
+    return Math.max(0, evidenceMilliseconds - elapsedMilliseconds * 2)
+  }
+  return evidenceMilliseconds
+}
