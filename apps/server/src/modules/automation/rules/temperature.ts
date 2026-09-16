@@ -44,6 +44,10 @@ export const createTemperatureController = (
   let overshootBlocked = false
 
   return {
+    /**
+     * 重置自动控制当前状态；只清理本函数负责的数据，不会隐式启动设备。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     reset() {
       integral = 0
       previousTemperature = undefined
@@ -52,6 +56,13 @@ export const createTemperatureController = (
       overshootBlocked = false
     },
 
+    /**
+     * 更新自动控制状态，并返回或广播更新后的结果。
+     * @param temperature 当前用于温控计算的温度值。
+     * @param config 从后台配置读取并校验后的业务参数。
+     * @param _current 兼容状态更新接口保留的当前值，本实现无需直接使用。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     update(
       temperature: number,
       config: PidConfig,

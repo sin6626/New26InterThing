@@ -16,6 +16,12 @@ export interface MonitoringConfig {
   diagnosisConfirmSeconds: number
 }
 
+/**
+ * 创建监控配置模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param pool MySQL 连接池，供仓储执行参数化查询和事务。
+ * @param clock 可替换的时钟函数，生产使用系统时间，测试可固定时间。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createMonitoringConfigLoader = (
   pool: Pool,
   clock: () => number = Date.now,
@@ -39,6 +45,11 @@ export const createMonitoringConfigLoader = (
        )`,
     )
     const values = new Map(rows.map(row => [String(row.topic), Number(row.value)]))
+    /**
+     * 读取必须大于零的监控配置，缺失或非法时抛出带字段名的错误。
+     * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     const positive = (topic: string) => {
       const value = values.get(topic)
       if (value === undefined || !Number.isFinite(value) || value <= 0) {

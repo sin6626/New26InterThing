@@ -27,7 +27,17 @@ interface CountRow extends RowDataPacket {
   total: number
 }
 
+/**
+ * 创建设备状态模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param pool MySQL 连接池，供仓储执行参数化查询和事务。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createDeviceRepository = (pool: Pool): DeviceRepository => ({
+  /**
+   * 按照查询条件读取设备状态列表，并返回分页或筛选结果。
+   * @param query 页面提交的筛选、分页或时间范围条件。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async list(query) {
     const filters: string[] = []
     const filterValues: string[] = []

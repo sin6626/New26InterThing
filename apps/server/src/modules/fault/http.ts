@@ -10,6 +10,11 @@ import { z } from 'zod'
 
 import type { FaultRepository } from './ports.js'
 
+/**
+ * 检查字符串能否解析为有效日期时间，阻止非法范围进入数据库查询。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const isValidDateTime = (value: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
   if (!match) return false
@@ -33,10 +38,20 @@ const listSchema = z.object({
   ...filters,
 }).refine((query) => !query.startTime || !query.endTime || query.startTime <= query.endTime)
 
+/**
+ * 生成统一的查询参数错误响应，供 HTTP 路由直接返回。
+ * @param response Express 响应对象，用于返回统一 JSON。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const invalidQuery = (response: Response) => {
   response.status(400).json({ code: 400, message: '请求参数错误', data: null })
 }
 
+/**
+ * 创建故障信息模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createFaultRouter = (repository: FaultRepository): ExpressRouter => {
   const router = Router()
 

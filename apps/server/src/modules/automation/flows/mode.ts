@@ -40,6 +40,13 @@ interface Dependencies {
   getSnapshot(): Promise<AutomationSnapshot>
 }
 
+/**
+ * 判断当前是否已有足够新鲜的设备读数允许启动自动模式。
+ * @param reading 已经规范化的本次设备实时读数。
+ * @param config 从后台配置读取并校验后的业务参数。
+ * @param now 当前服务器时间戳，单位为毫秒。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const hasUsableReading = (
   reading: AutomationReading | null,
   config: AutomationConfig,
@@ -56,6 +63,11 @@ const hasUsableReading = (
 
 /** 只处理自动模式启停；启动先校验数据和安全状态，再按顺序开启水泵。 */
 export const createAutomationModeControl = (dependencies: Dependencies) => ({
+  /**
+   * 更新自动控制状态，并返回或广播更新后的结果。
+   * @param nextEnabled 用户本次要求切换到的自动模式状态。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   setEnabled(nextEnabled: boolean) {
     return dependencies.runExclusive(async () => {
       if (dependencies.isEnabled() === nextEnabled) {

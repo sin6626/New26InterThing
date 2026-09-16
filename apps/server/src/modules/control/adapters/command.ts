@@ -14,6 +14,12 @@ interface CommandDefinition {
   value: string
 }
 
+/**
+ * 确认输入是普通对象后再返回，避免模板解析访问无效结构。
+ * @param value 本次准备读取、转换或保存的值。
+ * @param name 需要匹配或展示的字段名称。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const parseObject = (
   value: string | null,
   name: string,
@@ -32,6 +38,12 @@ const parseObject = (
 }
 
 // 根据开关on/off 正确的映射成为他们设备端能识别的指令
+/**
+ * 把指令模板占位符替换为本次控制值，生成最终 MQTT 载荷。
+ * @param value 本次准备读取、转换或保存的值。
+ * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const replaceTemplate = (
   value: unknown,
   context: Record<string, unknown>,

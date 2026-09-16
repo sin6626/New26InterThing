@@ -55,6 +55,12 @@ export const createAutomationProtection = ({
   let lastHeaterCloseAttempt = Number.NEGATIVE_INFINITY
   let lastPumpCloseAttempt = Number.NEGATIVE_INFINITY
 
+  /**
+   * 根据保护决定关闭加热或水泵，避免重复发布已满足的关闭指令。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @param firstEntry 窗口内最早的一条累计量记录。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const closeIfNeeded = async (
     topic: 'pump' | 'heater',
     firstEntry: boolean,
@@ -73,6 +79,11 @@ export const createAutomationProtection = ({
   }
 
   return {
+    /**
+     * 执行一次自动控制业务操作，按照模块规则更新状态和外部副作用。
+     * @param decision 安全监督器已经确认的故障与保护动作。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async apply(decision: SafetyDecision) {
       // 先在内存中锁定故障并把期望状态转为关闭，再发布设备关机指令。
       // 即使 MQTT 发布失败，也不能把状态机恢复成“正常运行”。
@@ -122,6 +133,10 @@ export const createAutomationProtection = ({
           })
       }
     },
+    /**
+     * 冷却延时结束后关闭水泵，并更新保护动作的完成状态。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async stopPumpAfterCooling() {
       // 只有限时散热故障进入这里；一到截止时间，尝试关泵直到设备反馈关闭。
       if (faultPumpStopAt === null || clock() < faultPumpStopAt) return
@@ -134,9 +149,17 @@ export const createAutomationProtection = ({
       lastPumpCloseAttempt = clock()
       await actuator.run('pump', 'off', true)
     },
+    /**
+     * 返回故障是否已经入库以及上报失败原因，供自动快照展示。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     reportingSnapshot() {
       return { faultRecorded, faultRecordError }
     },
+    /**
+     * 重置自动控制当前状态；只清理本函数负责的数据，不会隐式启动设备。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     reset() {
       reportingGeneration += 1
       reportedFaultCode = null

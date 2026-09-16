@@ -38,6 +38,11 @@ export const createAutomationManualControl = ({
   let emergencyOffGeneration = 0
   const emergencyOffPublishers = new Map<'pump' | 'heater', () => Promise<void>>()
 
+  /**
+   * 人工指令成功后把结果同步进自动引擎，避免两套状态互相覆盖。
+   * @param action 待安全授权或执行的设备控制动作。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const adopt = (action: SafetyAction) => {
     adoptPublished(action.topic, action.value)
     if (action.topic === 'pump') {
@@ -45,6 +50,12 @@ export const createAutomationManualControl = ({
     }
   }
 
+  /**
+   * 执行一次自动控制业务操作，按照模块规则更新状态和外部副作用。
+   * @param action 待安全授权或执行的设备控制动作。
+   * @param publish 真正执行 MQTT 发布的底层函数。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const execute = (
     action: SafetyAction,
     publish: () => Promise<void>,

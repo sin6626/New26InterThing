@@ -17,6 +17,10 @@ interface SensorFact {
   invalid: boolean
 }
 
+/**
+ * 创建安全保护模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const createFact = (): SensorFact => ({
   value: null,
   updatedAt: null,
@@ -32,6 +36,12 @@ export const createSensorFreshness = (clock: () => number) => {
     outletTemperature: createFact(),
   }
 
+  /**
+   * 判断指定传感器事实是否仍在数据超时时间内有效。
+   * @param key 需要读取、更新或校验的状态字段名称。
+   * @param timeoutSeconds 允许等待的最长秒数。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const isFresh = (key: SensorKey, timeoutSeconds: number) => {
     const fact = facts[key]
     if (fact.invalid || fact.updatedAt === null) return false
@@ -40,6 +50,14 @@ export const createSensorFreshness = (clock: () => number) => {
   }
 
   return {
+    /**
+     * 更新安全保护状态，并返回或广播更新后的结果。
+     * @param key 需要读取、更新或校验的状态字段名称。
+     * @param value 本次准备读取、转换或保存的值。
+     * @param recordedAt 本次读数的服务器接收时间戳，单位为毫秒。
+     * @param zeroInvalid 是否把持续零值视为传感器无效。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     update(
       key: SensorKey,
       value: number | null,
@@ -56,13 +74,29 @@ export const createSensorFreshness = (clock: () => number) => {
       fact.updatedAt = recordedAt
       fact.invalid = false
     },
+    /**
+     * 返回指定传感器最近一次有效数值；无有效事实时返回空值。
+     * @param key 需要读取、更新或校验的状态字段名称。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     value(key: SensorKey) {
       return facts[key].value
     },
+    /**
+     * 主动把指定传感器事实标记为无效，供持续零值等规则使用。
+     * @param key 需要读取、更新或校验的状态字段名称。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     invalidate(key: SensorKey) {
       facts[key].invalid = true
     },
     isFresh,
+    /**
+     * 根据最近值和更新时间返回传感器正常、无效或超时状态。
+     * @param key 需要读取、更新或校验的状态字段名称。
+     * @param timeoutSeconds 允许等待的最长秒数。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     status(key: SensorKey, timeoutSeconds?: number): SensorSafetyStatus {
       const fact = facts[key]
       if (fact.invalid) return 'invalid'

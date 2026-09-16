@@ -26,10 +26,20 @@ const trendQuerySchema = z.object({
   ...filters,
 }).refine((query) => !query.startTime || !query.endTime || query.startTime <= query.endTime)
 
+/**
+ * 生成统一的查询参数错误响应，供 HTTP 路由直接返回。
+ * @param response Express 响应对象，用于返回统一 JSON。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const invalidQuery = (response: Response) => {
   response.status(400).json({ code: 400, message: '请求参数错误', data: null })
 }
 
+/**
+ * 创建传感器历史模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createSensorHistoryRouter = (repository: SensorHistoryRepository): ExpressRouter => {
   const router = Router()
 

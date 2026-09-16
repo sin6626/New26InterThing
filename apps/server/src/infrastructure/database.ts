@@ -7,6 +7,11 @@ import mysql from 'mysql2/promise'
 
 import type { AppEnv } from '../config/env.js'
 
+/**
+ * 创建基础设施模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param env 已经校验过的后端环境配置。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createDatabasePool = (env: AppEnv) =>
   mysql.createPool({
     host: env.DB_HOST,

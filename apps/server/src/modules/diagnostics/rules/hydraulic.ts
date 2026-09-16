@@ -17,6 +17,13 @@ interface HydraulicThresholds {
   maxSafePressure: number
 }
 
+/**
+ * 比较当前和上一组水力数据，判断是否出现需要立即关注的骤降。
+ * @param samples 参与窗口计算的历史采样点。
+ * @param pressure 当前管路压力读数。
+ * @param flowRate 当前设备上报的流量读数。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const hasSuddenDrop = (
   samples: HydraulicSample[],
   pressure: number,

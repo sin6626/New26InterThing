@@ -28,6 +28,11 @@ const reportableCodes = new Set<HydraulicDiagnosisCode>([
   'HYDRAULIC_LEAK_OR_BURST', // 压力 + 流量骤降 水管爆了
 ])
 
+/**
+ * 创建水力诊断模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createHydraulicDiagnosisManager = ({
   loadConfig,
   emit,
@@ -42,6 +47,13 @@ export const createHydraulicDiagnosisManager = ({
   const reportedCodes = new Map<string, HydraulicDiagnosisCode>()
 
   return {
+    /**
+     * 处理设备的一包实时读数，推进水力诊断状态并返回最新结果。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @param reading 已经规范化的本次设备实时读数。
+     * @param automationState 设备当前所处的自动水循环状态。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async handleReading(
       deviceNumber: string,
       reading: AutomationReading,

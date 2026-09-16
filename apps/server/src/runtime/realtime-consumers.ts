@@ -17,6 +17,11 @@ interface Dependencies {
   deviceActuatorHistory: ReturnType<typeof createDeviceActuatorHistory>
 }
 
+/**
+ * 创建运行时装配模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export function createRealtimeConsumers({
   automation,
   hydraulicDiagnosis,

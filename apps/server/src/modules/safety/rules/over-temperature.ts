@@ -5,6 +5,12 @@
 
 import type { SafetyConfig, SafetyReading } from '../types.js'
 
+/**
+ * 判断安全保护当前是否满足对应业务条件；本函数不主动执行外部操作。
+ * @param reading 已经规范化的本次设备实时读数。
+ * @param config 从后台配置读取并校验后的业务参数。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const hasOverTemperature = (
   reading: SafetyReading,
   config: SafetyConfig,

@@ -21,6 +21,16 @@ import type { AutomationManager } from './flows/manager.js'
 import { AutomationError } from './types.js'
 import type { OperationHistoryRepository } from '../operation-history/index.js'
 
+/**
+ * 创建自动控制模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param manager 管理各设备自动控制引擎的入口模块。
+ * @param controls 人工和自动控制共用的指令执行流程。
+ * @param controlRepository 指令配置和当前值的仓储接口。
+ * @param waterFlow 累计水量和实时流速计算模块。
+ * @param operationalMetrics 泵、加热运行时长和温升速率统计模块。
+ * @param history 操作历史仓储，用于记录本次动作的来源和结果。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createAutomationRouter = (
   manager: AutomationManager,
   controls: ControlService,
@@ -52,6 +62,13 @@ export const createAutomationRouter = (
       .catch(next)
   })
 
+  /**
+   * 把已知业务错误转换为对应 HTTP 状态，未知异常继续交给全局错误处理中间件。
+   * @param error 执行过程中捕获的异常。
+   * @param response Express 响应对象，用于返回统一 JSON。
+   * @param next Express 后续错误处理函数。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const handleKnownError = (
     error: unknown,
     response: Response,
@@ -82,6 +99,12 @@ export const createAutomationRouter = (
     }
   })
 
+  /**
+   * 更新自动控制状态，并返回或广播更新后的结果。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param value 本次准备读取、转换或保存的值。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const setMaster = async (
     deviceNumber: string,
     value: 'on' | 'off',

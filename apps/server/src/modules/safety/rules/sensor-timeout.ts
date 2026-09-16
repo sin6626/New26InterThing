@@ -5,6 +5,11 @@
 
 import type { SafetyFaultCode } from '../types.js'
 
+/**
+ * 读取安全保护需要的数据或状态，并转换成调用方可以直接使用的结果。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const getSensorTimeoutFault = ({
   active,
   pressureFresh,

@@ -23,10 +23,22 @@ const configSchema = z.object({
   message: 'GET 请求的 bodyType 只能是 query 或 none', path: ['bodyType'],
 })
 
+/**
+ * 按照点分路径读取嵌套对象字段，供后台动态映射配置使用。
+ * @param source 动作来源，用于区分人工操作与自动控制。
+ * @param pathValue 从嵌套响应路径读取到的原始值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const valueAtPath = (source: unknown, pathValue: string): unknown => pathValue
   ? pathValue.split('.').reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, source)
   : source
 
+/**
+ * 根据后台模板把赛方识别响应映射成系统内部结果。
+ * @param template 后台配置的载荷或响应映射模板。
+ * @param rows 数据库查询返回的多行原始数据。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const applyTemplate = (template: unknown, rows: RecognitionInputRow[]): unknown => {
   if (template === '$rows') return rows
   if (template === '$firstRow') return rows[0]
@@ -39,7 +51,17 @@ const applyTemplate = (template: unknown, rows: RecognitionInputRow[]): unknown 
 
 export interface RecognitionAdapter { recognize(rows: RecognitionInputRow[]): Promise<Record<string, unknown>> }
 
+/**
+ * 创建智能识别模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createRecognitionAdapter = (options: { configPath?: string; fetchImpl?: typeof fetch } = {}): RecognitionAdapter => ({
+  /**
+   * 读取用户选择的历史数据、调用赛方模型并保存动态映射后的识别结果。
+   * @param rows 数据库查询返回的多行原始数据。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async recognize(rows) {
     // 比赛 AI 的地址、请求方法和响应位置都留在现场配置，不能假设它永远
     // 接受固定的 rows JSON。没有正式文档时 url 保持空，调用会明确报错。

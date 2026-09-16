@@ -28,6 +28,11 @@ export const createSensorRepository = (
   pool: Pool,
   evaluateVstatus: EvaluateSensorVstatus,
 ): SensorRepository => ({
+  /**
+   * 保存实时数据数据，并完成该写入需要的一致性处理。
+   * @param message 已经解析或准备发送的消息对象。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async save(message) {
     // 传感器 p_name 是设备报文字段，db_name 是历史表列名：
     // 例如 temp_out → field2。SQL 列名不能用参数占位符，必须先经过列白名单。

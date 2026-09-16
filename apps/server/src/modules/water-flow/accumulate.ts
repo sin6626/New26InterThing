@@ -30,6 +30,11 @@ interface FlowState extends PersistedWaterFlow {
   lastSavedAt: number
 }
 
+/**
+ * 创建水循环累计模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createWaterFlowService = ({
   repository,
   loadPipeDiameter,
@@ -42,6 +47,11 @@ export const createWaterFlowService = ({
    */
   const states = new Map<string, FlowState>()
 
+  /**
+   * 取得指定设备的进程内状态；首次访问时创建默认状态。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const getState = async (deviceNumber: string) => {
     const existing = states.get(deviceNumber)
     if (existing) return existing
@@ -57,6 +67,12 @@ export const createWaterFlowService = ({
     return state
   }
 
+  /**
+   * 根据内部状态生成只读快照，避免调用方直接修改累计数据。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param state 当前设备或状态机的内部状态。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const snapshot = async (
     deviceNumber: string,
     state: FlowState,
@@ -93,6 +109,13 @@ export const createWaterFlowService = ({
   }
 
   return {
+    /**
+     * 处理设备的一包实时读数，推进水循环累计状态并返回最新结果。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @param flowLitersPerMinute 当前瞬时流量，单位为升每分钟。
+     * @param recordedAt 本次读数的服务器接收时间戳，单位为毫秒。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async handleReading(
       deviceNumber: string,
       flowLitersPerMinute: number,
@@ -125,10 +148,20 @@ export const createWaterFlowService = ({
       return snapshot(deviceNumber, state)
     },
 
+    /**
+     * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async getSnapshot(deviceNumber: string) {
       return snapshot(deviceNumber, await getState(deviceNumber))
     },
 
+    /**
+     * 重置水循环累计当前状态；只清理本函数负责的数据，不会隐式启动设备。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async reset(deviceNumber: string) {
       const state = await getState(deviceNumber)
       const oldVolume = state.totalVolumeLiters

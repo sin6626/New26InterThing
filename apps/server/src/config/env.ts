@@ -31,4 +31,8 @@ const envSchema = z.object({
 export type AppEnv = z.infer<typeof envSchema>
 
 // 一般配置做校验使用parse, parse如果校验错误了, 会直接抛出ZodError的异常, 然后直接让服务停止
+/**
+ * 读取进程环境变量并通过 Zod 完整校验；配置缺失时直接阻止后端启动。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const readEnv = (): AppEnv => envSchema.parse(process.env)

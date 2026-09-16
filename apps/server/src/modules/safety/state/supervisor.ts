@@ -35,6 +35,11 @@ import {
 } from '../rules/temperature-reversed.js'
 import { safetyFaultDetails } from '../faults/definitions.js'
 
+/**
+ * 创建安全保护模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param clock 可替换的时钟函数，生产使用系统时间，测试可固定时间。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createSafetySupervisor = (clock: () => number = Date.now) => {
   /**
    * 安全监督器只做判断，不直接发布 MQTT。
@@ -58,10 +63,21 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let flowZeroSince: number | null = null
   let pressureZeroSince: number | null = null
 
+  /**
+   * 判断指定传感器事实是否仍在数据超时时间内有效。
+   * @param key 需要读取、更新或校验的状态字段名称。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const isFresh = (key: SensorKey, context: SafetyContext) => (
     sensors.isFresh(key, context.config.dataTimeoutSeconds)
   )
 
+  /**
+   * 跟踪运行期间持续为零的流量和压力，将长期零值标记为无效。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const refreshActiveZeroObservations = (context: SafetyContext) => {
     // 运行中的长期 0 值可能是传感器卡死，超时后应视作数据无效。
     const hydraulicallyActive = context.state === 'building-flow'
@@ -102,6 +118,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     }
   }
 
+  /**
+   * 故障锁定后继续观察水力条件，必要时把仅关热升级为同时停泵。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const upgradeLockedProtection = (context: SafetyContext) => {
     // 温度故障最初可只关热；水力通道随后变得不安全时再升级为停泵。
     if (!lockedDecision || lockedDecision.stopPump) return lockedDecision
@@ -116,6 +137,12 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return lockedDecision
   }
 
+  /**
+   * 锁存本轮首个安全故障并生成保护动作；锁存后只能人工复位。
+   * @param faultCode 安全模块内部统一使用的故障语义编码。
+   * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const latch = (
     faultCode: SafetyFaultCode,
     options: Partial<Pick<SafetyDecision, 'detail' | 'closeHeater' | 'stopPump'>> = {},
@@ -132,6 +159,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return lockedDecision
   }
 
+  /**
+   * 判断设备是否处于需要执行安全监督的活动状态。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const active = (context: SafetyContext) => (
     context.state !== 'stopped'
     || context.desiredPump === 'on'
@@ -140,6 +172,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     || latestReading?.actualHeater === 'on'
   )
 
+  /**
+   * 汇总当前禁止开启加热的首要原因，供安全授权和页面提示使用。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const currentUnsafeReason = (context: SafetyContext): string | null => {
     // 加热开启需要设备实际水泵、流量、压力与两路温度都有效；
     // 页面希望泵开启(desiredPump)不能代替设备反馈(actualPump)。
@@ -159,6 +196,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return null
   }
 
+  /**
+   * 判断自动或人工建流是否超时，必要时锁存建流类故障。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const evaluateInitialBuildTimeouts = (context: SafetyContext) => {
     const now = clock()
     if (hasBuildFlowTimeout(now, context)) return latch('BUILD_FLOW_TIMEOUT')
@@ -171,6 +213,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return null
   }
 
+  /**
+   * 按照安全优先级评估需要持续确认的慢速规则。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const evaluateTimedRules = (context: SafetyContext): SafetyDecision | null => {
     // 集中处理必须持续一段时间才成立的规则，过滤瞬时波动。
     if (lockedDecision) return lockedDecision
@@ -207,6 +254,13 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
     return null
   }
 
+  /**
+   * 在主故障说明后补充同一时刻检测到的其他危险事实。
+   * @param faultCode 安全模块内部统一使用的故障语义编码。
+   * @param reading 已经规范化的本次设备实时读数。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const detailWithConcurrentFacts = (
     faultCode: SafetyFaultCode,
     reading: SafetyReading,
@@ -236,12 +290,24 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       : `${safetyFaultDetails[faultCode]}；同时检测到：${additionalFacts.join('、')}`
   }
 
+  /**
+   * 检查当前动作所需传感器是否有效，缺失时锁存对应故障。
+   * @param reading 已经规范化的本次设备实时读数。
+   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+   * @param includeTemperature 是否把进出口温度也作为本次必需传感器检查项。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const evaluateRequiredSensors = (
     reading: SafetyReading,
     context: SafetyContext,
     includeTemperature = true,
   ) => {
     if (!active(context)) return null
+    /**
+     * 为传感器故障补充同时存在的现场危险事实。
+     * @param faultCode 安全模块内部统一使用的故障语义编码。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     const withFacts = (faultCode: SafetyFaultCode) => {
       return { detail: detailWithConcurrentFacts(faultCode, reading, context) }
     }
@@ -264,6 +330,12 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   }
 
   const api = {
+    /**
+     * 处理设备的一包实时读数，推进安全保护状态并返回最新结果。
+     * @param reading 已经规范化的本次设备实时读数。
+     * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     handleReading(reading: SafetyReading, context: SafetyContext): SafetyDecision | null {
       // 风险优先级：超压/建流 → 关键传感器 → 低流量 → 超温 → 慢规则。
       latestReading = reading
@@ -422,6 +494,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return evaluateTimedRules(context)
     },
 
+    /**
+     * 由定时器周期调用，在没有新报文时继续推进安全保护超时和时间规则。
+     * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     tick(context: SafetyContext): SafetyDecision | null {
       latestContext = context
       refreshActiveZeroObservations(context)
@@ -433,6 +510,13 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return evaluateTimedRules(context)
     },
 
+    /**
+     * 由外部诊断主动触发并锁存故障，复用统一的安全保护流程。
+     * @param faultCode 安全模块内部统一使用的故障语义编码。
+     * @param detail 故障或动作的补充说明，帮助现场定位具体原因。
+     * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     trip(
       faultCode: SafetyFaultCode,
       detail?: string,
@@ -443,6 +527,13 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return decision
     },
 
+    /**
+     * 根据当前安全事实判断控制动作是否允许，并返回明确的拒绝原因。
+     * @param action 待安全授权或执行的设备控制动作。
+     * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+     * @param source 动作来源，用于区分人工操作与自动控制。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     authorize(
       action: SafetyAction,
       context: SafetyContext,
@@ -463,6 +554,11 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return { allowed: reason === null, reason }
     },
 
+    /**
+     * 判断安全保护当前是否满足对应业务条件；本函数不主动执行外部操作。
+     * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     canReset(context: SafetyContext): SafetyAuthorization {
       // 复位只解除故障锁，不恢复运行，所以实际和期望执行器必须全部关闭。
       if (!lockedDecision) return { allowed: false, reason: '当前没有锁定故障' }
@@ -486,6 +582,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       return { allowed: true, reason: null }
     },
 
+    /**
+     * 重置安全保护当前状态；只清理本函数负责的数据，不会隐式启动设备。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     reset() {
       lockedDecision = null
       occurredAt = null
@@ -501,6 +601,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       pressureZeroSince = null
     },
 
+    /**
+     * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     getSnapshot(): SafetySnapshot {
       const reset = latestContext ? api.canReset(latestContext) : {
         allowed: false,

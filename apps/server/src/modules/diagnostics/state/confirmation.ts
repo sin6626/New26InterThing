@@ -37,6 +37,11 @@ const definitions: Record<HydraulicDiagnosisCode, Omit<DiagnosisResult, 'code'>>
   HYDRAULIC_LEAK_OR_BURST: { name: '疑似管路脱落或严重泄漏', detail: '平稳运行中压力与流量同步骤降', level: 'error' },
 }
 
+/**
+ * 根据压力、流量和变化趋势计算当前水力联合诊断结论。
+ * @param code 系统内部使用的故障语义编码。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const diagnosis = (code: HydraulicDiagnosisCode): DiagnosisResult => ({
   code,
   ...definitions[code],
@@ -54,6 +59,11 @@ interface State {
 /** 根据水泵状态、压力与流量组合判断堵塞、空转、传感器异常和泄漏。 */
 export const createHydraulicDiagnosisService = () => {
   const states = new Map<string, State>()
+  /**
+   * 取得指定设备的诊断确认状态；首次访问时创建默认状态。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const stateFor = (deviceNumber: string) => {
     const existing = states.get(deviceNumber)
     if (existing) return existing
@@ -68,6 +78,14 @@ export const createHydraulicDiagnosisService = () => {
   }
 
   return {
+    /**
+     * 推进诊断确认窗口，只在同一异常持续足够时间后输出正式结论。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @param facts 本次判断依赖的实时传感器与状态事实。
+     * @param config 从后台配置读取并校验后的业务参数。
+     * @param now 当前服务器时间戳，单位为毫秒。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     evaluate(
       deviceNumber: string,
       facts: HydraulicFacts,
@@ -118,6 +136,11 @@ export const createHydraulicDiagnosisService = () => {
       }
       return state.active
     },
+    /**
+     * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     getSnapshot(deviceNumber: string) {
       return stateFor(deviceNumber).active
     },

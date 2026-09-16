@@ -22,6 +22,11 @@ export interface SensorMqtt {
   publish(topic: string, payload: Record<string, unknown>): Promise<void>
   close(): Promise<void>
 }
+/**
+ * 创建基础设施模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createSensorMqtt = ({
   env,
   onMessage,
@@ -40,8 +45,19 @@ export const createSensorMqtt = ({
   // 这张短期指纹表用于过滤“自己发给自己的回声”，不能当设备执行确认。
   const outboundFingerprints = new Map<string, number>()
 
+  /**
+   * 生成 MQTT 连接配置指纹，用于判断连接参数是否发生变化。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @param payload 准备解析或发布的消息载荷。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const fingerprint = (topic: string, payload: string) => `${topic}\n${payload}`
 
+  /**
+   * 更新基础设施状态，并返回或广播更新后的结果。
+   * @param nextConnected MQTT 连接准备更新到的新状态。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const updateConnection = (nextConnected: boolean) => {
     if (connected === nextConnected) return
     connected = nextConnected
@@ -75,6 +91,12 @@ export const createSensorMqtt = ({
   // 把MQTT的close方法自己做一层封装, 返回更加现在的Promise, 原本是回调函数的写法, 很容易回调地狱
   // 第 1 个参数 false（是否强制断开）：设置为 false 表示优雅关闭（Graceful Shutdown）：如果当前还有正在排队发送的消息，等它发完再断开，而不是粗暴地瞬间切断 TCP 网络连接。第 2 个参数 {}（可选配置参数）：传空对象，使用默认配置即可。第 3 个参数 () => resolve()（完成回调函数）：当底层网络连接真正断开、所有清理工作完全结束时，mqtt.js 才会调用这个回调函数。在这里调用 resolve()，将 Promise 标记为完成。
   return {
+    /**
+     * 向外部通道发布基础设施指令，发布失败会交给调用方处理。
+     * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+     * @param payload 准备解析或发布的消息载荷。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     publish(topic, payload) {
       return new Promise<void>((resolve, reject) => {
         if (!connected) {
@@ -93,6 +115,11 @@ export const createSensorMqtt = ({
           }, 5_000).unref()
         }
         let settled = false
+        /**
+         * 按照安全顺序关闭基础设施持有的资源，并允许重复调用。
+         * @param error 执行过程中捕获的异常。
+         * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+         */
         const finish = (error?: Error) => {
           if (settled) return
           settled = true

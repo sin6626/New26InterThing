@@ -17,6 +17,11 @@ const querySchema = z.object({
   deviceName: z.string().trim().min(1).optional(),
 })
 
+/**
+ * 创建设备状态模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createDeviceRouter = (repository: DeviceRepository): ExpressRouter => {
   const router = Router()
 

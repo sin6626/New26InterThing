@@ -8,6 +8,11 @@ import type { AutomationReading } from '../types.js'
 
 type SensorValues = Record<string, string | number | null>
 
+/**
+ * 把设备字段安全转换为有限数字，并区分字段缺失与值非法。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const numeric = (value: unknown) => {
   if (value === null || value === undefined) return null
   if (typeof value === 'string' && value.trim() === '') return Number.NaN
@@ -16,12 +21,23 @@ const numeric = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : Number.NaN
 }
 
+/**
+ * 把设备上报的 0/1 或 on/off 统一转换为执行器状态。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const actuator = (value: unknown) => {
   if (value === 'on' || value === 1 || value === '1') return 'on' as const
   if (value === 'off' || value === 0 || value === '0') return 'off' as const
   return 'unknown' as const
 }
 
+/**
+ * 按照已确认字段映射把 MQTT 上行值转换成自动控制统一读数。
+ * @param values 设备上报或数据库读取到的字段值集合。
+ * @param recordedAt 本次读数的服务器接收时间戳，单位为毫秒。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const normalizeAutomationReading = (
   values: SensorValues,
   recordedAt: number,

@@ -27,12 +27,22 @@ const timeSyncSchema = z.object({
   deviceNumber: z.string().trim().min(1),
   time: z.string().trim().min(1).optional(),
 })
+/**
+ * 检查字符串能否解析为有效日期时间，阻止非法范围进入数据库查询。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const isValidDateTime = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
     return false
   }
   const date = new Date(value.replace(' ', 'T'))
   if (Number.isNaN(date.getTime())) return false
+  /**
+   * 把单个时间数字补齐为两位字符串，供日期时间格式化复用。
+   * @param part 准备补齐或拼入报文的单个内容片段。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const pad = (part: number) => String(part).padStart(2, '0')
   const normalized = [
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
@@ -57,12 +67,23 @@ const logSchema = z.object({
     || query.startTime <= query.endTime,
 )
 
+/**
+ * 生成统一的参数校验失败响应，避免各路由重复组织错误格式。
+ * @param response Express 响应对象，用于返回统一 JSON。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const invalid = (response: Response) => response.status(400).json({
   code: 400,
   message: '请求参数错误',
   data: null,
 })
 
+/**
+ * 创建指令控制模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @param service 路由需要调用的业务流程接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createControlRouter = (
   repository: ControlRepository,
   service: ControlService,
@@ -135,6 +156,11 @@ export const createControlRouter = (
 }
 
 // 操作日志相关的接口
+/**
+ * 创建指令控制模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createOperationLogRouter = (
   repository: OperationHistoryRepository,
 ): ExpressRouter => {

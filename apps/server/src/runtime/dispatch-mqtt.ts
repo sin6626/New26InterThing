@@ -5,6 +5,12 @@ import { parseSensorMessage } from '../modules/realtime/index.js'
 import type { createSensorRealtimeHandler } from '../modules/realtime/index.js'
 
 // 收到Mqtt的数据进行的操作
+/**
+ * 创建运行时装配模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param controlRepository 指令配置和当前值的仓储接口。
+ * @param handleSensorReading 解析完成后负责保存和分发传感器数据的流程函数。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export function createMqttDispatcher(
   controlRepository: ControlRepository,
   handleSensorReading: ReturnType<typeof createSensorRealtimeHandler>,

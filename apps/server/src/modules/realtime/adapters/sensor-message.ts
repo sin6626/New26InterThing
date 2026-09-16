@@ -17,7 +17,17 @@ export type SensorMessageParseResult =
   // 隔离出系统层数据的名单
 const reservedFields = new Set(['d_no', 'c_time', 'time', 'online', 'vstatus'])
 
+/**
+ * 把时间值转换成数据库和页面统一使用的本地日期时间字符串。
+ * @param date 需要格式化或同步的日期时间对象。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const formatDateTime = (date: Date) => {
+  /**
+   * 把单个时间数字补齐为两位字符串，供日期时间格式化复用。
+   * @param value 本次准备读取、转换或保存的值。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const pad = (value: number) => String(value).padStart(2, '0')
   return [
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,

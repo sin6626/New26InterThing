@@ -5,11 +5,25 @@
 
 import type { SafetyConfig } from '../types.js'
 
+/**
+ * 判断安全保护当前是否满足对应业务条件；本函数不主动执行外部操作。
+ * @param evidenceMilliseconds 当前累计的装反异常证据，单位为毫秒。
+ * @param config 从后台配置读取并校验后的业务参数。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const hasConfirmedReversedTemperature = (
   evidenceMilliseconds: number,
   config: SafetyConfig,
 ) => evidenceMilliseconds >= config.temperatureReversedConfirmSeconds * 1_000
 
+/**
+ * 按照 0.3℃ 异常阈值和恢复死区累计或消退探头装反证据。
+ * @param evidenceMilliseconds 当前累计的装反异常证据，单位为毫秒。
+ * @param elapsedMilliseconds 距离上次有效观察经过的毫秒数。
+ * @param inletTemperature 本次读数中的入口温度。
+ * @param outletTemperature 本次读数中的出口温度，缺失时为空值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const accumulateReversedTemperatureEvidence = (
   evidenceMilliseconds: number,
   elapsedMilliseconds: number,

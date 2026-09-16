@@ -23,6 +23,13 @@ export const createAutomationActuator = ({ execute }: Dependencies) => {
   let lastAction: AutomationSnapshot['lastAction'] = null
   let actionTail = Promise.resolve()
 
+  /**
+   * 经安全授权后发布执行器指令，并同步期望状态与最近动作信息。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @param value 本次准备读取、转换或保存的值。
+   * @param force 是否忽略相同状态检查并强制执行更新。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const run = async (
     topic: ActuatorTopic,
     value: ActuatorValue,
@@ -75,10 +82,22 @@ export const createAutomationActuator = ({ execute }: Dependencies) => {
     get lastAction() {
       return lastAction
     },
+    /**
+     * 接管外部已经确认的期望执行器状态，不重复发布 MQTT。
+     * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+     * @param value 本次准备读取、转换或保存的值。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     adoptDesired(topic: ActuatorTopic, value: ActuatorValue) {
       if (topic === 'pump') desiredPump = value
       else desiredHeater = value
     },
+    /**
+     * 记录外部已经发布成功的执行器状态和动作结果。
+     * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+     * @param value 本次准备读取、转换或保存的值。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     adoptPublished(topic: ActuatorTopic, value: ActuatorValue) {
       if (topic === 'pump') {
         desiredPump = value

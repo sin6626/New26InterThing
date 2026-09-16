@@ -27,6 +27,11 @@ interface DeviceNumberRow extends RowDataPacket { number: string }
 
 const allowedColumns = new Set(Array.from({ length: 10 }, (_, index) => `field${index + 1}`))
 
+/**
+ * 把后台字段映射行转换成页面使用的字段定义。
+ * @param mapping 单条后台字段映射配置。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const toField = (mapping: FieldMapping): SensorHistoryField => ({
   key: mapping.p_name,
   label: mapping.f_name,
@@ -34,6 +39,11 @@ const toField = (mapping: FieldMapping): SensorHistoryField => ({
   type: mapping.type === '1' ? 'number' : 'string',
 })
 
+/**
+ * 读取传感器历史需要的数据或状态，并转换成调用方可以直接使用的结果。
+ * @param pool MySQL 连接池，供仓储执行参数化查询和事务。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const getMappings = async (pool: Pool) => {
   const [rows] = await pool.query<FieldMapping[]>(
     `select f_name, db_name, p_name, unit, type, visible
@@ -43,6 +53,11 @@ const getMappings = async (pool: Pool) => {
   return rows.filter((row) => allowedColumns.has(row.db_name) && Boolean(row.p_name))
 }
 
+/**
+ * 根据查询条件生成参数化 SQL 的 WHERE 子句和值列表，避免调用方直接拼接 SQL。
+ * @param query 页面提交的筛选、分页或时间范围条件。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const buildFilters = (query: Omit<SensorHistoryQuery, 'page' | 'pageSize'>) => {
   const clauses: string[] = []
   const values: Array<string> = []
@@ -63,6 +78,12 @@ const buildFilters = (query: Omit<SensorHistoryQuery, 'page' | 'pageSize'>) => {
   return { where: clauses.length ? clauses.join(' and ') : '1 = 1', values }
 }
 
+/**
+ * 把数据库行转换成共享类型，集中处理字段名、数字和空值。
+ * @param row 从 MySQL 查询得到的一行原始数据。
+ * @param mappings 后台配置的字段映射集合。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const mapItem = (row: RowDataPacket, mappings: FieldMapping[]): SensorHistoryItem => ({
   id: Number(row.id),
   deviceNumber: row.d_no ?? null,
@@ -80,6 +101,10 @@ const mapItem = (row: RowDataPacket, mappings: FieldMapping[]): SensorHistoryIte
 
 /** 历史查询适配器：负责动态列、条件分页和按分钟归并趋势。 */
 export const createSensorHistoryRepository = (pool: Pool): SensorHistoryRepository => ({
+  /**
+   * 读取传感器历史需要的数据或状态，并转换成调用方可以直接使用的结果。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async getOptions() {
     const [mappings, [deviceRows]] = await Promise.all([
       getMappings(pool),
@@ -95,6 +120,11 @@ export const createSensorHistoryRepository = (pool: Pool): SensorHistoryReposito
     }
   },
 
+  /**
+   * 按照查询条件读取传感器历史列表，并返回分页或筛选结果。
+   * @param query 页面提交的筛选、分页或时间范围条件。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async list(query) {
     const mappings = (await getMappings(pool)).filter((mapping) => mapping.visible === '1')
     const { where, values } = buildFilters(query)
@@ -117,6 +147,11 @@ export const createSensorHistoryRepository = (pool: Pool): SensorHistoryReposito
     }
   },
 
+  /**
+   * 读取传感器历史需要的数据或状态，并转换成调用方可以直接使用的结果。
+   * @param query 页面提交的筛选、分页或时间范围条件。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async getTrend(query) {
     const mappings = (await getMappings(pool)).filter(
       (mapping) => mapping.visible === '1' && mapping.type === '1',

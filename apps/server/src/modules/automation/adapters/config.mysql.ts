@@ -13,6 +13,11 @@ const aliases: Record<string, string> = {
   pid_min_close_time: 'pid_min_off_time',
 }
 
+/**
+ * 创建自动控制模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param pool MySQL 连接池，供仓储执行参数化查询和事务。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createAutomationConfigLoader = (pool: Pool) => async () => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `select c.topic, g.value
@@ -24,6 +29,11 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     const topic = aliases[String(row.topic)] ?? String(row.topic)
     if (row.value !== null) values.set(topic, String(row.value))
   }
+  /**
+   * 读取自动控制需要的数据或状态，并转换成调用方可以直接使用的结果。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const getRequiredNumber = (topic: string) => {
     const value = Number(values.get(topic))
     if (!Number.isFinite(value)) {
@@ -31,6 +41,11 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     }
     return value
   }
+  /**
+   * 读取必须大于零的自动控制配置，非法时阻止状态机启动。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const positive = (topic: string) => {
     const value = getRequiredNumber(topic)
     if (value <= 0) {
@@ -38,6 +53,11 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     }
     return value
   }
+  /**
+   * 读取允许为零但不能为负数的自动控制配置。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const nonNegative = (topic: string) => {
     const value = getRequiredNumber(topic)
     if (value < 0) {

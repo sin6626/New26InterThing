@@ -136,6 +136,12 @@ automationManager = createAutomationManager({
   loadConfig: loadAutomationConfig,
   waterFlow: waterFlowService,
   emit: message => realtimeWebSocket.broadcast(message),
+  /**
+   * 自动模式启动失败时把 master 保存为关闭，并记录失败原因。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param reason 本次状态变化或动作失败的业务原因，供日志和页面提示使用。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async disableMaster(deviceNumber, reason) {
     // 对控制模式控制
     const definition = await controlRepository.getDefinitionByTopic?.('master')
@@ -149,6 +155,13 @@ automationManager = createAutomationManager({
     )
   },
   // 自动模式下指令, 还是复用之前的control发指令
+  /**
+   * 执行一次运行时装配业务操作，按照模块规则更新状态和外部副作用。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @param value 本次准备读取、转换或保存的值。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async execute(deviceNumber, topic, value) {
     const definition = await controlRepository.getDefinitionByTopic?.(topic)
     if (!definition) throw new Error(`未配置 ${topic} 设备指令`)
@@ -159,6 +172,13 @@ automationManager = createAutomationManager({
     })
   },
   // 推送错误, 也是复用之前
+  /**
+   * 把安全故障交给统一故障上报模块完成语义映射、入库和推送。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param errorNumber 与后台错误语义映射表对应的故障编号。
+   * @param detail 故障或动作的补充说明，帮助现场定位具体原因。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async reportFault(deviceNumber, errorNumber, detail) {
     await faultReporter.reportFault({
       deviceNumber,
@@ -209,6 +229,10 @@ sensorMqtt = createSensorMqtt({
 })
 
 let automationTimer: ReturnType<typeof setInterval> | undefined
+/**
+ * 启动 HTTP 监听和后台周期任务；资源本身已在运行时装配阶段创建。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const start = () => {
   server.listen(env.SERVER_PORT, env.SERVER_HOST, () => {
     console.log(`后端已启动：http://${env.SERVER_HOST}:${env.SERVER_PORT}`)
@@ -225,6 +249,10 @@ const start = () => {
 }
 
 let stopping = false
+/**
+ * 按照安全顺序关闭运行时装配持有的资源，并允许重复调用。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const stop = async () => {
   // 停止顺序很重要：先关闭自动动作，再断开 MQTT；否则停机指令可能无法发布。
   // stopping 保护多种退出信号同时到达时不重复关闭同一资源。

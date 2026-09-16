@@ -26,12 +26,22 @@ const fieldTypes: Record<string, ControlField['type']> = {
   '6': 'checkbox',
 }
 
+/**
+ * 把可选数据库值转换为有限数字，不存在或非法时返回空值。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const numberOrNull = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
   const number = Number(value)
   return Number.isFinite(number) ? number : null
 }
 
+/**
+ * 解析后台配置的可选值列表，并兼容普通字符串与 JSON 表示。
+ * @param value 本次准备读取、转换或保存的值。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const parseOptions = (value: unknown): ControlOption[] => {
   let values: unknown = value
   if (typeof value === 'string' && value) {
@@ -61,6 +71,11 @@ const parseOptions = (value: unknown): ControlOption[] => {
   })
 }
 
+/**
+ * 把控制配置查询行整理成领域定义，屏蔽数据库字段命名。
+ * @param row 从 MySQL 查询得到的一行原始数据。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const definitionFromRow = (row: RowDataPacket): ControlDefinition => ({
   configId: Number(row.config_id),
   name: String(row.t_name || ''),
@@ -83,6 +98,11 @@ export const createControlRepository = (
   pool: Pool,
   history: OperationHistoryRepository,
 ): ControlRepository => ({
+  /**
+   * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async getSnapshot(deviceNumber) {
     // 控制树的 id/ref_id/ref_value/f_type 都来自后台配置，前端据此决定
     // 父子顺序、当前模式分支和控件种类；后端不写死页面只显示文本框。
@@ -116,6 +136,12 @@ export const createControlRepository = (
     }
   },
 
+  /**
+   * 读取指令控制需要的数据或状态，并转换成调用方可以直接使用的结果。
+   * @param _deviceNumber 设备唯一编号；当前查询按全局配置读取，因此暂不参与 SQL。
+   * @param configId 后台控制配置的主键。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async getDefinition(_deviceNumber, configId) {
     const [rows] = await pool.query<RowDataPacket[]>(
       `select c.id as config_id, c.t_name, c.f_type, c.topic, c.publish_topic,
@@ -129,6 +155,11 @@ export const createControlRepository = (
     return rows[0] ? definitionFromRow(rows[0]) : null
   },
 
+  /**
+   * 读取指令控制需要的数据或状态，并转换成调用方可以直接使用的结果。
+   * @param topic 控制配置使用的业务主题，例如 master、pump 或 heater。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async getDefinitionByTopic(topic) {
     const [rows] = await pool.query<RowDataPacket[]>(
       `select c.id as config_id, c.t_name, c.f_type, c.topic, c.publish_topic,
@@ -142,6 +173,15 @@ export const createControlRepository = (
     return rows[0] ? definitionFromRow(rows[0]) : null
   },
 
+  /**
+   * 保存指令控制数据，并完成该写入需要的一致性处理。
+   * @param definition 从数据库读取并整理后的控制项定义。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param value 本次准备读取、转换或保存的值。
+   * @param _remark 兼容旧调用接口保留的说明参数；新操作历史不保存备注。
+   * @param triggerMode 触发模式，用于区分人工操作和自动控制。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async saveSuccess(definition, deviceNumber, value, _remark, triggerMode = 'manual') {
     // 控制值和“成功操作日志”放在同一事务：其中一条 SQL 失败就整体回滚。
     // 注意事务不能回滚已经发出去的 MQTT，所以调用方需要区分这两种失败。
@@ -172,6 +212,15 @@ export const createControlRepository = (
     }
   },
 
+  /**
+   * 保存指令控制数据，并完成该写入需要的一致性处理。
+   * @param definition 从数据库读取并整理后的控制项定义。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param value 本次准备读取、转换或保存的值。
+   * @param _remark 兼容旧调用接口保留的说明参数；新操作历史不保存备注。
+   * @param triggerMode 触发模式，用于区分人工操作和自动控制。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async saveFailure(definition, deviceNumber, value, _remark, triggerMode = 'manual') {
     // 失败只记日志，不把未发布成功的新值写成当前控制值。
     await history.record({
@@ -184,6 +233,13 @@ export const createControlRepository = (
     })
   },
 
+  /**
+   * 执行一次指令控制业务操作，按照模块规则更新状态和外部副作用。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param configId 后台控制配置的主键。
+   * @param value 本次准备读取、转换或保存的值。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async applyDeviceReport(deviceNumber, configId, value) {
     const [rows] = await pool.query<RowDataPacket[]>(
       `select c.id as config_id, c.t_name, c.f_type, c.topic, c.publish_topic,
@@ -222,6 +278,14 @@ export const createControlRepository = (
     }
   },
 
+  /**
+   * 保存指令控制数据，并完成该写入需要的一致性处理。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @param value 本次准备读取、转换或保存的值。
+   * @param result 本次操作或判断产生的结果。
+   * @param _remark 兼容旧调用接口保留的说明参数；新操作历史不保存备注。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async saveTimeSync(deviceNumber, value, result, _remark) {
     await history.record({
       source: 'application', triggerMode: 'manual',

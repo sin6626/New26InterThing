@@ -17,6 +17,11 @@ export const createRecognitionService = (
   adapter: RecognitionAdapter = createRecognitionAdapter(),
   history?: OperationHistoryRepository,
 ): RecognitionService => ({
+  /**
+   * 读取用户选择的历史数据、调用赛方模型并保存动态映射后的识别结果。
+   * @param rowIds 用户选择并要求识别的历史数据主键列表。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   async recognize(rowIds) {
     const rows = await repository.getRecognitionRows(rowIds)
     if (rows.length !== rowIds.length) throw new Error('部分历史数据不存在，请刷新页面后重新选择')

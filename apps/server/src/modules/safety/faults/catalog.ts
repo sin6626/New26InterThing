@@ -23,6 +23,11 @@ const faultTypes: Record<SafetyFaultCode, string> = {
   DRY_HEATING_NO_TEMP_RISE: '6',
 }
 
+/**
+ * 读取安全保护需要的数据或状态，并转换成调用方可以直接使用的结果。
+ * @param faultCode 安全模块内部统一使用的故障语义编码。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const getSafetyFaultType = (faultCode: SafetyFaultCode) => (
   faultTypes[faultCode]
 )
@@ -34,6 +39,11 @@ const hydraulicFaultTypes: Partial<Record<HydraulicDiagnosisCode, string>> = {
   HYDRAULIC_LEAK_OR_BURST: '6',
 }
 
+/**
+ * 读取安全保护需要的数据或状态，并转换成调用方可以直接使用的结果。
+ * @param faultCode 安全模块内部统一使用的故障语义编码。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const getHydraulicFaultType = (faultCode: HydraulicDiagnosisCode) => {
   const type = hydraulicFaultTypes[faultCode]
   if (!type) throw new Error(`水力诊断 ${faultCode} 没有故障类型映射`)

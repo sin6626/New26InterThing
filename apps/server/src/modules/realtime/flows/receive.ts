@@ -15,6 +15,11 @@ interface SensorRealtimeHandlerDependencies {
   afterSave?: Array<(message: ParsedSensorMessage) => Promise<void>>
 }
 
+/**
+ * 创建实时数据模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createSensorRealtimeHandler = ({
   repository,
   broadcast,

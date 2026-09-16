@@ -40,6 +40,12 @@ export class ControlError extends Error {
   }
 }
 
+/**
+ * 按照控制项类型规范化页面提交值，拒绝不符合后台配置的数据。
+ * @param value 本次准备读取、转换或保存的值。
+ * @param fieldType 后台控制配置使用的控件类型编码。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const normalizeValue = (
   value: ControlCommandIntent['value'],
   fieldType: string,
@@ -53,6 +59,11 @@ const normalizeValue = (
   return String(value).trim()
 }
 
+/**
+ * 提取控制项允许值，供提交前执行白名单校验。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const optionValues = (options: unknown) => {
   if (!Array.isArray(options)) return []
   return options.flatMap((option) => {
@@ -75,6 +86,12 @@ export const createControlService = (
   publisher: CommandPublisher,
   automation?: AutomationModeController,
 ) => {
+  /**
+   * 执行一次指令控制业务操作，按照模块规则更新状态和外部副作用。
+   * @param intent 已经校验、准备执行的控制意图。
+   * @param trustedAutomation 该动作是否来自后端自动状态机，而不是页面人工请求。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const executeCommand = async (
     intent: ControlCommandIntent,
     trustedAutomation = false,
@@ -160,6 +177,10 @@ export const createControlService = (
         value,
       })
       try {
+        /**
+         * 向外部通道发布指令控制指令，发布失败会交给调用方处理。
+         * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+         */
         const publish = () => publisher.publish(envelope.topic, envelope.payload)
         if (!trustedAutomation && action) {
           await automation!.executeAction!(intent.deviceNumber, action, publish)
@@ -208,10 +229,21 @@ export const createControlService = (
   }
 
   return {
+    /**
+     * 生成时间同步载荷并通过统一指令流程发布，同时记录操作结果。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @param requestedTime 页面要求同步到设备的目标时间。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async syncTime(deviceNumber: string, requestedTime?: string) {
       // 时间同步是固定协议的特殊指令，不从普通控制配置树选择 pump/heater 模板。
       const date = requestedTime ? new Date(requestedTime.replace(' ', 'T')) : new Date()
       if (Number.isNaN(date.getTime())) throw new ControlError('时间格式错误', 400)
+      /**
+       * 把单个时间数字补齐为两位字符串，供日期时间格式化复用。
+       * @param value 本次准备读取、转换或保存的值。
+       * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+       */
       const pad = (value: number) => String(value).padStart(2, '0')
       const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
       try {

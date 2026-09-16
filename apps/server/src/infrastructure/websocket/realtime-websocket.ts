@@ -14,10 +14,20 @@ export interface RealtimeWebSocket {
   close(callback: () => void): void
 }
 
+/**
+ * 创建基础设施模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param server 已经创建的 Node HTTP 服务器。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createRealtimeWebSocket = (server: Server): RealtimeWebSocket => {
   const webSocketServer = new WebSocketServer({ server, path: '/ws' })
   let mqttConnected = false
 
+  /**
+   * 向所有已连接浏览器广播一条实时消息。
+   * @param message 已经解析或准备发送的消息对象。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const broadcast = (message: RealtimeMessage) => {
     const payload = JSON.stringify(message)
     webSocketServer.clients.forEach((client) => {
@@ -34,10 +44,20 @@ export const createRealtimeWebSocket = (server: Server): RealtimeWebSocket => {
 
   return {
     broadcast,
+    /**
+     * 更新基础设施状态，并返回或广播更新后的结果。
+     * @param connected MQTT 客户端当前是否连接成功。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     setMqttConnected(connected) {
       mqttConnected = connected
       broadcast({ type: 'system.status', data: { mqttConnected } })
     },
+    /**
+     * 按照安全顺序关闭基础设施持有的资源，并允许重复调用。
+     * @param callback 资源关闭完成后需要调用的回调函数。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     close(callback) {
       webSocketServer.clients.forEach((client) => client.terminate())
       webSocketServer.close(callback)

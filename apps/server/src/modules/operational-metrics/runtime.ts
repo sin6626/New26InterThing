@@ -31,6 +31,11 @@ interface Options {
   temperatureWindowSeconds?: number
 }
 
+/**
+ * 创建运行指标模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createOperationalMetricsService = ({
   dataTimeoutSeconds = 3,
   loadDataTimeoutSeconds = async () => dataTimeoutSeconds,
@@ -42,6 +47,11 @@ export const createOperationalMetricsService = ({
    */
   const states = new Map<string, OperationalState>()
 
+  /**
+   * 取得指定设备的进程内状态；首次访问时创建默认状态。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const getState = (deviceNumber: string) => {
     const existing = states.get(deviceNumber)
     if (existing) return existing
@@ -58,6 +68,11 @@ export const createOperationalMetricsService = ({
     return state
   }
 
+  /**
+   * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+   * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const getSnapshot = (deviceNumber: string) => {
     const state = getState(deviceNumber)
     return {
@@ -74,6 +89,12 @@ export const createOperationalMetricsService = ({
   }
 
   return {
+    /**
+     * 处理设备的一包实时读数，推进运行指标状态并返回最新结果。
+     * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
+     * @param reading 已经规范化的本次设备实时读数。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     async handleReading(deviceNumber: string, reading: OperationalReading) {
       const state = getState(deviceNumber)
       const currentDataTimeoutSeconds = await loadDataTimeoutSeconds()

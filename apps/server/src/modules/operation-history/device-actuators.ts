@@ -5,6 +5,11 @@ import type { OperationHistoryRepository } from './types.js'
 type SwitchValue = 'on' | 'off'
 interface Snapshot { pump?: SwitchValue; heater?: SwitchValue }
 
+/**
+ * 创建操作历史模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param history 操作历史仓储，用于记录本次动作的来源和结果。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createDeviceActuatorHistory = (history: OperationHistoryRepository) => {
   const previous = new Map<string, Snapshot>()
 

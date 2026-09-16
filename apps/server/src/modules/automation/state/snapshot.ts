@@ -30,6 +30,13 @@ interface SnapshotFacts {
   safety: SafetySnapshot
 }
 
+/**
+ * 把自动引擎内部状态、PID、安全保护和累计量组合成页面只读快照。
+ * @param facts 本次判断依赖的实时传感器与状态事实。
+ * @param clock 可替换的时钟函数，生产使用系统时间，测试可固定时间。
+ * @param getWaterFlow 读取当前设备水循环快照的函数。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const buildAutomationSnapshot = async (
   facts: SnapshotFacts,
   clock: () => number,

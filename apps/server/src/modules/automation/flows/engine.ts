@@ -46,6 +46,11 @@ interface Dependencies {
   reportFault?(errorNumber: SafetyFaultCode, detail: string): Promise<void>
 }
 
+/**
+ * 创建自动控制模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param options 调用方传入的依赖或业务选项，具体字段见参数的 TypeScript 类型。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createAutomationEngine = ({
   deviceNumber,
   initialDebugMode = false,
@@ -110,12 +115,21 @@ export const createAutomationEngine = ({
     getActualPump: () => actualPump,
     getActualHeater: () => actualHeater,
     getCoolingDelaySeconds: () => config?.coolingDelaySeconds ?? 0,
+    /**
+     * 把自动状态机切换到故障状态，并保留触发故障的保护决定。
+     * @param detail 故障或动作的补充说明，帮助现场定位具体原因。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     enterFault(detail) {
       enabled = false
       state = 'fault'
       enteredAt = clock()
       limitationReason = detail
     },
+    /**
+     * 清空本轮温控需求和 PID 状态，为下一次运行重新初始化。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     resetTemperatureControl() {
       temperatureDemand.reset()
     },
@@ -129,6 +143,11 @@ export const createAutomationEngine = ({
     reportFault,
   })
 
+  /**
+   * 把 MQTT、定时推进和页面操作放入同一条 Promise 队列，避免并发修改状态机。
+   * @param operation 需要进入串行队列执行的异步操作。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
     // MQTT、定时 tick 和页面操作可能同时到达，串行队列防止状态交叉覆盖。
     const current = operationTail.then(operation, operation)
@@ -139,6 +158,10 @@ export const createAutomationEngine = ({
     return current
   }
 
+  /**
+   * 返回指定设备当前快照，供 HTTP 查询或 WebSocket 展示。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const getSnapshot = () => buildAutomationSnapshot({
     // 快照是给页面看的只读事实，不触发模式转换或设备操作。
     deviceNumber,
@@ -160,6 +183,10 @@ export const createAutomationEngine = ({
     },
   }, clock, getWaterFlow)
 
+  /**
+   * 把自动控制最新快照交给运行时，由运行时统一推送前端。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const notify = async () => {
     emit({
       type: 'automation.status',
@@ -167,6 +194,11 @@ export const createAutomationEngine = ({
     })
   }
 
+  /**
+   * 处理自动需求发布失败，进入冷却并记录最近动作结果。
+   * @param error 执行过程中捕获的异常。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const handleDemandFailure = async (error: unknown) => {
     // 指令发送失败会进入可锁定故障；“安全门拒绝开启”已经记录为 blocked，
     // 不应再次伪装为 MQTT 发布失败。
@@ -178,10 +210,19 @@ export const createAutomationEngine = ({
     ))
   }
 
+  /**
+   * 执行安全层返回的保护决定，并把状态机切换到故障处理。
+   * @param decision 安全监督器已经确认的故障与保护动作。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const applySafetyDecision = async (decision: SafetyDecision) => {
     await protection.apply(decision)
   }
 
+  /**
+   * 读取最新自动控制配置并完成业务约束校验，非法配置会阻止运行。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const loadCheckedConfig = async () => {
     // 配置非法时不能继续自动运行，因此将其提升为可锁定的安全故障。
     try {
@@ -200,6 +241,10 @@ export const createAutomationEngine = ({
     }
   }
 
+  /**
+   * 根据当前温度、控制策略和时间推进加热需求。
+   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+   */
   const updateTemperatureDemand = () => temperatureDemand.update(
     state,
     config,
@@ -246,6 +291,13 @@ export const createAutomationEngine = ({
     runPump: value => actuator.run('pump', value),
     runHeater: value => actuator.run('heater', value),
     handleDemandFailure,
+    /**
+     * 按照模式开关和当前读数进入停止、建流或运行状态。
+     * @param nextEnabled 用户本次要求切换到的自动模式状态。
+     * @param nextState 状态机准备进入的新状态。
+     * @param reason 本次状态变化或动作失败的业务原因，供日志和页面提示使用。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     enterModeState(nextEnabled, nextState, reason) {
       enabled = nextEnabled
       state = nextState
@@ -257,6 +309,11 @@ export const createAutomationEngine = ({
   })
 
   return {
+    /**
+     * 更新自动控制状态，并返回或广播更新后的结果。
+     * @param nextDebugMode 调试模式准备切换到的新状态。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     setDebugMode(nextDebugMode: boolean) {
       return serialize(async () => {
         debugMode = nextDebugMode
@@ -271,10 +328,20 @@ export const createAutomationEngine = ({
         await notify()
       })
     },
+    /**
+     * 更新自动控制状态，并返回或广播更新后的结果。
+     * @param nextEnabled 用户本次要求切换到的自动模式状态。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     setEnabled(nextEnabled: boolean) {
       return modeControl.setEnabled(nextEnabled)
     },
 
+    /**
+     * 处理设备的一包实时读数，推进自动控制状态并返回最新结果。
+     * @param reading 已经规范化的本次设备实时读数。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     handleReading(reading: AutomationReading) {
       // 先更新实际反馈，再判断安全，最后计算新的温控需求。
       readingGeneration += 1
@@ -319,6 +386,10 @@ export const createAutomationEngine = ({
       })
     },
 
+    /**
+     * 由定时器周期调用，在没有新报文时继续推进自动控制超时和时间规则。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     tick() {
       // 处理由时间经过触发的规则：数据超时、冷却延时和 PID 时间窗口。
       return serialize(async () => {
@@ -383,6 +454,11 @@ export const createAutomationEngine = ({
 
     getSnapshot,
 
+    /**
+     * 根据当前安全事实判断控制动作是否允许，并返回明确的拒绝原因。
+     * @param action 待安全授权或执行的设备控制动作。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     authorizeAction(action: SafetyAction) {
       return serialize(async () => {
         if (!config) await loadCheckedConfig()
@@ -396,6 +472,12 @@ export const createAutomationEngine = ({
       })
     },
 
+    /**
+     * 执行一次自动控制业务操作，按照模块规则更新状态和外部副作用。
+     * @param action 待安全授权或执行的设备控制动作。
+     * @param publish 真正执行 MQTT 发布的底层函数。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     executeManualAction(
       action: SafetyAction,
       publish: () => Promise<void>,
@@ -403,10 +485,21 @@ export const createAutomationEngine = ({
       return manualControl.execute(action, publish)
     },
 
+    /**
+     * 保存自动控制数据，并完成该写入需要的一致性处理。
+     * @param action 待安全授权或执行的设备控制动作。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     recordCommand(action: SafetyAction) {
       manualControl.adopt(action)
     },
 
+    /**
+     * 记录人工或自动指令失败，并让保护层根据失败类型更新状态。
+     * @param action 待安全授权或执行的设备控制动作。
+     * @param message 已经解析或准备发送的消息对象。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     handleCommandFailure(action: SafetyAction, message: string) {
       return serialize(async () => {
         const decision = safety.trip(
@@ -418,6 +511,12 @@ export const createAutomationEngine = ({
       })
     },
 
+    /**
+     * 由外部诊断主动触发并锁存故障，复用统一的安全保护流程。
+     * @param faultCode 安全模块内部统一使用的故障语义编码。
+     * @param detail 故障或动作的补充说明，帮助现场定位具体原因。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     tripFault(faultCode: SafetyFaultCode, detail: string) {
       return serialize(async () => {
         await applySafetyDecision(safety.trip(faultCode, detail))
@@ -425,6 +524,10 @@ export const createAutomationEngine = ({
       })
     },
 
+    /**
+     * 重置自动控制当前状态；只清理本函数负责的数据，不会隐式启动设备。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     resetFault() {
       return serialize(async () => {
         // 复位是“先确认→发送关闭→再次确认→清锁”，不是点击按钮就直接清故障。
@@ -456,6 +559,10 @@ export const createAutomationEngine = ({
       })
     },
 
+    /**
+     * 按照安全顺序关闭自动控制持有的资源，并允许重复调用。
+     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+     */
     close() {
       return serialize(async () => {
         enabled = false

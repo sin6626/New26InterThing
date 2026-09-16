@@ -13,8 +13,19 @@ import type { RecognitionService } from './flows/recognize.js'
 const dateTime = z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
 const querySchema = z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(20), startTime: dateTime.optional(), endTime: dateTime.optional() }).refine(query => !query.startTime || !query.endTime || query.startTime <= query.endTime)
 const recognitionSchema = z.object({ rowIds: z.array(z.number().int().positive()).min(1).max(500).refine(ids => new Set(ids).size === ids.length) })
+/**
+ * 生成统一的参数校验失败响应，避免各路由重复组织错误格式。
+ * @param response Express 响应对象，用于返回统一 JSON。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 const invalid = (response: Response) => response.status(400).json({ code: 400, message: '请求参数错误', data: null })
 
+/**
+ * 创建智能识别模块实例，集中接收外部依赖并返回调用方使用的接口。
+ * @param repository 负责数据库读写的仓储接口。
+ * @param recognitionService 调用赛方模型并保存识别结果的流程接口。
+ * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
+ */
 export const createBehaviorRouter = (repository: BehaviorRepository, recognitionService: RecognitionService): ExpressRouter => {
   const router = Router()
   router.get('/options', async (_request, response, next) => { try { response.json({ code: 0, message: '查询成功', data: await repository.getOptions() }) } catch (error) { next(error) } })
