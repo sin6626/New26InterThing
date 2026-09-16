@@ -31,7 +31,7 @@ export const createAutomationRouter = (
 ): Router => {
   const router = Router()
 
-  // 查询是否是调试模式
+  // 查询是否是调试模式, 一样内存
   router.get('/debug-mode', (_request, response) => {
     response.json({ code: 0, message: '操作成功', data: manager.getDebugMode() })
   })
@@ -68,6 +68,7 @@ export const createAutomationRouter = (
     next(error)
   }
 
+  // 指令信息页面的各个状态获取接口, 自动化状态获取的快照, 也是内存的
   router.get('/:deviceNumber', async (request, response, next) => {
     try {
       response.json({
@@ -162,6 +163,7 @@ export const createAutomationRouter = (
     }
   })
 
+  // 各个运行时长, 速度, 一样是在内存的
   router.get('/:deviceNumber/operational-metrics', (request, response) => {
     response.json({
       code: 0,
