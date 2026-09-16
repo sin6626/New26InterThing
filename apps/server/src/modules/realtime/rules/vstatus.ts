@@ -20,6 +20,12 @@ export const createSensorVstatusEvaluator = (loadConfig: LoadConfig) => (
   async (message: ParsedSensorMessage): Promise<number> => {
     const config = await loadConfig()
     const reading = normalizeAutomationReading(message.values, Date.now())
+    const invalidSensor = [
+      reading.inletTemperature,
+      reading.outletTemperature,
+      reading.pressure,
+      reading.flowRate,
+    ].some(value => value !== null && !Number.isFinite(value))
     const overTemperature = (
       reading.inletTemperature !== null
       && reading.inletTemperature >= config.maxSafeTemperature
@@ -33,6 +39,6 @@ export const createSensorVstatusEvaluator = (loadConfig: LoadConfig) => (
       && reading.flowRate !== null
       && reading.flowRate < config.minSafeFlow
 
-    return overTemperature || overPressure || runningLowFlow ? 1 : 0
+    return invalidSensor || overTemperature || overPressure || runningLowFlow ? 1 : 0
   }
 )

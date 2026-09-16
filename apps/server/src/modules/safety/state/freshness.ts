@@ -4,6 +4,7 @@
  */
 
 import type { SensorSafetyStatus } from '@new26interthing/shared'
+import { isValidSensorValue } from '../rules/sensor-value.js'
 
 export type SensorKey =
   | 'flow'
@@ -55,18 +56,16 @@ export const createSensorFreshness = (clock: () => number) => {
      * @param key 需要读取、更新或校验的状态字段名称。
      * @param value 本次准备读取、转换或保存的值。
      * @param recordedAt 本次读数的服务器接收时间戳，单位为毫秒。
-     * @param zeroInvalid 是否把持续零值视为传感器无效。
      * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
      */
     update(
       key: SensorKey,
       value: number | null,
       recordedAt: number,
-      zeroInvalid = false,
     ) {
       const fact = facts[key]
       if (value === null) return
-      if (!Number.isFinite(value) || (zeroInvalid && value === 0)) {
+      if (!isValidSensorValue(value)) {
         fact.invalid = true
         return
       }
@@ -81,14 +80,6 @@ export const createSensorFreshness = (clock: () => number) => {
      */
     value(key: SensorKey) {
       return facts[key].value
-    },
-    /**
-     * 主动把指定传感器事实标记为无效，供持续零值等规则使用。
-     * @param key 需要读取、更新或校验的状态字段名称。
-     * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
-     */
-    invalidate(key: SensorKey) {
-      facts[key].invalid = true
     },
     isFresh,
     /**

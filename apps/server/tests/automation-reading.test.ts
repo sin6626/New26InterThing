@@ -64,4 +64,18 @@ describe('automation reading normalization', () => {
     expect(Number.isNaN(normalized.pressure)).toBe(true)
     expect(Number.isNaN(normalized.flowRate)).toBe(true)
   })
+
+  it('keeps zero valid and converts the device disconnected sentinel to invalid', () => {
+    const normalized = normalizeAutomationReading({
+      pressure: 0,
+      flow_rate: 0,
+      temp_in: 0,
+      temp_out: 6_553.5,
+    }, 5_000)
+
+    expect(normalized.pressure).toBe(0)
+    expect(normalized.flowRate).toBe(0)
+    expect(normalized.inletTemperature).toBe(0)
+    expect(Number.isNaN(normalized.outletTemperature)).toBe(true)
+  })
 })

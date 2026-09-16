@@ -4,6 +4,7 @@
  */
 
 import type { SafetyConfig, SafetyReading } from '../types.js'
+import { isValidSensorValue } from './sensor-value.js'
 
 /**
  * 判断安全保护当前是否满足对应业务条件；本函数不主动执行外部操作。
@@ -15,7 +16,9 @@ export const hasOverTemperature = (
   reading: SafetyReading,
   config: SafetyConfig,
 ) => (reading.inletTemperature !== null
+    && isValidSensorValue(reading.inletTemperature)
     // 入口与出口任一路达到上限都成立；相等边界也属于超温。
     && reading.inletTemperature >= config.maxSafeTemperature)
   || (reading.outletTemperature !== null
+    && isValidSensorValue(reading.outletTemperature)
     && reading.outletTemperature >= config.maxSafeTemperature)

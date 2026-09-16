@@ -4,6 +4,7 @@
  */
 
 import type { SafetyConfig, SafetyReading } from '../types.js'
+import { isValidSensorValue } from './sensor-value.js'
 
 /**
  * 判断安全保护当前是否满足对应业务条件；本函数不主动执行外部操作。
@@ -17,4 +18,5 @@ export const hasOverPressure = (
 ) => reading.actualPump === 'on'
   // 只有设备实际泵运行时把压力读数当作运行超压；期望开泵不算实际运行。
   && reading.pressure !== null
+  && isValidSensorValue(reading.pressure)
   && reading.pressure >= config.maxSafePressure

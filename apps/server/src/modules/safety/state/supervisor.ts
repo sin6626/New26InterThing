@@ -60,8 +60,6 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   let lastEffectiveHeatingAt: number | null = null
   let observedManualPumpStartedAt: number | null = null
   let manualFlowEstablished = false
-  let flowZeroSince: number | null = null
-  let pressureZeroSince: number | null = null
 
   /**
    * 判断指定传感器事实是否仍在数据超时时间内有效。
@@ -72,51 +70,6 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
   const isFresh = (key: SensorKey, context: SafetyContext) => (
     sensors.isFresh(key, context.config.dataTimeoutSeconds)
   )
-
-  /**
-   * 跟踪运行期间持续为零的流量和压力，将长期零值标记为无效。
-   * @param context 当前自动状态、期望执行器状态和安全参数组成的上下文。
-   * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
-   */
-  const refreshActiveZeroObservations = (context: SafetyContext) => {
-    // 运行中的长期 0 值可能是传感器卡死，超时后应视作数据无效。
-    const hydraulicallyActive = context.state === 'building-flow'
-      || context.state === 'running'
-      || context.state === 'cooling'
-      || context.desiredPump === 'on'
-      || context.desiredHeater === 'on'
-      || latestReading?.actualPump === 'on'
-      || latestReading?.actualHeater === 'on'
-    if (!hydraulicallyActive) {
-      flowZeroSince = null
-      pressureZeroSince = null
-      return
-    }
-    const now = clock()
-    if (sensors.value('flow') === 0) flowZeroSince ??= now
-    else flowZeroSince = null
-    if (sensors.value('pressure') === 0) pressureZeroSince ??= now
-    else pressureZeroSince = null
-    const timeoutMilliseconds = context.config.dataTimeoutSeconds * 1_000
-    const initiallyBuildingFlow = context.state === 'building-flow'
-      || (context.manualPumpStartedAt !== null
-        && context.manualPumpStartedAt !== undefined
-        && !manualFlowEstablished)
-    if (
-      !initiallyBuildingFlow
-      && flowZeroSince !== null
-      && now - flowZeroSince >= timeoutMilliseconds
-    ) {
-      sensors.invalidate('flow')
-    }
-    if (
-      !initiallyBuildingFlow
-      && pressureZeroSince !== null
-      && now - pressureZeroSince >= timeoutMilliseconds
-    ) {
-      sensors.invalidate('pressure')
-    }
-  }
 
   /**
    * 故障锁定后继续观察水力条件，必要时把仅关热升级为同时停泵。
@@ -342,9 +295,8 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       latestContext = context
       sensors.update('flow', reading.flowRate, reading.recordedAt)
       sensors.update('pressure', reading.pressure, reading.recordedAt)
-      sensors.update('inletTemperature', reading.inletTemperature, reading.recordedAt, true)
-      sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt, true)
-      refreshActiveZeroObservations(context)
+      sensors.update('inletTemperature', reading.inletTemperature, reading.recordedAt)
+      sensors.update('outletTemperature', reading.outletTemperature, reading.recordedAt)
       if (context.manualPumpStartedAt !== observedManualPumpStartedAt) {
         observedManualPumpStartedAt = context.manualPumpStartedAt ?? null
         manualFlowEstablished = false
@@ -501,7 +453,6 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
      */
     tick(context: SafetyContext): SafetyDecision | null {
       latestContext = context
-      refreshActiveZeroObservations(context)
       if (lockedDecision) return upgradeLockedProtection(context)
       if (latestReading) {
         const missingSensorDecision = evaluateRequiredSensors(latestReading, context)
@@ -597,8 +548,6 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
       heatingBaseline = null
       observedManualPumpStartedAt = null
       manualFlowEstablished = false
-      flowZeroSince = null
-      pressureZeroSince = null
     },
 
     /**

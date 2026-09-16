@@ -63,4 +63,15 @@ describe('sensor history status evaluation', () => {
       water_Y2: 1,
     }))).resolves.toBe(0)
   })
+
+  it('marks the device disconnected sentinel as abnormal while keeping zero available', async () => {
+    const evaluate = createSensorVstatusEvaluator(vi.fn().mockResolvedValue(config))
+
+    await expect(evaluate(message({
+      temp_out: 6_553.5,
+      pressure: 0,
+      flow_rate: 0,
+      water_Y2: 0,
+    }))).resolves.toBe(1)
+  })
 })

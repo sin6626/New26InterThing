@@ -5,6 +5,7 @@
  */
 
 import type { AutomationReading } from '../types.js'
+import { isValidSensorValue } from '../../safety/rules/sensor-value.js'
 
 type SensorValues = Record<string, string | number | null>
 
@@ -18,7 +19,9 @@ const numeric = (value: unknown) => {
   if (typeof value === 'string' && value.trim() === '') return Number.NaN
   const parsed = Number(value)
   // isFinite判断一个值是不是有限的, 也就是说判断不是infinity
-  return Number.isFinite(parsed) ? parsed : Number.NaN
+  return isValidSensorValue(parsed)
+    ? parsed
+    : Number.NaN
 }
 
 /**

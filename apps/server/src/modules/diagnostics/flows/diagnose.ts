@@ -63,7 +63,10 @@ export const createHydraulicDiagnosisManager = ({
       const result = service.evaluate(deviceNumber, {
         pumpRunning: reading.actualPump === 'on',
         buildingFlow: automationState === 'building-flow',
-        sensorsValid: reading.pressure !== null && reading.flowRate !== null,
+        sensorsValid: reading.pressure !== null
+          && Number.isFinite(reading.pressure)
+          && reading.flowRate !== null
+          && Number.isFinite(reading.flowRate),
         pressure: reading.pressure,
         flowRate: reading.flowRate,
       }, {

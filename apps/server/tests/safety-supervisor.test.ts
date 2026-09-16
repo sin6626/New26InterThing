@@ -356,28 +356,42 @@ describe('safety supervisor', () => {
     })
   })
 
-  it('treats sustained zero pressure as invalid only during active control', () => {
+  it('keeps zero pressure as a valid reading for other safety rules', () => {
     let now = 1_000
-    const activeSupervisor = createSafetySupervisor(() => now)
-    activeSupervisor.handleReading({
+    const supervisor = createSafetySupervisor(() => now)
+    expect(supervisor.handleReading({
       ...reading(now),
       pressure: 0,
-    }, context())
-    now = 4_000
-    expect(activeSupervisor.tick(context())).toMatchObject({
+    }, context())).toBeNull()
+
+    for (now = 2_000; now <= 4_000; now += 1_000) {
+      expect(supervisor.handleReading({
+        ...reading(now),
+        pressure: 0,
+      }, context())).toBeNull()
+    }
+    expect(supervisor.getSnapshot().sensors.pressure).toBe('ok')
+  })
+
+  it('treats the device disconnected sentinel as an invalid sensor reading', () => {
+    const pressureSupervisor = createSafetySupervisor(() => 1_000)
+    expect(pressureSupervisor.handleReading({
+      ...reading(),
+      pressure: 6_553.5,
+    }, context())).toMatchObject({
       faultCode: 'SENSOR_PRESSURE_TIMEOUT',
     })
+    expect(pressureSupervisor.getSnapshot().sensors.pressure).toBe('invalid')
 
-    const stoppedSupervisor = createSafetySupervisor(() => now)
-    stoppedSupervisor.handleReading({
-      ...reading(now),
-      pressure: 0,
-      actualPump: 'off',
-    }, context({ state: 'stopped', desiredPump: 'off' }))
-    now = 8_000
-    expect(stoppedSupervisor.tick(
-      context({ state: 'stopped', desiredPump: 'off' }),
-    )).toBeNull()
+    const temperatureSupervisor = createSafetySupervisor(() => 1_000)
+    expect(temperatureSupervisor.handleReading({
+      ...reading(),
+      outletTemperature: 6_553.5,
+      actualHeater: 'on',
+    }, context({ desiredHeater: 'on' }))).toMatchObject({
+      faultCode: 'SENSOR_TEMPERATURE_TIMEOUT',
+    })
+    expect(temperatureSupervisor.getSnapshot().sensors.outletTemperature).toBe('invalid')
   })
 
   it('keeps the last valid sensor fact when a partial message omits the field', () => {
