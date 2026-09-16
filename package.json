@@ -7,6 +7,7 @@
     "dev": "pnpm --parallel --filter @new26interthing/web --filter @new26interthing/server run dev",
     "dev:web": "pnpm --filter @new26interthing/web dev",
     "dev:server": "pnpm --filter @new26interthing/server dev",
+    "start:server": "pnpm --filter @new26interthing/server start",
     "test": "pnpm --recursive --if-present run test",
     "typecheck": "pnpm --recursive --if-present run typecheck",
     "check:env": "pnpm --filter @new26interthing/server check:env"
