@@ -1,6 +1,7 @@
 /**
  * 阅读导航：故障中文说明：为故障锁存和页面警告提供一致描述；具体触发条件由各纯规则与监督器决定。
  * 入口位置：modules/safety/faults/definitions.ts
+ * 故障码的默认的中文描述模版, 仅仅作为兜底
  */
 
 import type { SafetyFaultCode } from '../types.js'
