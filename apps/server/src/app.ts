@@ -10,7 +10,7 @@ import express, { type Express } from 'express'
 import { createBehaviorRouter, type BehaviorRepository, type RecognitionService } from './modules/behavior/index.js'
 
 import { createDeviceRouter, type DeviceRepository } from './modules/device/index.js'
-import { createFaultRouter, type FaultRepository } from './modules/fault/index.js'
+import { createFaultRouter, createFaultRuleRouter, type FaultRepository, type FaultRuleService } from './modules/fault/index.js'
 import { createSensorHistoryRouter, type SensorHistoryRepository } from './modules/sensor-history/index.js'
 import {
   createControlRouter,
@@ -26,6 +26,7 @@ import type { OperationHistoryRepository } from './modules/operation-history/ind
 interface AppDependencies {
   deviceRepository: DeviceRepository
   faultRepository: FaultRepository
+  faultRuleService?: FaultRuleService
   sensorHistoryRepository: SensorHistoryRepository
   behaviorRepository?: BehaviorRepository
   recognitionService?: RecognitionService
@@ -45,6 +46,7 @@ interface AppDependencies {
 export const createApp = ({
   deviceRepository,
   faultRepository,
+  faultRuleService,
   sensorHistoryRepository,
   behaviorRepository,
   recognitionService,
@@ -61,6 +63,7 @@ export const createApp = ({
   app.use(express.json())
   app.use('/api/devices', createDeviceRouter(deviceRepository))
   app.use('/api/faults', createFaultRouter(faultRepository))
+  if (faultRuleService) app.use('/api/fault-rules', createFaultRuleRouter(faultRuleService))
   app.use('/api/sensor-history', createSensorHistoryRouter(sensorHistoryRepository))
   if (behaviorRepository && recognitionService) app.use('/api/behaviors', createBehaviorRouter(behaviorRepository, recognitionService))
   if (controlRepository && controlService) {
@@ -90,7 +93,16 @@ export const createApp = ({
   })
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     console.error(error)
-    response.status(500).json({ code: 500, message: '服务器内部错误', data: null })
+    const status = error
+      && typeof error === 'object'
+      && 'status' in error
+      && typeof error.status === 'number'
+      ? error.status
+      : 500
+    const message = status < 500 && error instanceof Error
+      ? error.message
+      : '服务器内部错误'
+    response.status(status).json({ code: status, message, data: null })
   })
 
   return app

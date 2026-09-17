@@ -44,4 +44,44 @@ describe('hydraulic diagnosis manager', () => {
 
     expect(order).toEqual(['protect', 'report'])
   })
+
+  it('does not protect or report when the hydraulic rule is disabled', async () => {
+    const protect = vi.fn()
+    const reportFault = vi.fn()
+    const manager = createHydraulicDiagnosisManager({
+      loadConfig: vi.fn().mockResolvedValue({
+        deviceOfflineTimeoutSeconds: 5,
+        dataTimeoutSeconds: 3,
+        minSafeFlow: 0.5,
+        minOperatingPressure: 20,
+        maxSafePressure: 130,
+        maxSafeTemperature: 45,
+        diagnosisConfirmSeconds: 2,
+      }),
+      emit: vi.fn(),
+      isEnabled: vi.fn().mockResolvedValue(false),
+      protect,
+      reportFault,
+    })
+    const normalReading = {
+      flowRate: 2,
+      pressure: 80,
+      inletTemperature: 20,
+      outletTemperature: 21,
+      actualPump: 'on' as const,
+      actualHeater: 'off' as const,
+    }
+    for (const recordedAt of [1_000, 2_000, 3_000]) {
+      await manager.handleReading('device-1', { ...normalReading, recordedAt }, 'running')
+    }
+    await manager.handleReading('device-1', {
+      ...normalReading,
+      recordedAt: 4_000,
+      pressure: 30,
+      flowRate: 0.5,
+    }, 'running')
+
+    expect(protect).not.toHaveBeenCalled()
+    expect(reportFault).not.toHaveBeenCalled()
+  })
 })

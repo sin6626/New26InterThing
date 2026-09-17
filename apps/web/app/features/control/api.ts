@@ -9,6 +9,8 @@ import type {
   PaginatedOperationLogs,
   AutomationSnapshot,
   AutomationDebugMode,
+  FaultRuleConfig,
+  UpdateFaultRuleConfig,
   WaterFlowSnapshot,
 } from '@new26interthing/shared'
 
@@ -91,6 +93,17 @@ export const useControlApi = () => {
     async getLogOptions() {
       const response = await http.get<ApiResponse<OperationLogOptions>>(
         '/operation-logs/options',
+      )
+      return unwrap(response.data)
+    },
+    async getFaultRules() {
+      const response = await http.get<ApiResponse<FaultRuleConfig[]>>('/fault-rules')
+      return unwrap(response.data)
+    },
+    async updateFaultRule(faultCode: string, input: UpdateFaultRuleConfig) {
+      const response = await http.put<ApiResponse<FaultRuleConfig>>(
+        `/fault-rules/${encodeURIComponent(faultCode)}`,
+        input,
       )
       return unwrap(response.data)
     },

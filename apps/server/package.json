@@ -8,6 +8,7 @@
     "migrate:operation-history": "tsx src/config/migrate-operation-history.ts",
     "migrate:error-source": "tsx src/config/migrate-error-source.ts",
     "migrate:operational-metrics": "tsx src/config/migrate-operational-metrics.ts",
+    "migrate:fault-rules": "tsx src/config/migrate-fault-rules.ts",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run",

@@ -34,6 +34,7 @@ docs              API、里程碑、现场手册和新旧对照
 pnpm migrate:operation-history
 pnpm migrate:error-source
 pnpm migrate:operational-metrics
+pnpm migrate:fault-rules
 ```
 
 5. 执行：

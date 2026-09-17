@@ -60,6 +60,10 @@ const { enabled: debugMode, loading: debugModeLoading, change: changeDebugMode }
             <el-icon><Warning /></el-icon>
             <span>错误信息</span>
           </el-menu-item>
+          <el-menu-item index="/fault-rules">
+            <el-icon><Warning /></el-icon>
+            <span>告警配置</span>
+          </el-menu-item>
 
           <el-menu-item index="/controls">
             <el-icon><ChatLineRound /></el-icon>

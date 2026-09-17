@@ -14,7 +14,7 @@ import { createDeviceRepository, createDevicePresenceService } from '../modules/
 import { createHydraulicDiagnosisManager } from '../modules/diagnostics/index.js'
 import { createMonitoringConfigLoader } from '../modules/monitoring-config/index.js'
 import { createBehaviorRepository, createRecognitionService } from '../modules/behavior/index.js'
-import { createFaultRepository, createFaultReporter } from '../modules/fault/index.js'
+import { createFaultRepository, createFaultReporter, createFaultRuleService } from '../modules/fault/index.js'
 import {
   createSensorRealtimeHandler,
   createSensorRepository,
@@ -59,6 +59,7 @@ const pool = createDatabasePool(env)
 const faultRepository = createFaultRepository(pool)
 const behaviorRepository = createBehaviorRepository(pool)
 const operationHistory = createOperationHistoryRepository(pool)
+const faultRuleService = createFaultRuleService(pool, operationHistory)
 const controlRepository = createControlRepository(pool, operationHistory)
 const loadMonitoringConfig = createMonitoringConfigLoader(pool)
 const loadAutomationConfig = createAutomationConfigLoader(pool)
@@ -66,6 +67,7 @@ const loadAutomationConfig = createAutomationConfigLoader(pool)
 const faultReporter = createFaultReporter({
   repository: faultRepository,
   broadcast: message => realtimeWebSocket.broadcast(message),
+  getRule: faultRuleService.get,
 })
 // 注册设备各个传感器状态, 离线推送
 const devicePresence = createDevicePresenceService({
@@ -87,6 +89,10 @@ const devicePresence = createDevicePresenceService({
 const hydraulicDiagnosis = createHydraulicDiagnosisManager({
   loadConfig: loadMonitoringConfig,
   emit: message => realtimeWebSocket.broadcast(message),
+  isEnabled: async (code) => {
+    const rule = await faultRuleService.get(code)
+    return !rule || rule.protectionLocked || rule.protectionEnabled
+  },
   protect: async (diagnosis) => {
     await automationManager.tripFault(
       diagnosis.deviceNumber,
@@ -199,6 +205,7 @@ automationManager = createAutomationManager({
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
   faultRepository,
+  faultRuleService,
   sensorHistoryRepository: createSensorHistoryRepository(
     pool,
     async () => (await loadMonitoringConfig()).dataTimeoutSeconds,

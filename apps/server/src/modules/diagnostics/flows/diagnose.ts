@@ -17,6 +17,7 @@ import { createHydraulicDiagnosisService } from '../state/confirmation.js'
 interface Dependencies {
   loadConfig(): Promise<MonitoringConfig>
   emit(message: HydraulicDiagnosisMessage): void
+  isEnabled?(code: HydraulicDiagnosisCode): Promise<boolean>
   protect?(diagnosis: HydraulicDiagnosis): Promise<void>
   reportFault(deviceNumber: string, code: HydraulicDiagnosisCode, detail: string): Promise<void>
 }
@@ -36,6 +37,7 @@ const reportableCodes = new Set<HydraulicDiagnosisCode>([
 export const createHydraulicDiagnosisManager = ({
   loadConfig,
   emit,
+  isEnabled = async () => true,
   protect = async () => {},
   reportFault,
 }: Dependencies) => {
@@ -75,16 +77,23 @@ export const createHydraulicDiagnosisManager = ({
         maxSafePressure: config.maxSafePressure,
         confirmSeconds: config.diagnosisConfirmSeconds,
       }, reading.recordedAt)
+      const reportable = reportableCodes.has(result.code)
+      const enabled = !reportable || await isEnabled(result.code)
+
       emit({
         // 就是Websocket的broadcast因为在runtime层调用的时候传递的就是这个
         type: 'hydraulic.diagnosis',
         data: { deviceNumber, ...result },
       })
+      if (!enabled) {
+        reportedCodes.delete(deviceNumber)
+        return result
+      }
       // 仅确定的泄漏/爆管要求紧急停机；其他诊断只上报，不擅自改变设备状态。
       if (result.code === 'HYDRAULIC_LEAK_OR_BURST') {
         await protect({ deviceNumber, ...result })
       }
-      if (!reportableCodes.has(result.code)) {
+      if (!reportable) {
         reportedCodes.delete(deviceNumber)
       }
       else if (reportedCodes.get(deviceNumber) !== result.code) {

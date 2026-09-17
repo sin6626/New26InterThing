@@ -179,6 +179,16 @@ await reporter.reportFault({
 
 报告器按 `errorNumber + type` 查询 `t_error_code_mapper`，将标准中文信息和具体原因写入 `t_error_msg`。写入成功后通过现有 `/ws` 广播 `{ type: 'fault.alert', data: FaultItem }`，供应用布局显示右上角警告；故障页面仍由 HTTP 主动查询。
 
+## 告警配置
+
+告警配置保存在 `t_fault_rule_config`，修改后立即生效，并以 `fault_rule_config` 类型写入操作历史。
+
+- `GET /api/fault-rules`：返回全部规则及保护、记录、弹窗开关。
+- `PUT /api/fault-rules/:faultCode`：请求体为 `protectionEnabled`、`recordEnabled`、`notificationEnabled` 三个布尔值。
+- 核心安全规则的 `protectionLocked=true`，接口会强制保持保护开启；页面仍可独立关闭历史记录或右上角弹窗。
+- 未锁定的水力诊断和设备离线规则可整体停用。停用后不执行该规则的保护动作，也不入库、不弹窗。
+- `recordEnabled=false` 但 `notificationEnabled=true` 时只即时弹窗，不写故障历史；反之则只保存记录。
+
 ## 智能识别与行为数据
 
 行为数据不使用 MQTT 或 WebSocket。历史数据页提交记录 ID，后端重查 `t_sensor_data`、调用本地配置的现场识别接口，并按 `t_behavior_field_mapper` 将响应写入 `t_behavior_data`。

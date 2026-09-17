@@ -6,4 +6,7 @@
 export { createFaultRepository } from './mysql.js'
 export { createFaultReporter } from './report.js'
 export { createFaultRouter } from './http.js'
+export { createFaultRuleService } from './rules.js'
+export { createFaultRuleRouter } from './rules-http.js'
+export type { FaultRuleService } from './rules.js'
 export type { FaultRepository } from './ports.js'

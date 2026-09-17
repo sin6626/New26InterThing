@@ -5,6 +5,77 @@ import { createFaultReporter } from '../src/modules/fault/report.js'
 const report = { deviceNumber: '202111', errorNumber: 'LOW_FLOW', type: '6', source: 'system' as const, detail: '流量 0.10L/min' }
 
 describe('fault reporter', () => {
+  it('suppresses a disabled diagnostic rule before mapping, saving, or notifying', async () => {
+    const repository = {
+      findMappedMessage: vi.fn(), save: vi.fn(),
+      getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn(),
+    }
+    const broadcast = vi.fn()
+    const reporter = createFaultReporter({
+      repository,
+      broadcast,
+      getRule: vi.fn().mockResolvedValue({
+        faultCode: 'LOW_FLOW', name: '测试规则', category: 'diagnostic',
+        protectionEnabled: false, protectionLocked: false,
+        recordEnabled: true, notificationEnabled: true,
+      }),
+    })
+
+    await expect(reporter.reportFault(report)).resolves.toBeNull()
+    expect(repository.findMappedMessage).not.toHaveBeenCalled()
+    expect(repository.save).not.toHaveBeenCalled()
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('can notify without saving a history record', async () => {
+    const repository = {
+      findMappedMessage: vi.fn().mockResolvedValue('设备离线'),
+      save: vi.fn(),
+      getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn(),
+    }
+    const broadcast = vi.fn()
+    const reporter = createFaultReporter({
+      repository,
+      broadcast,
+      getRule: vi.fn().mockResolvedValue({
+        faultCode: 'E002', name: '设备离线', category: 'communication',
+        protectionEnabled: true, protectionLocked: false,
+        recordEnabled: false, notificationEnabled: true,
+      }),
+    })
+
+    await reporter.reportFault({ ...report, errorNumber: 'E002' })
+
+    expect(repository.save).not.toHaveBeenCalled()
+    expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'fault.alert' }))
+  })
+
+  it('can save a history record without notifying', async () => {
+    const saved = {
+      id: 9, ...report, message: '低流量', occurredAt: '2026-09-17 16:00:00',
+    }
+    const repository = {
+      findMappedMessage: vi.fn().mockResolvedValue('低流量'),
+      save: vi.fn().mockResolvedValue(saved),
+      getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn(),
+    }
+    const broadcast = vi.fn()
+    const reporter = createFaultReporter({
+      repository,
+      broadcast,
+      getRule: vi.fn().mockResolvedValue({
+        faultCode: 'LOW_FLOW', name: '持续低流量', category: 'safety',
+        protectionEnabled: true, protectionLocked: true,
+        recordEnabled: true, notificationEnabled: false,
+      }),
+    })
+
+    await reporter.reportFault(report)
+
+    expect(repository.save).toHaveBeenCalledTimes(1)
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
   it('maps, saves, and broadcasts one normalized fault', async () => {
     const saved = {
       id: 8, deviceNumber: '202111', errorNumber: 'LOW_FLOW', type: '6',
