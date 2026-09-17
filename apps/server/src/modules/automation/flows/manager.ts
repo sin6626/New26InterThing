@@ -15,13 +15,14 @@ import {
 } from './engine.js'
 import type {
   AutomationConfig,
+  AutomationConfigLoadOptions,
   AutomationReading,
 } from '../types.js'
 import type { WaterFlowService } from '../../water-flow/accumulate.js'
 
 interface Dependencies {
   clock?: () => number
-  loadConfig(): Promise<AutomationConfig>
+  loadConfig(options?: AutomationConfigLoadOptions): Promise<AutomationConfig>
   execute(
     deviceNumber: string,
     topic: 'pump' | 'heater',

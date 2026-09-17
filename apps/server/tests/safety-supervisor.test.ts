@@ -525,7 +525,7 @@ describe('safety supervisor', () => {
     )).toMatchObject({ faultCode: 'DRY_HEATING_NO_TEMP_RISE' })
   })
 
-  it('pauses no-rise timing while heating is ineffective', () => {
+  it('restarts no-rise timing after heating becomes ineffective', () => {
     let now = 1_000
     const supervisor = createSafetySupervisor(() => now)
     const heatingReading = () => ({
@@ -545,7 +545,39 @@ describe('safety supervisor', () => {
       context({ desiredHeater: 'on' }),
     )).toBeNull()
     now = 121_000
+    expect(supervisor.handleReading(
+      heatingReading(),
+      context({ desiredHeater: 'on' }),
+    )).toBeNull()
+    now = 151_000
+    expect(supervisor.handleReading(
+      heatingReading(),
+      context({ desiredHeater: 'on' }),
+    )).toMatchObject({ faultCode: 'DRY_HEATING_NO_TEMP_RISE' })
+  })
 
+  it('requires one continuous actual-heater-on period before reporting no temperature rise', () => {
+    let now = 1_000
+    const supervisor = createSafetySupervisor(() => now)
+    const heatingReading = () => ({
+      ...reading(now),
+      outletTemperature: 31,
+      actualHeater: 'on' as const,
+    })
+
+    supervisor.handleReading(heatingReading(), context({ desiredHeater: 'on' }))
+    now = 61_000
+    expect(supervisor.handleReading({
+      ...heatingReading(),
+      actualHeater: 'off',
+    }, context({ desiredHeater: 'off' }))).toBeNull()
+
+    now = 91_000
+    expect(supervisor.handleReading(
+      heatingReading(),
+      context({ desiredHeater: 'on' }),
+    )).toBeNull()
+    now = 151_000
     expect(supervisor.handleReading(
       heatingReading(),
       context({ desiredHeater: 'on' }),

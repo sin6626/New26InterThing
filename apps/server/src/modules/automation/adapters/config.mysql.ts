@@ -6,7 +6,10 @@
 
 import type { Pool, RowDataPacket } from 'mysql2/promise'
 
-import type { AutomationConfig } from '../types.js'
+import type {
+  AutomationConfig,
+  AutomationConfigLoadOptions,
+} from '../types.js'
 
 const aliases: Record<string, string> = {
   pid_min_open_time: 'pid_min_on_time',
@@ -18,7 +21,9 @@ const aliases: Record<string, string> = {
  * @param pool MySQL 连接池，供仓储执行参数化查询和事务。
  * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
  */
-export const createAutomationConfigLoader = (pool: Pool) => async () => {
+export const createAutomationConfigLoader = (pool: Pool) => async ({
+  allowUnsafeBusinessValues = false,
+}: AutomationConfigLoadOptions = {}) => {
   const [rows] = await pool.query<RowDataPacket[]>(
     `select c.topic, g.value
      from t_direct_config c
@@ -65,49 +70,58 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     }
     return value
   }
+  const positiveBusinessValue = allowUnsafeBusinessValues
+    ? getRequiredNumber
+    : positive
+  const nonNegativeBusinessValue = allowUnsafeBusinessValues
+    ? getRequiredNumber
+    : nonNegative
   const strategy = values.get('temperature_control_strategy')
   if (strategy !== 'hysteresis' && strategy !== 'pid') {
     throw new Error('控制参数 temperature_control_strategy 必须是 hysteresis 或 pid')
   }
-  const targetTemperature = positive('target_temperature')
-  const temperatureHysteresis = positive('temperature_hysteresis')
-  const maxSafeTemperature = positive('max_safe_temperature')
+  const targetTemperature = positiveBusinessValue('target_temperature')
+  const temperatureHysteresis = positiveBusinessValue('temperature_hysteresis')
+  const maxSafeTemperature = positiveBusinessValue('max_safe_temperature')
   const config: AutomationConfig = {
     strategy,
     targetTemperature,
     temperatureHysteresis,
-    minSafeFlow: positive('min_safe_flow'),
-    buildFlowTimeoutSeconds: positive('build_flow_timeout'),
-    coolingDelaySeconds: positive('cooling_delay'),
-    dataTimeoutSeconds: positive('data_timeout'),
-    lowFlowConfirmSeconds: positive('low_flow_confirm_time'),
-    maxSafePressure: positive('max_safe_pressure'),
+    minSafeFlow: positiveBusinessValue('min_safe_flow'),
+    buildFlowTimeoutSeconds: positiveBusinessValue('build_flow_timeout'),
+    coolingDelaySeconds: positiveBusinessValue('cooling_delay'),
+    dataTimeoutSeconds: positiveBusinessValue('data_timeout'),
+    lowFlowConfirmSeconds: positiveBusinessValue('low_flow_confirm_time'),
+    maxSafePressure: positiveBusinessValue('max_safe_pressure'),
     maxSafeTemperature,
-    temperatureReversedConfirmSeconds: positive('temp_reversed_confirm_time'),
-    dryHeatingTimeoutSeconds: positive('dry_heating_timeout'),
-    dryHeatingTemperatureDifference: positive('dry_heating_temp_diff'),
+    temperatureReversedConfirmSeconds: positiveBusinessValue('temp_reversed_confirm_time'),
+    dryHeatingTimeoutSeconds: positiveBusinessValue('dry_heating_timeout'),
+    dryHeatingTemperatureDifference: positiveBusinessValue('dry_heating_temp_diff'),
     pid: {
       targetTemperature,
-      kp: nonNegative('pid_kp'),
-      ki: nonNegative('pid_ki'),
-      kd: nonNegative('pid_kd'),
-      cycleSeconds: positive('pid_cycle_time'),
-      minOnSeconds: positive('pid_min_on_time'),
-      minOffSeconds: positive('pid_min_off_time'),
-      overshootAllowance: nonNegative('pid_overshoot_allowance'),
-      resumeHysteresis: positive('pid_resume_hysteresis'),
+      kp: nonNegativeBusinessValue('pid_kp'),
+      ki: nonNegativeBusinessValue('pid_ki'),
+      kd: nonNegativeBusinessValue('pid_kd'),
+      cycleSeconds: positiveBusinessValue('pid_cycle_time'),
+      minOnSeconds: positiveBusinessValue('pid_min_on_time'),
+      minOffSeconds: positiveBusinessValue('pid_min_off_time'),
+      overshootAllowance: nonNegativeBusinessValue('pid_overshoot_allowance'),
+      resumeHysteresis: positiveBusinessValue('pid_resume_hysteresis'),
     },
   }
-  if (targetTemperature >= maxSafeTemperature) {
+  if (!allowUnsafeBusinessValues && targetTemperature >= maxSafeTemperature) {
     throw new Error('目标温度必须低于最高安全温度')
   }
-  if (temperatureHysteresis >= targetTemperature) {
+  if (!allowUnsafeBusinessValues && temperatureHysteresis >= targetTemperature) {
     throw new Error('温度回差必须小于目标温度')
   }
-  if (strategy === 'pid' && config.pid.kp <= 0) {
+  if (!allowUnsafeBusinessValues && strategy === 'pid' && config.pid.kp <= 0) {
     throw new Error('PID 模式启动前必须设置 pid_kp > 0')
   }
-  if (config.pid.cycleSeconds < config.pid.minOnSeconds + config.pid.minOffSeconds) {
+  if (
+    !allowUnsafeBusinessValues
+    && config.pid.cycleSeconds < config.pid.minOnSeconds + config.pid.minOffSeconds
+  ) {
     throw new Error('PID 周期必须不小于最短开启与关闭时间之和')
   }
   for (const [topic, value] of [
@@ -115,17 +129,20 @@ export const createAutomationConfigLoader = (pool: Pool) => async () => {
     ['pid_min_on_time', config.pid.minOnSeconds],
     ['pid_min_off_time', config.pid.minOffSeconds],
   ] as const) {
-    if (!Number.isSafeInteger(value)) {
+    if (!allowUnsafeBusinessValues && !Number.isSafeInteger(value)) {
       throw new Error(`控制参数 ${topic} 必须是正整数秒`)
     }
   }
-  if (targetTemperature + config.pid.overshootAllowance >= maxSafeTemperature) {
+  if (
+    !allowUnsafeBusinessValues
+    && targetTemperature + config.pid.overshootAllowance >= maxSafeTemperature
+  ) {
     throw new Error('PID 强制关热温度必须低于最高安全温度')
   }
-  if (config.pid.resumeHysteresis >= targetTemperature) {
+  if (!allowUnsafeBusinessValues && config.pid.resumeHysteresis >= targetTemperature) {
     throw new Error('PID 恢复回差必须小于目标温度')
   }
-  positive('command_timeout')
-  positive('pipe_inner_diameter')
+  positiveBusinessValue('command_timeout')
+  positiveBusinessValue('pipe_inner_diameter')
   return config
 }

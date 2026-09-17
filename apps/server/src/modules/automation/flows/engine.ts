@@ -25,6 +25,7 @@ import type {
 } from '../../safety/types.js'
 import type {
   AutomationConfig,
+  AutomationConfigLoadOptions,
   AutomationReading,
 } from '../types.js'
 import { AutomationError } from '../types.js'
@@ -38,7 +39,7 @@ interface Dependencies {
   deviceNumber: string
   initialDebugMode?: boolean
   clock?: () => number
-  loadConfig(): Promise<AutomationConfig>
+  loadConfig(options?: AutomationConfigLoadOptions): Promise<AutomationConfig>
   execute(topic: 'pump' | 'heater', value: ActuatorValue): Promise<void>
   getWaterFlow(): Promise<WaterFlowSnapshot>
   emit(message: AutomationStatusMessage): void
@@ -226,7 +227,9 @@ export const createAutomationEngine = ({
   const loadCheckedConfig = async () => {
     // 配置非法时不能继续自动运行，因此将其提升为可锁定的安全故障。
     try {
-      const loaded = await loadConfig()
+      const loaded = await loadConfig({
+        allowUnsafeBusinessValues: debugMode,
+      })
       config = loaded
       configFingerprint = JSON.stringify(loaded)
       return loaded
@@ -417,7 +420,9 @@ export const createAutomationEngine = ({
         }
         let latestConfig: AutomationConfig
         try {
-          latestConfig = await loadConfig()
+          latestConfig = await loadConfig({
+            allowUnsafeBusinessValues: debugMode,
+          })
         }
         catch (error) {
           const detail = error instanceof Error ? error.message : String(error)

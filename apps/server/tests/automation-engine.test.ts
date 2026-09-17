@@ -287,6 +287,49 @@ describe('automation engine', () => {
     expect(execute).toHaveBeenCalledWith('pump', 'on')
   })
 
+  it('loads relaxed business values when automatic mode starts in debug mode', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const relaxedConfig = {
+      ...config,
+      targetTemperature: -10,
+      minSafeFlow: -1,
+    }
+    const loadConfig = vi.fn(
+      async (options?: { allowUnsafeBusinessValues?: boolean }) => {
+        if (!options?.allowUnsafeBusinessValues) {
+          throw new Error('目标温度必须大于 0')
+        }
+        return relaxedConfig
+      },
+    )
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      initialDebugMode: true,
+      clock: () => 5_000,
+      loadConfig,
+      execute,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 0,
+        averageFlowOneMinute: 0,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await expect(engine.setEnabled(true)).resolves.toMatchObject({
+      enabled: true,
+      state: 'building-flow',
+    })
+    expect(loadConfig).toHaveBeenCalledWith({
+      allowUnsafeBusinessValues: true,
+    })
+  })
+
   it('refuses to start when the recent reading lacks control values', async () => {
     const execute = vi.fn().mockResolvedValue(undefined)
     const engine = createAutomationEngine({

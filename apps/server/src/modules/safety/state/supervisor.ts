@@ -434,14 +434,10 @@ export const createSafetySupervisor = (clock: () => number = Date.now) => {
         lastEffectiveHeatingAt = clock()
       }
       else {
-        if (lastEffectiveHeatingAt !== null) {
-          effectiveHeatingMilliseconds += clock() - lastEffectiveHeatingAt
-        }
-        lastEffectiveHeatingAt = null
-      }
-      if (context.state === 'stopped' && reading.actualHeater === 'off') {
+        // 实际加热器关闭或水力条件失效就结束本轮观察，不能跨加热周期拼接证据。
         heatingBaseline = null
         effectiveHeatingMilliseconds = 0
+        lastEffectiveHeatingAt = null
       }
       return evaluateTimedRules(context)
     },

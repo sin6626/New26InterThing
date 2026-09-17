@@ -24,6 +24,10 @@ export interface AutomationConfig {
   pid: PidConfig
 }
 
+export interface AutomationConfigLoadOptions {
+  allowUnsafeBusinessValues?: boolean
+}
+
 export interface AutomationReading {
   recordedAt: number
   flowRate: number | null

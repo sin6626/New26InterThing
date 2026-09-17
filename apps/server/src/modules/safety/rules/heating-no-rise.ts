@@ -1,5 +1,5 @@
   /**
-   * 阅读导航：无温升规则：只累计有效加热时间，出口温度不达到后台温差要求时判干烧疑似故障。
+   * 阅读导航：无温升规则：只累计本轮连续有效加热时间，出口温度不达到后台温差要求时判加热异常。
    * 入口位置：modules/safety/rules/heating-no-rise.ts
    */
 
@@ -27,7 +27,7 @@
   }) => heatingBaseline !== null
     // baseline 是本轮有效加热开始时的出口温度；没有基线就不能判断“升了多少”。
     && effectiveHeatingMilliseconds + (
-      // 上次有效加热时间到 now 的片段在此补算，停热阶段不累计。
+      // 上次有效加热时间到 now 的片段在此补算；停热会在监督器中清除整轮证据。
       lastEffectiveHeatingAt === null ? 0 : now - lastEffectiveHeatingAt
     ) >= config.dryHeatingTimeoutSeconds * 1_000
     && (outletTemperature ?? heatingBaseline) - heatingBaseline
