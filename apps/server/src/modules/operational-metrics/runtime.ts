@@ -1,14 +1,18 @@
 /**
- * 阅读导航：进程内运行指标：只根据设备实际泵/加热反馈累计时间，超时不补算；服务重启后从零开始。
+ * 阅读导航：实时运行指标：只根据设备实际泵/加热反馈累计时间，超时不补算，并定时持久化供重启恢复。
  * 入口位置：modules/operational-metrics/runtime.ts
  */
 
 import { calculateTemperatureRatePerMinute } from './calculation.js'
+import type {
+  OperationalMetricsRepository,
+  OperationalSwitchState,
+} from './types.js'
 
 interface OperationalReading {
   recordedAt: number
-  actualPump: 'on' | 'off' | 'unknown'
-  actualHeater: 'on' | 'off' | 'unknown'
+  actualPump: OperationalSwitchState
+  actualHeater: OperationalSwitchState
   outletTemperature: number | null
 }
 
@@ -25,12 +29,21 @@ interface OperationalState {
   lastHeaterState: OperationalReading['actualHeater']
   outletTemperatureSamples: TemperatureSample[]
   outletHeatingRatePerMinute: number | null
+  lastSavedAt: number
 }
 
 interface Options {
+  repository?: OperationalMetricsRepository
   dataTimeoutSeconds?: number
   loadDataTimeoutSeconds?: () => Promise<number>
   temperatureWindowSeconds?: number
+  persistIntervalMilliseconds?: number
+}
+
+const emptyRepository: OperationalMetricsRepository = {
+  load: async () => null,
+  save: async () => undefined,
+  reset: async () => undefined,
 }
 
 /**
@@ -39,13 +52,15 @@ interface Options {
  * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
  */
 export const createOperationalMetricsService = ({
+  repository = emptyRepository,
   dataTimeoutSeconds = 3,
   loadDataTimeoutSeconds = async () => dataTimeoutSeconds,
   temperatureWindowSeconds = 60,
+  persistIntervalMilliseconds = 2_000,
 }: Options = {}) => {
   /**
    * 计算进程内现场指标：泵/加热运行秒数和出口温度每分钟变化。
-   * 只认设备实际反馈，不按页面期望状态计时；服务重启后从零统计。
+   * 只认设备实际反馈，不按页面期望状态计时；服务重启后从数据库恢复。
    */
   const states = new Map<string, OperationalState>()
 
@@ -54,17 +69,19 @@ export const createOperationalMetricsService = ({
    * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
    */
-  const getState = (deviceNumber: string) => {
+  const getState = async (deviceNumber: string) => {
     const existing = states.get(deviceNumber)
     if (existing) return existing
+    const persisted = await repository.load(deviceNumber)
     const state: OperationalState = {
-      pumpRuntimeSeconds: 0,
-      heaterRuntimeSeconds: 0,
-      lastCalculatedAt: 0,
-      lastPumpState: 'unknown',
-      lastHeaterState: 'unknown',
+      pumpRuntimeSeconds: persisted?.pumpRuntimeSeconds ?? 0,
+      heaterRuntimeSeconds: persisted?.heaterRuntimeSeconds ?? 0,
+      lastCalculatedAt: persisted?.lastCalculatedAt ?? 0,
+      lastPumpState: persisted?.lastPumpState ?? 'unknown',
+      lastHeaterState: persisted?.lastHeaterState ?? 'unknown',
       outletTemperatureSamples: [],
       outletHeatingRatePerMinute: null,
+      lastSavedAt: 0,
     }
     states.set(deviceNumber, state)
     return state
@@ -75,8 +92,7 @@ export const createOperationalMetricsService = ({
    * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
    */
-  const getSnapshot = (deviceNumber: string) => {
-    const state = getState(deviceNumber)
+  const snapshot = (deviceNumber: string, state: OperationalState) => {
     return {
       deviceNumber,
       pumpRuntimeSeconds: Number(state.pumpRuntimeSeconds.toFixed(1)), // 水泵累计运行时间
@@ -98,7 +114,7 @@ export const createOperationalMetricsService = ({
      * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
      */
     async handleReading(deviceNumber: string, reading: OperationalReading) {
-      const state = getState(deviceNumber)
+      const state = await getState(deviceNumber)
       const currentDataTimeoutSeconds = await loadDataTimeoutSeconds()
       const elapsedSeconds = state.lastCalculatedAt
         ? (reading.recordedAt - state.lastCalculatedAt) / 1_000
@@ -143,10 +159,32 @@ export const createOperationalMetricsService = ({
           )
         }
       }
-
-      return getSnapshot(deviceNumber)
+      if (reading.recordedAt - state.lastSavedAt >= persistIntervalMilliseconds) {
+        state.lastSavedAt = reading.recordedAt
+        await repository.save(deviceNumber, state)
+      }
+      return snapshot(deviceNumber, state)
     },
-    getSnapshot,
+    async getSnapshot(deviceNumber: string) {
+      return snapshot(deviceNumber, await getState(deviceNumber))
+    },
+    async reset(deviceNumber: string) {
+      const state = await getState(deviceNumber)
+      const oldPumpRuntimeSeconds = state.pumpRuntimeSeconds
+      const oldHeaterRuntimeSeconds = state.heaterRuntimeSeconds
+      await repository.reset(
+        deviceNumber,
+        oldPumpRuntimeSeconds,
+        oldHeaterRuntimeSeconds,
+      )
+      state.pumpRuntimeSeconds = 0
+      state.heaterRuntimeSeconds = 0
+      state.lastCalculatedAt = 0
+      state.lastPumpState = 'unknown'
+      state.lastHeaterState = 'unknown'
+      state.lastSavedAt = 0
+      return snapshot(deviceNumber, state)
+    },
   }
 }
 

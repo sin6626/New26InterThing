@@ -20,6 +20,7 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
   } = useRealtimeSocket()
   const loading = ref(false)
   const resetting = ref(false)
+  const resettingOperationalMetrics = ref(false)
   const resettingFault = ref(false)
 
   const snapshot = computed<AutomationSnapshot | undefined>(() => {
@@ -105,6 +106,35 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
     }
   }
 
+  const resetOperationalMetrics = async () => {
+    if (!deviceNumber.value) return
+    try {
+      await ElMessageBox.confirm(
+        '只清零实时页面累计的水泵和加热运行时长，不删除历史采样数据。确认继续吗？',
+        '确认清零运行时长',
+        { type: 'warning', confirmButtonText: '确认清零', cancelButtonText: '取消' },
+      )
+    }
+    catch {
+      return
+    }
+    resettingOperationalMetrics.value = true
+    try {
+      const result = await api.resetOperationalMetrics(deviceNumber.value)
+      operationalMetricsSnapshots.value = {
+        ...operationalMetricsSnapshots.value,
+        [deviceNumber.value]: result,
+      }
+      ElMessage.success('水泵和加热运行时长已清零')
+    }
+    catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '运行时长清零失败')
+    }
+    finally {
+      resettingOperationalMetrics.value = false
+    }
+  }
+
   watch(deviceNumber, () => void load(), { immediate: true })
 
   return {
@@ -113,7 +143,9 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
     operationalMetrics,
     resetting,
     resettingFault,
+    resettingOperationalMetrics,
     resetFault,
+    resetOperationalMetrics,
     resetWaterFlow,
     snapshot,
   }

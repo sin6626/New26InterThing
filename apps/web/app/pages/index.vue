@@ -23,6 +23,8 @@ const {
 const {
   loading: metricsLoading,
   resetting: resettingWaterFlow,
+  resettingOperationalMetrics,
+  resetOperationalMetrics,
   resetWaterFlow,
   snapshot: automation,
   operationalMetrics,
@@ -116,8 +118,10 @@ onMounted(() => {
       :operational-metrics="operationalMetrics"
       :loading="metricsLoading"
       :resetting="resettingWaterFlow"
+      :runtime-resetting="resettingOperationalMetrics"
       :disabled="!selectedDevice"
       @reset="resetWaterFlow"
+      @reset-runtime="resetOperationalMetrics"
     />
 
     <RealtimeTrendsPanel

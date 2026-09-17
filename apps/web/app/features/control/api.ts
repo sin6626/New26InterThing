@@ -62,6 +62,12 @@ export const useControlApi = () => {
       )
       return unwrap(response.data)
     },
+    async resetOperationalMetrics(deviceNumber: string) {
+      const response = await http.post<ApiResponse<OperationalMetricsSnapshot>>(
+        `/automation/${encodeURIComponent(deviceNumber)}/operational-metrics/reset`,
+      )
+      return unwrap(response.data)
+    },
     async resetAutomationFault(deviceNumber: string) {
       const response = await http.post<ApiResponse<AutomationSnapshot>>(
         `/automation/${encodeURIComponent(deviceNumber)}/fault/reset`,

@@ -5,3 +5,8 @@
 
 export { createOperationalMetricsService } from './runtime.js'
 export type { OperationalMetricsService } from './runtime.js'
+export { createOperationalMetricsRepository } from './mysql.js'
+export type {
+  OperationalMetricsRepository,
+  PersistedOperationalMetrics,
+} from './types.js'

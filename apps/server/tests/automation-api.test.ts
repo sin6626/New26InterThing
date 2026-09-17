@@ -49,7 +49,7 @@ const startServer = async (
 
 describe('automation HTTP API', () => {
   it('returns the current operational metrics for initial page loading', async () => {
-    const getSnapshot = vi.fn().mockReturnValue({
+    const getSnapshot = vi.fn().mockResolvedValue({
       deviceNumber: 'device-1',
       pumpRuntimeSeconds: 12,
       heaterRuntimeSeconds: 8,
@@ -75,6 +75,32 @@ describe('automation HTTP API', () => {
         heaterRuntimeSeconds: 8,
         outletHeatingRatePerMinute: 1.5,
       },
+    })
+  })
+
+  it('clears both operational runtime counters', async () => {
+    const reset = vi.fn().mockResolvedValue({
+      deviceNumber: 'device-1',
+      pumpRuntimeSeconds: 0,
+      heaterRuntimeSeconds: 0,
+    })
+    const baseUrl = await startServer(
+      vi.fn(),
+      {} as ControlService,
+      {} as ControlRepository,
+      { reset } as unknown as OperationalMetricsService,
+    )
+
+    const response = await fetch(
+      `${baseUrl}/api/automation/device-1/operational-metrics/reset`,
+      { method: 'POST' },
+    )
+
+    expect(response.status).toBe(200)
+    expect(reset).toHaveBeenCalledWith('device-1')
+    expect(await response.json()).toMatchObject({
+      code: 0,
+      data: { pumpRuntimeSeconds: 0, heaterRuntimeSeconds: 0 },
     })
   })
 

@@ -186,14 +186,39 @@ export const createAutomationRouter = (
     }
   })
 
-  // 各个运行时长, 速度, 一样是在内存的
-  router.get('/:deviceNumber/operational-metrics', (request, response) => {
-    response.json({
-      code: 0,
-      message: '操作成功',
-      data: operationalMetrics?.getSnapshot(request.params.deviceNumber) ?? null,
-    })
+  // 泵和加热运行时长由后端累计并持久化，温升速度仍使用最近一分钟内存窗口。
+  router.get('/:deviceNumber/operational-metrics', async (request, response, next) => {
+    try {
+      response.json({
+        code: 0,
+        message: '操作成功',
+        data: operationalMetrics
+          ? await operationalMetrics.getSnapshot(request.params.deviceNumber)
+          : null,
+      })
+    }
+    catch (error) {
+      next(error)
+    }
   })
+
+  router.post(
+    '/:deviceNumber/operational-metrics/reset',
+    async (request, response, next) => {
+      try {
+        response.json({
+          code: 0,
+          message: '水泵和加热运行时长已清零',
+          data: operationalMetrics
+            ? await operationalMetrics.reset(request.params.deviceNumber)
+            : null,
+        })
+      }
+      catch (error) {
+        next(error)
+      }
+    },
+  )
 
   return router
 }

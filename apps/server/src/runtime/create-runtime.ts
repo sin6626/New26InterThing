@@ -21,7 +21,10 @@ import {
   createSensorVstatusEvaluator,
 } from '../modules/realtime/index.js'
 import { createSensorHistoryRepository } from '../modules/sensor-history/index.js'
-import { createOperationalMetricsService } from '../modules/operational-metrics/index.js'
+import {
+  createOperationalMetricsRepository,
+  createOperationalMetricsService,
+} from '../modules/operational-metrics/index.js'
 import { createControlRepository, createControlService } from '../modules/control/index.js'
 import {
   createAutomationConfigLoader,
@@ -127,8 +130,9 @@ const waterFlowService = createWaterFlowService({
   // 指令表查内径
   loadPipeDiameter: createPipeDiameterLoader(pool),
 })
-// 水泵, 加热时间累计, 内存算, 跟指令控制层的配置联动, 内部会查表
+// 水泵、加热运行时长在内存增量计算并定时持久化，服务重启后从表中恢复。
 const operationalMetricsService = createOperationalMetricsService({
+  repository: createOperationalMetricsRepository(pool, operationHistory),
   loadDataTimeoutSeconds: async () => (
     await loadMonitoringConfig()
   ).dataTimeoutSeconds,

@@ -269,7 +269,13 @@ GET /automation/:deviceNumber
 GET /automation/:deviceNumber/operational-metrics
 ```
 
-返回进程内累计的水泵和加热运行秒数、设备实际开关状态、出口水温每分钟变化速度及更新时间。运行时长不持久化，服务重启后从零统计；页面后续通过 `operational-metrics.realtime` 实时更新。
+返回累计的水泵和加热运行秒数、设备实际开关状态、出口水温每分钟变化速度及更新时间。泵与加热运行时长定时保存到 `t_operational_metrics_accumulator`，服务重启后恢复；出口温度变化速度仍根据重启后的最近 60 秒采样重新形成。页面后续通过 `operational-metrics.realtime` 实时更新。
+
+```http
+POST /automation/:deviceNumber/operational-metrics/reset
+```
+
+将该设备实时页面的水泵和加热累计运行时长同时清零，并写入操作历史；不删除 `t_sensor_data`，因此不影响历史页面按时间范围重新计算。
 
 ### 启停自动模式
 

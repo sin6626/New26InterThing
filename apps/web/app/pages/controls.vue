@@ -22,9 +22,11 @@ const {
   loading: automationLoading,
   operationalMetrics,
   resetting: resettingWaterFlow,
+  resettingOperationalMetrics,
   resettingFault,
   resetFault,
   resetWaterFlow,
+  resetOperationalMetrics,
   snapshot: automation,
 } = useAutomation(selectedDevice)
 
@@ -252,8 +254,10 @@ onMounted(() => void initialize())
       :operational-metrics="operationalMetrics"
       :loading="automationLoading"
       :resetting="resettingWaterFlow"
+      :runtime-resetting="resettingOperationalMetrics"
       :disabled="!selectedDevice"
       @reset="resetWaterFlow"
+      @reset-runtime="resetOperationalMetrics"
     />
 
     <el-card v-loading="loading" shadow="never" class="rounded-xl border-slate-200">

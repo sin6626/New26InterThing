@@ -9,12 +9,14 @@ defineProps<{
   disabled: boolean
   loading: boolean
   resetting: boolean
+  runtimeResetting: boolean
   snapshot?: WaterFlowSnapshot
   operationalMetrics?: OperationalMetricsSnapshot
 }>()
 
 defineEmits<{
   reset: []
+  resetRuntime: []
 }>()
 </script>
 
@@ -27,16 +29,25 @@ defineEmits<{
       <div>
         <h2 class="m-0 text-lg font-semibold text-slate-900">水循环运行指标</h2>
         <p class="mt-1 mb-0 text-sm text-slate-500">
-          根据实时流量计算，累计结果在后端持久化
+          根据设备实时反馈计算，累计结果在后端持久化
         </p>
       </div>
-      <el-button
-        :loading="resetting"
-        :disabled="disabled"
-        @click="$emit('reset')"
-      >
-        清零累计水量
-      </el-button>
+      <div class="flex gap-2">
+        <el-button
+          :loading="runtimeResetting"
+          :disabled="disabled"
+          @click="$emit('resetRuntime')"
+        >
+          清零运行时长
+        </el-button>
+        <el-button
+          :loading="resetting"
+          :disabled="disabled"
+          @click="$emit('reset')"
+        >
+          清零累计水量
+        </el-button>
+      </div>
     </div>
 
     <div class="grid grid-cols-4 gap-4">
