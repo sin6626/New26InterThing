@@ -9,6 +9,7 @@ const {
   controlTree,
   deviceNumbers,
   errorMessage,
+  fieldDisabled,
   initialize,
   loading,
   savingId,
@@ -300,7 +301,7 @@ onMounted(() => void initialize())
                 v-if="field.type === 'switch'"
                 :model-value="switchValue(field)"
                 :loading="savingId === field.configId"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 active-text="开启"
                 inactive-text="关闭"
                 @change="value => update(field, Boolean(value))"
@@ -308,7 +309,7 @@ onMounted(() => void initialize())
               <el-input
                 v-else-if="field.type === 'input'"
                 :model-value="getInputValue(field)"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 placeholder="请输入配置值"
                 @focus="onInputFocus(field)"
                 @input="value => onInputUpdate(field, String(value))"
@@ -320,13 +321,13 @@ onMounted(() => void initialize())
                 :model-value="Number(field.value || 0)"
                 :min="field.min ?? 0"
                 :max="field.max ?? 100"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 @change="value => update(field, Number(value))"
               />
               <el-select
                 v-else-if="field.type === 'radio'"
                 :model-value="field.value"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 @change="value => update(field, value)"
               >
                 <el-option
@@ -339,7 +340,7 @@ onMounted(() => void initialize())
               <el-date-picker
                 v-else-if="field.type === 'datetime'"
                 :model-value="field.value"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 type="datetime"
                 value-format="YYYY-MM-DD HH:mm:ss"
                 placeholder="选择日期时间"
@@ -348,7 +349,7 @@ onMounted(() => void initialize())
               <el-checkbox-group
                 v-else-if="field.type === 'checkbox'"
                 :model-value="field.value ? field.value.split(',') : []"
-                :disabled="savingId !== undefined"
+                :disabled="fieldDisabled(field)"
                 @change="updateCheckbox(field, $event)"
               >
                 <el-checkbox

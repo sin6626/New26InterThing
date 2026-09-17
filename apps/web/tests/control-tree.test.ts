@@ -5,7 +5,11 @@ import {
 } from 'vitest'
 
 import type { ControlField } from '@new26interthing/shared'
-import { buildVisibleControlTree } from '../app/features/control/control-tree'
+import {
+  buildVisibleControlTree,
+  isControlFieldDisabled,
+  syncAutomaticModeField,
+} from '../app/features/control/control-tree'
 
 const field = (overrides: Partial<ControlField>): ControlField => ({
   configId: 0,
@@ -39,5 +43,18 @@ describe('control tree', () => {
       [10, 'datetime'],
       [20, 'slider'],
     ])
+  })
+
+  it('synchronizes master to off and disables it after a safety fault', () => {
+    const fields = [
+      field({ configId: 0, name: '控制模式', topic: 'master', value: 'on' }),
+      field({ configId: 4, name: '水泵开关', topic: 'pump', value: 'off' }),
+    ]
+
+    syncAutomaticModeField(fields, false)
+
+    expect(fields[0]?.value).toBe('off')
+    expect(isControlFieldDisabled(fields[0]!, undefined, true)).toBe(true)
+    expect(isControlFieldDisabled(fields[1]!, undefined, true)).toBe(false)
   })
 })

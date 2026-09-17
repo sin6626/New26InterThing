@@ -7,12 +7,16 @@ import { ElMessage } from 'element-plus'
 import { useControlApi } from './api'
 import {
   buildVisibleControlTree,
+  isControlFieldDisabled,
+  syncAutomaticModeField,
   type ControlTreeNode,
 } from './control-tree'
+import { useRealtimeSocket } from '../realtime/use-realtime-socket'
 
 /** 读取后台动态控制树，并把页面操作转换成明确的控制请求。 */
 export const useControls = () => {
   const api = useControlApi()
+  const { automationSnapshots } = useRealtimeSocket()
   const snapshot = ref<ControlSnapshot>({ deviceNumber: '', fields: [] })
   const deviceNumbers = ref<string[]>([])
   const selectedDevice = ref('')
@@ -25,12 +29,24 @@ export const useControls = () => {
     buildVisibleControlTree(snapshot.value.fields)
   ))
 
+  const syncAutomaticMode = () => {
+    const automation = automationSnapshots.value[selectedDevice.value]
+    if (automation) syncAutomaticModeField(snapshot.value.fields, automation.enabled)
+  }
+
+  const fieldDisabled = (field: ControlField) => isControlFieldDisabled(
+    field,
+    savingId.value,
+    automationSnapshots.value[selectedDevice.value]?.safety.locked ?? false,
+  )
+
   const load = async () => {
     if (!selectedDevice.value) return
     loading.value = true
     errorMessage.value = ''
     try {
       snapshot.value = await api.getSnapshot(selectedDevice.value)
+      syncAutomaticMode()
     }
     catch {
       snapshot.value = { deviceNumber: selectedDevice.value, fields: [] }
@@ -97,11 +113,16 @@ export const useControls = () => {
   }
 
   watch(selectedDevice, () => void load(), { immediate: false })
+  watch(
+    () => automationSnapshots.value[selectedDevice.value],
+    () => syncAutomaticMode(),
+  )
 
   return {
     controlTree,
     deviceNumbers,
     errorMessage,
+    fieldDisabled,
     initialize,
     loading,
     savingId,
