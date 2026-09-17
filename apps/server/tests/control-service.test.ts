@@ -38,6 +38,59 @@ const allowSafety = () => ({
 })
 
 describe('control service', () => {
+  it('ignores a repeated device command without publishing or recording it', async () => {
+    const repo = repository()
+    const publish = vi.fn()
+    const safety = allowSafety()
+    const service = createControlService(repo, { publish }, safety)
+
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 23,
+      value: 'off',
+    })).resolves.toEqual({ configId: 23, value: 'off', status: 'unchanged' })
+
+    expect(publish).not.toHaveBeenCalled()
+    expect(safety.executeAction).not.toHaveBeenCalled()
+    expect(repo.saveSuccess).not.toHaveBeenCalled()
+    expect(repo.saveFailure).not.toHaveBeenCalled()
+  })
+
+  it('ignores equivalent numeric and master values without saving or changing automation', async () => {
+    const repo = repository()
+    const setEnabled = vi.fn()
+    const service = createControlService(repo, { publish: vi.fn() }, { setEnabled })
+
+    vi.mocked(repo.getDefinition).mockResolvedValueOnce({
+      ...definition,
+      configId: 10,
+      fieldType: '3',
+      topic: 'target_temperature',
+      oldValue: '20',
+    })
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 10,
+      value: '20.0',
+    })).resolves.toMatchObject({ status: 'unchanged' })
+
+    vi.mocked(repo.getDefinition).mockResolvedValueOnce({
+      ...definition,
+      configId: 1,
+      topic: 'master',
+      oldValue: 'off',
+    })
+    await expect(service.execute({
+      deviceNumber: '202111',
+      configId: 1,
+      value: false,
+    })).resolves.toMatchObject({ status: 'unchanged' })
+
+    expect(setEnabled).not.toHaveBeenCalled()
+    expect(repo.saveSuccess).not.toHaveBeenCalled()
+    expect(repo.saveFailure).not.toHaveBeenCalled()
+  })
+
   it('fails closed when a device command has no safety controller', async () => {
     const repo = repository()
     const publish = vi.fn()

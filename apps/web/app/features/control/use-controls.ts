@@ -70,7 +70,7 @@ export const useControls = () => {
         value,
       })
       field.value = result.value
-      ElMessage.success('修改成功')
+      ElMessage.success(result.status === 'unchanged' ? '当前已是该值' : '修改成功')
     }
     catch (error) {
       ElMessage.error(error instanceof Error ? error.message : '操作失败')

@@ -77,6 +77,20 @@ const optionValues = (options: unknown) => {
   })
 }
 
+/** 比较规范化后的请求值与数据库当前值；数值控件按数值语义比较。 */
+const isUnchangedValue = (
+  oldValue: string | null,
+  newValue: string,
+  fieldType: string,
+  hasNumericRange: boolean,
+) => {
+  if (oldValue === null) return false
+  if (fieldType === '3' || hasNumericRange) {
+    return Number(oldValue) === Number(newValue)
+  }
+  return oldValue === newValue
+}
+
 /**
  * 控制业务门面：校验动态配置、区分运行指令与参数保存，并统一记录操作日志。
  * pump/heater 会发布 MQTT；master 交给自动状态机；普通参数只写数据库。
@@ -128,6 +142,18 @@ export const createControlService = (
         : [value]
       if (selected.some(item => !allowed.includes(item))) {
         throw new ControlError('指令值不在配置选项中', 400)
+      }
+    }
+    if (isUnchangedValue(
+      definition.oldValue,
+      value,
+      definition.fieldType,
+      hasNumericRange,
+    )) {
+      return {
+        configId: intent.configId,
+        value,
+        status: 'unchanged',
       }
     }
     const shouldPublish = isDeviceCommand(definition.topic)

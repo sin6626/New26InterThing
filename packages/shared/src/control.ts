@@ -35,7 +35,7 @@ export interface ControlCommandIntent {
 export interface ControlCommandResult {
   configId: number
   value: string
-  status: 'published' | 'saved'
+  status: 'published' | 'saved' | 'unchanged'
 }
 
 export interface OperationLogItem {
