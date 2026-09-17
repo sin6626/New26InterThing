@@ -88,6 +88,7 @@ describe('realtime WebSocket', () => {
         deviceNumber: '202111',
         errorNumber: 'E001',
         type: '3',
+        source: 'system' as const,
         message: '传感器故障',
         occurredAt: '2026-09-11 10:00:00',
       },

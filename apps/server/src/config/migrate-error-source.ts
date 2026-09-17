@@ -1,0 +1,21 @@
+/** 现场首次部署时执行一次；只创建故障来源旁表，不修改旧故障表。 */
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { RowDataPacket } from 'mysql2/promise'
+import { readEnv } from './env.js'
+import { createDatabasePool } from '../infrastructure/database.js'
+
+const directory = path.dirname(fileURLToPath(import.meta.url))
+const sqlPath = path.resolve(directory, '../../migrations/002-error-source.sql')
+const pool = createDatabasePool(readEnv())
+
+try {
+  await pool.query(await fs.readFile(sqlPath, 'utf8'))
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'select count(*) as total from t_error_source',
+  )
+  console.log('故障来源表已就绪；当前记录数：', Number(rows[0]?.total ?? 0))
+} finally {
+  await pool.end()
+}

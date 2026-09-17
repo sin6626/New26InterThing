@@ -1,8 +1,11 @@
+export type FaultSource = 'system' | 'intelligence'
+
 export interface FaultItem {
   id: number
   deviceNumber: string | null
   errorNumber: string | null
   type: string | null
+  source: FaultSource
   message: string | null
   occurredAt: string | null
 }
@@ -15,6 +18,7 @@ export interface FaultTypeOption {
 export interface FaultOptions {
   deviceNumbers: string[]
   types: FaultTypeOption[]
+  sources: Array<{ value: FaultSource, label: string }>
 }
 
 export interface FaultQuery {
@@ -22,6 +26,7 @@ export interface FaultQuery {
   pageSize: number
   deviceNumber?: string
   type?: string
+  source?: FaultSource
   startTime?: string
   endTime?: string
 }

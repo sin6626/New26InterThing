@@ -75,6 +75,7 @@ const devicePresence = createDevicePresenceService({
       deviceNumber,
       errorNumber: 'E002',
       type: '2',
+      source: 'system',
       detail,
     })
   },
@@ -96,6 +97,7 @@ const hydraulicDiagnosis = createHydraulicDiagnosisManager({
       deviceNumber,
       errorNumber: code,
       type: getHydraulicFaultType(code),
+      source: 'system',
       detail,
     })
   },
@@ -184,6 +186,7 @@ automationManager = createAutomationManager({
       deviceNumber,
       errorNumber,
       type: getSafetyFaultType(errorNumber),
+      source: 'system',
       detail,
     })
   },

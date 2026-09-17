@@ -8,6 +8,7 @@ import type {
   FaultItem,
   FaultOptions,
   FaultQuery,
+  FaultSource,
   FaultStatisticsItem,
   PaginatedFaults,
 } from '@new26interthing/shared'
@@ -16,6 +17,7 @@ export interface NewFaultRecord {
   deviceNumber: string
   errorNumber: string
   type: string
+  source: FaultSource
   message: string
   occurredAt: string | Date
 }

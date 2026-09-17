@@ -32,6 +32,7 @@ docs              API、里程碑、现场手册和新旧对照
 
 ```powershell
 pnpm migrate:operation-history
+pnpm migrate:error-source
 ```
 
 5. 执行：

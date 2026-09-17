@@ -25,19 +25,23 @@ const buildFilters = (query: Omit<FaultQuery, 'page' | 'pageSize'>) => {
   const clauses: string[] = []
   const values: string[] = []
   if (query.deviceNumber) {
-    clauses.push('d_no = ?')
+    clauses.push('fault.d_no = ?')
     values.push(query.deviceNumber)
   }
   if (query.type) {
-    clauses.push('type = ?')
+    clauses.push('fault.type = ?')
     values.push(query.type)
   }
+  if (query.source) {
+    clauses.push("coalesce(fault_source.source, 'system') = ?")
+    values.push(query.source)
+  }
   if (query.startTime) {
-    clauses.push('c_time >= ?')
+    clauses.push('fault.c_time >= ?')
     values.push(query.startTime)
   }
   if (query.endTime) {
-    clauses.push('c_time <= ?')
+    clauses.push('fault.c_time <= ?')
     values.push(query.endTime)
   }
   return { where: clauses.length ? clauses.join(' and ') : '1 = 1', values }
@@ -48,11 +52,18 @@ const buildFilters = (query: Omit<FaultQuery, 'page' | 'pageSize'>) => {
  * @param row 从 MySQL 查询得到的一行原始数据。
  * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
  */
+const mapSource = (value: unknown): FaultItem['source'] => {
+  if (value === null || value === undefined || value === 'system') return 'system'
+  if (value === 'intelligence') return 'intelligence'
+  throw new Error(`未知故障来源：${String(value)}`)
+}
+
 const mapItem = (row: RowDataPacket): FaultItem => ({
   id: Number(row.id),
   deviceNumber: row.d_no ?? null,
   errorNumber: row.e_no ?? null,
   type: row.type ?? null,
+  source: mapSource(row.source),
   message: row.e_msg ?? null,
   occurredAt: row.c_time ?? null,
 })
@@ -109,18 +120,34 @@ export const createFaultRepository = (pool: Pool): FaultRepository => ({
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
    */
   async save(record) {
-    const [result] = await pool.execute<ResultSetHeader>(
-      `insert into t_error_msg (d_no, c_time, e_msg, e_no, type)
-       values (?, ?, ?, ?, ?)`,
-      [record.deviceNumber, record.occurredAt, record.message, record.errorNumber, record.type],
-    )
-    return {
-      id: result.insertId,
-      deviceNumber: record.deviceNumber,
-      errorNumber: record.errorNumber,
-      type: record.type,
-      message: record.message,
-      occurredAt: formatDateTime(record.occurredAt),
+    const connection = await pool.getConnection()
+    try {
+      await connection.beginTransaction()
+      const [result] = await connection.execute<ResultSetHeader>(
+        `insert into t_error_msg (d_no, c_time, e_msg, e_no, type)
+         values (?, ?, ?, ?, ?)`,
+        [record.deviceNumber, record.occurredAt, record.message, record.errorNumber, record.type],
+      )
+      await connection.execute(
+        `insert into t_error_source (fault_id, source)
+         values (?, ?)`,
+        [result.insertId, record.source],
+      )
+      await connection.commit()
+      return {
+        id: result.insertId,
+        deviceNumber: record.deviceNumber,
+        errorNumber: record.errorNumber,
+        type: record.type,
+        source: record.source,
+        message: record.message,
+        occurredAt: formatDateTime(record.occurredAt),
+      }
+    } catch (error) {
+      await connection.rollback()
+      throw error
+    } finally {
+      connection.release()
     }
   },
 
@@ -144,6 +171,10 @@ export const createFaultRepository = (pool: Pool): FaultRepository => ({
     return {
       deviceNumbers: deviceRows.map((row) => row.number),
       types: typeRows.map((row) => ({ value: row.type, label: typeLabel(row.type) })),
+      sources: [
+        { value: 'system', label: '系统判定' },
+        { value: 'intelligence', label: '智能判定' },
+      ],
     }
   },
 
@@ -155,14 +186,19 @@ export const createFaultRepository = (pool: Pool): FaultRepository => ({
   async list(query) {
     const { where, values } = buildFilters(query)
     const [countRows] = await pool.query<CountRow[]>(
-      `select count(*) as total from t_error_msg where ${where}`,
+      `select count(*) as total
+       from t_error_msg fault
+       left join t_error_source fault_source on fault_source.fault_id = fault.id
+       where ${where}`,
       values,
     )
     const [rows] = await pool.query<RowDataPacket[]>(
-      `select id, d_no, e_no, type, e_msg, c_time
-       from t_error_msg
+      `select fault.id, fault.d_no, fault.e_no, fault.type, fault.e_msg, fault.c_time,
+              coalesce(fault_source.source, 'system') as source
+       from t_error_msg fault
+       left join t_error_source fault_source on fault_source.fault_id = fault.id
        where ${where}
-       order by c_time desc, id desc
+       order by fault.c_time desc, fault.id desc
        limit ? offset ?`,
       [...values, query.pageSize, (query.page - 1) * query.pageSize],
     )
@@ -177,11 +213,12 @@ export const createFaultRepository = (pool: Pool): FaultRepository => ({
   async getStatistics(query) {
     const { where, values } = buildFilters(query)
     const [rows] = await pool.query<StatisticsRow[]>(
-      `select type, count(*) as total
-       from t_error_msg
+      `select fault.type, count(*) as total
+       from t_error_msg fault
+       left join t_error_source fault_source on fault_source.fault_id = fault.id
        where ${where}
-       group by type
-       order by total desc, type`,
+       group by fault.type
+       order by total desc, fault.type`,
       values,
     )
     return rows.map((row) => ({

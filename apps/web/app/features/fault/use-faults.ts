@@ -1,4 +1,4 @@
-import type { FaultItem, FaultOptions, FaultStatisticsItem } from '@new26interthing/shared'
+import type { FaultItem, FaultOptions, FaultSource, FaultStatisticsItem } from '@new26interthing/shared'
 import dayjs from 'dayjs'
 
 import { useFaultApi } from './api'
@@ -10,8 +10,12 @@ export const useFaults = () => {
   const errorMessage = ref('')
   const rows = ref<FaultItem[]>([])
   const statistics = ref<FaultStatisticsItem[]>([])
-  const options = ref<FaultOptions>({ deviceNumbers: [], types: [] })
-  const filters = reactive({ deviceNumber: '', type: '' })
+  const options = ref<FaultOptions>({ deviceNumbers: [], types: [], sources: [] })
+  const filters = reactive<{
+    deviceNumber: string
+    type: string
+    source: FaultSource | ''
+  }>({ deviceNumber: '', type: '', source: '' })
   const startTime = ref<Date | null>(null)
   const endTime = ref<Date | null>(null)
   const page = reactive({ current: 1, size: 20 })
@@ -20,6 +24,7 @@ export const useFaults = () => {
   const requestFilters = computed(() => ({
     deviceNumber: filters.deviceNumber || undefined,
     type: filters.type || undefined,
+    source: filters.source || undefined,
     startTime: startTime.value ? dayjs(startTime.value).format('YYYY-MM-DD HH:mm:ss') : undefined,
     endTime: endTime.value ? dayjs(endTime.value).format('YYYY-MM-DD HH:mm:ss') : undefined,
   }))
@@ -65,6 +70,7 @@ export const useFaults = () => {
   const reset = () => {
     filters.deviceNumber = ''
     filters.type = ''
+    filters.source = ''
     startTime.value = null
     endTime.value = null
     void search()

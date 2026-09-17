@@ -125,6 +125,10 @@ GET /sensor-history/operational-metrics?deviceNumber=202111&startTime=2026-09-10
 
 故障页面只使用以下 HTTP 接口，不通过 WebSocket 推送或自动轮询。接口固定读取 `t_error_msg`、`t_error_code_mapper` 和 `t_device`。
 
+故障记录的 `source` 固定为 `system`（系统判定）或 `intelligence`（智能判定）。来源保存在 `t_error_source` 旁表；没有旁表记录的旧故障统一返回 `system`。列表和统计接口支持可选参数 `source=system|intelligence`，非法值返回 HTTP 400。`GET /faults/options` 的 `sources` 始终返回这两个固定选项。
+
+当前确定性安全规则、设备离线和水力诊断产生的故障均为 `system`。比赛方智能识别协议尚未确认错误字段，因此当前不会生成 `intelligence` 故障。
+
 ### 页面选项
 
 ```http

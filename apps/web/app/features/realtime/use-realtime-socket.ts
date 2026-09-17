@@ -132,7 +132,7 @@ export function useRealtimeSocket() {
         if (message.type === 'fault.alert') {
           ElNotification.error({
             title: `设备 ${message.data.deviceNumber || '未知'} 发生故障`,
-            message: message.data.message || `故障编号 ${message.data.errorNumber || '未知'}`,
+            message: `${message.data.source === 'intelligence' ? '智能判定' : '系统判定'}：${message.data.message || `故障编号 ${message.data.errorNumber || '未知'}`}`,
             duration: 8_000,
             position: 'top-right',
           })

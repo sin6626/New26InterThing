@@ -14,7 +14,7 @@ onMounted(() => void initialize())
   <div class="mx-auto max-w-[1600px] space-y-4">
     <div>
       <h1 class="m-0 text-2xl font-semibold text-slate-900">故障信息</h1>
-      <p class="mt-2 mb-0 text-sm text-slate-500">查询设备主动上报并已保存的故障记录</p>
+      <p class="mt-2 mb-0 text-sm text-slate-500">查询系统规则与智能判定产生的故障记录</p>
     </div>
 
     <el-card shadow="never" class="rounded-xl border-slate-200">
@@ -27,6 +27,11 @@ onMounted(() => void initialize())
         <el-form-item label="类型" class="mb-0">
           <el-select v-model="filters.type" clearable placeholder="全部类型" style="width: 140px">
             <el-option v-for="item in options.types" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="错误来源" class="mb-0">
+          <el-select v-model="filters.source" clearable placeholder="全部来源" style="width: 140px">
+            <el-option v-for="item in options.sources" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="开始时间" class="mb-0">
@@ -58,6 +63,13 @@ onMounted(() => void initialize())
         <el-table-column label="类型" width="110">
           <template #default="scope">
             <el-tag type="danger" effect="plain">{{ scope.row.type ? `类型 ${scope.row.type}` : '未知类型' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="错误来源" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.source === 'intelligence' ? 'warning' : 'primary'" effect="plain">
+              {{ scope.row.source === 'intelligence' ? '智能判定' : '系统判定' }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="message" label="故障信息" min-width="320" show-overflow-tooltip />

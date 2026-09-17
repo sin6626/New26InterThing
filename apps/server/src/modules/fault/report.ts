@@ -3,7 +3,7 @@
  * 入口位置：modules/fault/report.ts
  */
 
-import type { FaultAlertMessage, FaultItem } from '@new26interthing/shared'
+import type { FaultAlertMessage, FaultItem, FaultSource } from '@new26interthing/shared'
 
 import type { FaultRepository } from './ports.js'
 
@@ -11,6 +11,7 @@ export interface FaultReport {
   deviceNumber: string
   errorNumber: string
   type: string
+  source: FaultSource
   detail?: string
   occurredAt?: string | Date
 }
@@ -47,6 +48,7 @@ export const createFaultReporter = ({
       deviceNumber: report.deviceNumber,
       errorNumber: report.errorNumber,
       type: report.type,
+      source: report.source,
       message: detail ? `${standardMessage}（${detail}）` : standardMessage,
       occurredAt: report.occurredAt || now(),
     })

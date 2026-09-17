@@ -27,19 +27,19 @@ describe('fault HTTP API', () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
     const getStatistics = vi.fn().mockResolvedValue([{ type: '3', label: '类型 3', count: 2 }])
     const baseUrl = await startServer(repository({
-      getOptions: vi.fn().mockResolvedValue({ deviceNumbers: ['202111'], types: [{ value: '3', label: '类型 3' }] }),
+      getOptions: vi.fn().mockResolvedValue({ deviceNumbers: ['202111'], types: [{ value: '3', label: '类型 3' }], sources: [{ value: 'system', label: '系统判定' }, { value: 'intelligence', label: '智能判定' }] }),
       list,
       getStatistics,
     }))
 
     const optionsResponse = await fetch(`${baseUrl}/api/faults/options`)
-    const pageResponse = await fetch(`${baseUrl}/api/faults?page=2&pageSize=10&deviceNumber=202111&type=3`)
-    const statisticsResponse = await fetch(`${baseUrl}/api/faults/statistics?deviceNumber=202111&type=3`)
+    const pageResponse = await fetch(`${baseUrl}/api/faults?page=2&pageSize=10&deviceNumber=202111&type=3&source=system`)
+    const statisticsResponse = await fetch(`${baseUrl}/api/faults/statistics?deviceNumber=202111&type=3&source=system`)
 
     expect(await optionsResponse.json()).toEqual({
       code: 0,
       message: '查询成功',
-      data: { deviceNumbers: ['202111'], types: [{ value: '3', label: '类型 3' }] },
+      data: { deviceNumbers: ['202111'], types: [{ value: '3', label: '类型 3' }], sources: [{ value: 'system', label: '系统判定' }, { value: 'intelligence', label: '智能判定' }] },
     })
     expect(await pageResponse.json()).toEqual({ code: 0, message: '查询成功', data: { items: [], total: 0, page: 2, pageSize: 10 } })
     expect(await statisticsResponse.json()).toEqual({
@@ -47,8 +47,16 @@ describe('fault HTTP API', () => {
       message: '查询成功',
       data: [{ type: '3', label: '类型 3', count: 2 }],
     })
-    expect(list).toHaveBeenCalledWith({ page: 2, pageSize: 10, deviceNumber: '202111', type: '3' })
-    expect(getStatistics).toHaveBeenCalledWith({ deviceNumber: '202111', type: '3' })
+    expect(list).toHaveBeenCalledWith({ page: 2, pageSize: 10, deviceNumber: '202111', type: '3', source: 'system' })
+    expect(getStatistics).toHaveBeenCalledWith({ deviceNumber: '202111', type: '3', source: 'system' })
+  })
+
+  it('rejects an unknown fault source', async () => {
+    const list = vi.fn()
+    const baseUrl = await startServer(repository({ list }))
+    const response = await fetch(`${baseUrl}/api/faults?source=device`)
+    expect(response.status).toBe(400)
+    expect(list).not.toHaveBeenCalled()
   })
 
   it('rejects invalid ranges and returns 500 for repository failures', async () => {

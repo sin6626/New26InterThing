@@ -27,6 +27,7 @@ const dateTime = z.string().refine(isValidDateTime)
 const filters = {
   deviceNumber: z.string().trim().min(1).optional(),
   type: z.string().trim().min(1).optional(),
+  source: z.enum(['system', 'intelligence']).optional(),
   startTime: dateTime.optional(),
   endTime: dateTime.optional(),
 }
