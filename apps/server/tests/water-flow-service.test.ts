@@ -50,4 +50,22 @@ describe('water flow service', () => {
     expect(reset.totalVolumeLiters).toBe(0)
     expect(repository.reset).toHaveBeenCalledWith('device-1', 12.5)
   })
+
+  it('clears the one-minute average when realtime indicators are reset', async () => {
+    const service = createWaterFlowService({
+      repository: {
+        load: vi.fn().mockResolvedValue(null),
+        save: vi.fn(),
+        reset: vi.fn(),
+      },
+      loadPipeDiameter: vi.fn().mockResolvedValue(null),
+    })
+    await service.handleReading('device-1', 6, 1_000)
+    await service.handleReading('device-1', 6, 2_000)
+    expect((await service.getSnapshot('device-1')).averageFlowOneMinute).toBe(6)
+
+    await service.resetRealtimeIndicators('device-1')
+
+    expect((await service.getSnapshot('device-1')).averageFlowOneMinute).toBe(0)
+  })
 })

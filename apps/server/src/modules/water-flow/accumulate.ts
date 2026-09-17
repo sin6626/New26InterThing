@@ -78,7 +78,7 @@ export const createWaterFlowService = ({
     state: FlowState,
   ): Promise<WaterFlowSnapshot> => {
     const diameter = await loadPipeDiameter(deviceNumber)
-    let average = state.lastFlowRateLitersPerMinute
+    let average = state.samples[0]?.flow ?? 0
     if (state.samples.length > 1) {
       let weightedFlow = 0
       let totalMilliseconds = 0
@@ -155,6 +155,13 @@ export const createWaterFlowService = ({
      */
     async getSnapshot(deviceNumber: string) {
       return snapshot(deviceNumber, await getState(deviceNumber))
+    },
+
+    /** 清空仅用于页面展示的一分钟流量窗口，不修改瞬时流量和累计水量。 */
+    async resetRealtimeIndicators(deviceNumber: string) {
+      const state = await getState(deviceNumber)
+      state.samples = []
+      return snapshot(deviceNumber, state)
     },
 
     /**

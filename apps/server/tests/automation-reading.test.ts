@@ -78,4 +78,18 @@ describe('automation reading normalization', () => {
     expect(normalized.inletTemperature).toBe(0)
     expect(Number.isNaN(normalized.outletTemperature)).toBe(true)
   })
+
+  it('treats the 600-range ff representation as disconnected', () => {
+    const normalized = normalizeAutomationReading({
+      pressure: 655.35,
+      flow_rate: 655.35,
+      temp_in: 655.35,
+      temp_out: 655.35,
+    }, 6_000)
+
+    expect(Number.isNaN(normalized.pressure)).toBe(true)
+    expect(Number.isNaN(normalized.flowRate)).toBe(true)
+    expect(Number.isNaN(normalized.inletTemperature)).toBe(true)
+    expect(Number.isNaN(normalized.outletTemperature)).toBe(true)
+  })
 })

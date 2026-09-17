@@ -65,6 +65,26 @@ describe('operational metrics service', () => {
     expect(repository.reset).toHaveBeenCalledWith('device-1', 12, 8)
   })
 
+  it('clears the outlet temperature rate when runtime counters are reset', async () => {
+    const service = createOperationalMetricsService({ dataTimeoutSeconds: 3 })
+    await service.handleReading('device-1', {
+      recordedAt: 1_000,
+      actualPump: 'on',
+      actualHeater: 'on',
+      outletTemperature: 20,
+    })
+    await service.handleReading('device-1', {
+      recordedAt: 61_000,
+      actualPump: 'on',
+      actualHeater: 'on',
+      outletTemperature: 23,
+    })
+
+    await expect(service.reset('device-1')).resolves.toMatchObject({
+      outletHeatingRatePerMinute: null,
+    })
+  })
+
   it('keeps the in-memory counters when persistence reset fails', async () => {
     const repository = {
       load: vi.fn().mockResolvedValue({

@@ -284,7 +284,9 @@ GET /automation/:deviceNumber/operational-metrics
 POST /automation/:deviceNumber/operational-metrics/reset
 ```
 
-将该设备实时页面的水泵和加热累计运行时长同时清零，并写入操作历史；不删除 `t_sensor_data`，因此不影响历史页面按时间范围重新计算。
+将该设备实时页面的水泵和加热累计运行时长、一分钟平均流量窗口及出口水温变化窗口同时清零，并写入操作历史；不清零累计水量，不删除 `t_sensor_data`，因此不影响历史页面按时间范围重新计算。
+
+设备传感器值达到 `600` 及以上时，按设备端 `0xFFFF` 经不同小数位换算后的断线值处理。`655.35` 与 `6553.5` 均不会进入实时累计、安全计算或被显示为正常传感器数据。
 
 ### 启停自动模式
 

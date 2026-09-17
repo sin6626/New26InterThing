@@ -38,7 +38,7 @@ defineEmits<{
           :disabled="disabled"
           @click="$emit('resetRuntime')"
         >
-          清零运行时长
+          清零运行指标
         </el-button>
         <el-button
           :loading="resetting"

@@ -73,5 +73,11 @@ describe('sensor history status evaluation', () => {
       flow_rate: 0,
       water_Y2: 0,
     }))).resolves.toBe(1)
+    await expect(evaluate(message({
+      temp_out: 655.35,
+      pressure: 0,
+      flow_rate: 0,
+      water_Y2: 0,
+    }))).resolves.toBe(1)
   })
 })

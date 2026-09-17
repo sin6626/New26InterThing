@@ -206,9 +206,10 @@ export const createAutomationRouter = (
     '/:deviceNumber/operational-metrics/reset',
     async (request, response, next) => {
       try {
+        await waterFlow.resetRealtimeIndicators(request.params.deviceNumber)
         response.json({
           code: 0,
-          message: '水泵和加热运行时长已清零',
+          message: '实时运行指标已清零',
           data: operationalMetrics
             ? await operationalMetrics.reset(request.params.deviceNumber)
             : null,

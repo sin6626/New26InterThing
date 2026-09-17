@@ -182,6 +182,8 @@ export const createOperationalMetricsService = ({
       state.lastCalculatedAt = 0
       state.lastPumpState = 'unknown'
       state.lastHeaterState = 'unknown'
+      state.outletTemperatureSamples = []
+      state.outletHeatingRatePerMinute = null
       state.lastSavedAt = 0
       return snapshot(deviceNumber, state)
     },

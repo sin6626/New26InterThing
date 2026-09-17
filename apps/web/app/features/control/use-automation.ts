@@ -110,8 +110,8 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
     if (!deviceNumber.value) return
     try {
       await ElMessageBox.confirm(
-        '只清零实时页面累计的水泵和加热运行时长，不删除历史采样数据。确认继续吗？',
-        '确认清零运行时长',
+        '清零水泵和加热运行时长、一分钟平均流量及出口水温每分钟变化，不删除历史采样数据。确认继续吗？',
+        '确认清零运行指标',
         { type: 'warning', confirmButtonText: '确认清零', cancelButtonText: '取消' },
       )
     }
@@ -125,7 +125,16 @@ export const useAutomation = (deviceNumber: Ref<string>) => {
         ...operationalMetricsSnapshots.value,
         [deviceNumber.value]: result,
       }
-      ElMessage.success('水泵和加热运行时长已清零')
+      const automation = await api.getAutomationSnapshot(deviceNumber.value)
+      automationSnapshots.value = {
+        ...automationSnapshots.value,
+        [deviceNumber.value]: automation,
+      }
+      waterFlowSnapshots.value = {
+        ...waterFlowSnapshots.value,
+        [deviceNumber.value]: automation.waterFlow,
+      }
+      ElMessage.success('实时运行指标已清零')
     }
     catch (error) {
       ElMessage.error(error instanceof Error ? error.message : '运行时长清零失败')

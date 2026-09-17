@@ -27,13 +27,14 @@ const startServer = async (
   controls = {} as ControlService,
   controlRepository = {} as ControlRepository,
   operationalMetrics = undefined as OperationalMetricsService | undefined,
+  waterFlow = {} as WaterFlowService,
 ) => {
   const app = express()
   app.use('/api/automation', createAutomationRouter(
     { resetFault } as unknown as AutomationManager,
     controls,
     controlRepository,
-    {} as WaterFlowService,
+    waterFlow,
     operationalMetrics,
   ))
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
@@ -84,11 +85,15 @@ describe('automation HTTP API', () => {
       pumpRuntimeSeconds: 0,
       heaterRuntimeSeconds: 0,
     })
+    const resetRealtimeIndicators = vi.fn().mockResolvedValue({
+      averageFlowOneMinute: 0,
+    })
     const baseUrl = await startServer(
       vi.fn(),
       {} as ControlService,
       {} as ControlRepository,
       { reset } as unknown as OperationalMetricsService,
+      { resetRealtimeIndicators } as unknown as WaterFlowService,
     )
 
     const response = await fetch(
@@ -98,6 +103,7 @@ describe('automation HTTP API', () => {
 
     expect(response.status).toBe(200)
     expect(reset).toHaveBeenCalledWith('device-1')
+    expect(resetRealtimeIndicators).toHaveBeenCalledWith('device-1')
     expect(await response.json()).toMatchObject({
       code: 0,
       data: { pumpRuntimeSeconds: 0, heaterRuntimeSeconds: 0 },
