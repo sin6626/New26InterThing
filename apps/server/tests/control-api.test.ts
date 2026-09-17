@@ -66,6 +66,7 @@ const startServer = async () => {
       getOptions: vi.fn(),
       list: vi.fn(),
       getTrend: vi.fn(),
+      getOperationalMetrics: vi.fn(),
     },
     controlRepository,
     controlService,

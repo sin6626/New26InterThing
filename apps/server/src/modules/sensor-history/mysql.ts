@@ -12,6 +12,10 @@ import type {
 } from '@new26interthing/shared'
 
 import type { SensorHistoryRepository } from './types.js'
+import {
+  calculateHistoricalOperationalMetrics,
+  type HistoricalOperationalSample,
+} from './operational-metrics.js'
 
 interface FieldMapping extends RowDataPacket {
   f_name: string
@@ -25,7 +29,32 @@ interface FieldMapping extends RowDataPacket {
 interface CountRow extends RowDataPacket { total: number }
 interface DeviceNumberRow extends RowDataPacket { number: string }
 
+interface OperationalRow extends RowDataPacket {
+  c_time: Date | string
+  field2: string | null
+  field6: string | null
+  field7: string | null
+}
+
 const allowedColumns = new Set(Array.from({ length: 10 }, (_, index) => `field${index + 1}`))
+
+const actuator = (value: unknown): HistoricalOperationalSample['actualPump'] => {
+  if (value === 'on' || value === 1 || value === '1') return 'on'
+  if (value === 'off' || value === 0 || value === '0') return 'off'
+  return 'unknown'
+}
+
+const numeric = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const mysqlDateTime = (timestamp: number) => {
+  const date = new Date(timestamp)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 /**
  * 把后台字段映射行转换成页面使用的字段定义。
@@ -100,7 +129,10 @@ const mapItem = (row: RowDataPacket, mappings: FieldMapping[]): SensorHistoryIte
 })
 
 /** 历史查询适配器：负责动态列、条件分页和按分钟归并趋势。 */
-export const createSensorHistoryRepository = (pool: Pool): SensorHistoryRepository => ({
+export const createSensorHistoryRepository = (
+  pool: Pool,
+  loadDataTimeoutSeconds: () => Promise<number> = async () => 3,
+): SensorHistoryRepository => ({
   /**
    * 读取传感器历史需要的数据或状态，并转换成调用方可以直接使用的结果。
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
@@ -180,5 +212,53 @@ export const createSensorHistoryRepository = (pool: Pool): SensorHistoryReposito
         data: rows.map((row) => row[mapping.db_name] === null ? null : Number(row[mapping.db_name])),
       })),
     }
+  },
+
+  async getOperationalMetrics(query) {
+    let startTime = query.startTime
+    let endTime = query.endTime
+    if (!startTime || !endTime) {
+      const [latestRows] = await pool.query<RowDataPacket[]>(
+        `select max(c_time) as latest_time
+         from t_sensor_data
+         where d_no = ?`,
+        [query.deviceNumber],
+      )
+      const latest = latestRows[0]?.latest_time
+      if (!latest) {
+        return calculateHistoricalOperationalMetrics({
+          deviceNumber: query.deviceNumber,
+          dataTimeoutSeconds: await loadDataTimeoutSeconds(),
+          samples: [],
+        })
+      }
+      const endTimestamp = new Date(latest).getTime()
+      endTime = mysqlDateTime(endTimestamp)
+      startTime = mysqlDateTime(endTimestamp - 120 * 60 * 1_000)
+    }
+
+    const startTimestamp = new Date(startTime).getTime()
+    const endTimestamp = new Date(endTime).getTime()
+    const historyStart = mysqlDateTime(startTimestamp - 60_000)
+    const [rows] = await pool.query<OperationalRow[]>(
+      `select field2, field6, field7, c_time
+       from t_sensor_data
+       where d_no = ? and c_time >= ? and c_time <= ?
+       order by c_time, id`,
+      [query.deviceNumber, historyStart, endTime],
+    )
+    const samples = rows.map((row): HistoricalOperationalSample => ({
+      recordedAt: new Date(row.c_time).getTime(),
+      actualPump: actuator(row.field7),
+      actualHeater: actuator(row.field6),
+      outletTemperature: numeric(row.field2),
+    }))
+    return calculateHistoricalOperationalMetrics({
+      deviceNumber: query.deviceNumber,
+      dataTimeoutSeconds: await loadDataTimeoutSeconds(),
+      startTime: startTimestamp,
+      endTime: endTimestamp,
+      samples,
+    })
   },
 })

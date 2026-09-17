@@ -83,7 +83,19 @@ GET /sensor-history/trend?deviceNumber=202111&status=all&limit=10
 
 设备、时间和状态参数与历史分页一致；`limit` 默认为 10，范围为 10 至 500。响应 `data` 包含正序的 `times`，以及带字段键、名称、单位和数值数组的动态 `series`。
 
-三个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
+### 历史运行指标
+
+```http
+GET /sensor-history/operational-metrics?deviceNumber=202111&startTime=2026-09-10%2008:00:00&endTime=2026-09-10%2010:00:00
+```
+
+`deviceNumber` 必填。`startTime`、`endTime` 必须同时提供；未提供时间范围时统计该设备数据库中最新记录之前的 120 分钟。
+
+接口根据 `water_Y2/field7`、`heat_Y1/field6` 的设备实际反馈和相邻采样时间差，估算查询范围内的水泵、加热运行秒数；超过当前 `data_timeout` 的报文断档不累计。根据 `temp_out/field2` 最近 60 秒窗口计算出口水温每分钟变化，并按自然分钟保留最后一个有效值。
+
+历史运行时长是离散采样推导的查询区间估算值，不等同于实时页“当前服务进程启动以来”的累计值。
+
+四个接口均返回 `{ code, message, data }`。参数格式或范围错误返回 HTTP 400，数据库异常返回 HTTP 500。
 
 ## 实时 WebSocket
 

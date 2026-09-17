@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DeviceRepository } from '../src/modules/device/mysql.js'
 import { createApp } from '../src/app.js'
 
-const sensorHistoryRepository = { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn() }
+const sensorHistoryRepository = { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn(), getOperationalMetrics: vi.fn() }
 const faultRepository = { findMappedMessage: vi.fn(), save: vi.fn(), getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn() }
 
 const servers: Array<{ close: () => void }> = []

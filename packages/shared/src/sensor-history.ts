@@ -47,3 +47,19 @@ export interface SensorHistoryTrend {
   times: string[]
   series: SensorHistoryTrendSeries[]
 }
+
+export interface SensorHistoryOperationalMetricsQuery {
+  deviceNumber: string
+  startTime?: string
+  endTime?: string
+}
+
+export interface SensorHistoryOperationalMetrics {
+  deviceNumber: string
+  pumpRuntimeSeconds: number
+  heaterRuntimeSeconds: number
+  outletTemperatureRate: {
+    times: string[]
+    data: Array<number | null>
+  }
+}

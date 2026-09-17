@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import HistoryTrendChart from '~/features/sensor-history/HistoryTrendChart.vue'
+import HistoricalOperationalMetricsPanel from '~/features/sensor-history/HistoricalOperationalMetricsPanel.vue'
 import { useSensorHistory } from '~/features/sensor-history/use-sensor-history'
 
 const {
   chartType, changeTrendLimit, errorMessage, fieldValue, filters, initialize,
   loadCurrentPage, loading, options, page, reset, rows, search, timeRange,
   total, trend, trendLimit,
+  operationalMetrics, operationalMetricsError, operationalMetricsLoading,
   recognize, recognizing, updateSelection,
 } = useSensorHistory()
 
@@ -55,6 +57,13 @@ const isBackfill = (value: unknown) => String(value) === '1' || value === 'ф┐Эхн
     </el-card>
 
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
+
+    <HistoricalOperationalMetricsPanel
+      :loading="operationalMetricsLoading"
+      :error-message="operationalMetricsError"
+      :metrics="operationalMetrics"
+      :has-time-range="Boolean(timeRange)"
+    />
 
     <el-card shadow="never" class="rounded-xl border-slate-200">
       <template #header>

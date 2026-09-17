@@ -2,6 +2,7 @@ import type {
   SensorHistoryField,
   SensorHistoryItem,
   SensorHistoryOptions,
+  SensorHistoryOperationalMetrics,
   SensorHistoryTrend,
 } from '@new26interthing/shared'
 import dayjs from 'dayjs'
@@ -16,6 +17,9 @@ export const useSensorHistory = () => {
   const rows = ref<SensorHistoryItem[]>([])
   const options = ref<SensorHistoryOptions>({ deviceNumbers: [], fields: [] })
   const trend = ref<SensorHistoryTrend>({ times: [], series: [] })
+  const operationalMetrics = ref<SensorHistoryOperationalMetrics | null>(null)
+  const operationalMetricsError = ref('')
+  const operationalMetricsLoading = ref(false)
   const total = ref(0)
   const filters = reactive({ deviceNumber: '', status: 'all' as 'all' | 'normal' | 'abnormal' })
   const timeRange = ref<[Date, Date] | null>(null)
@@ -52,12 +56,33 @@ export const useSensorHistory = () => {
     }
   }
 
+  const loadOperationalMetrics = async () => {
+    operationalMetricsError.value = ''
+    if (!filters.deviceNumber) {
+      operationalMetrics.value = null
+      return
+    }
+    operationalMetricsLoading.value = true
+    try {
+      operationalMetrics.value = await api.getOperationalMetrics({
+        deviceNumber: filters.deviceNumber,
+        startTime: requestFilters.value.startTime,
+        endTime: requestFilters.value.endTime,
+      })
+    } catch {
+      operationalMetrics.value = null
+      operationalMetricsError.value = '历史运行指标加载失败。'
+    } finally {
+      operationalMetricsLoading.value = false
+    }
+  }
+
   const search = async () => {
     page.current = 1
     loading.value = true
     errorMessage.value = ''
     try {
-      await Promise.all([loadPage(), loadTrend()])
+      await Promise.all([loadPage(), loadTrend(), loadOperationalMetrics()])
     } catch {
       rows.value = []
       total.value = 0
@@ -119,7 +144,8 @@ export const useSensorHistory = () => {
     loading.value = true
     try {
       options.value = await api.getOptions()
-      await Promise.all([loadPage(), loadTrend()])
+      filters.deviceNumber ||= options.value.deviceNumbers[0] ?? ''
+      await Promise.all([loadPage(), loadTrend(), loadOperationalMetrics()])
     } catch {
       rows.value = []
       total.value = 0
@@ -140,6 +166,9 @@ export const useSensorHistory = () => {
     loadCurrentPage,
     loading,
     options,
+    operationalMetrics,
+    operationalMetricsError,
+    operationalMetricsLoading,
     page,
     reset,
     recognize,

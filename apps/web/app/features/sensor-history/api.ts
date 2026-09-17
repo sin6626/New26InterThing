@@ -2,6 +2,8 @@ import type {
   ApiResponse,
   PaginatedSensorHistory,
   SensorHistoryOptions,
+  SensorHistoryOperationalMetrics,
+  SensorHistoryOperationalMetricsQuery,
   SensorHistoryQuery,
   SensorHistoryTrend,
 } from '@new26interthing/shared'
@@ -32,6 +34,13 @@ export const useSensorHistoryApi = () => {
     },
     async getTrend(query: HistoryFilters & { limit: number }) {
       const response = await http.get<ApiResponse<SensorHistoryTrend>>('/sensor-history/trend', { params: query })
+      return unwrap(response.data)
+    },
+    async getOperationalMetrics(query: SensorHistoryOperationalMetricsQuery) {
+      const response = await http.get<ApiResponse<SensorHistoryOperationalMetrics>>(
+        '/sensor-history/operational-metrics',
+        { params: query },
+      )
       return unwrap(response.data)
     },
     async recognize(rowIds: number[]) {

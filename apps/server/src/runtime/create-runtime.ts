@@ -192,7 +192,10 @@ automationManager = createAutomationManager({
 const app = createApp({
   deviceRepository: createDeviceRepository(pool),
   faultRepository,
-  sensorHistoryRepository: createSensorHistoryRepository(pool),
+  sensorHistoryRepository: createSensorHistoryRepository(
+    pool,
+    async () => (await loadMonitoringConfig()).dataTimeoutSeconds,
+  ),
   behaviorRepository,
   recognitionService: createRecognitionService(behaviorRepository, undefined, operationHistory),
   controlRepository,

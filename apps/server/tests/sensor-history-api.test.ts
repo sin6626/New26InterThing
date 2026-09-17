@@ -25,6 +25,7 @@ describe('sensor history HTTP API', () => {
       getOptions: vi.fn().mockResolvedValue({ deviceNumbers: ['202111'], fields: [] }),
       list: vi.fn(),
       getTrend: vi.fn().mockResolvedValue({ times: [], series: [] }),
+      getOperationalMetrics: vi.fn(),
     }
     const baseUrl = await startServer(repository)
 
@@ -45,7 +46,7 @@ describe('sensor history HTTP API', () => {
 
   it('returns a filtered history page through the public API', async () => {
     const list = vi.fn().mockResolvedValue({ items: [], total: 0 })
-    const repository = { getOptions: vi.fn(), list, getTrend: vi.fn() }
+    const repository = { getOptions: vi.fn(), list, getTrend: vi.fn(), getOperationalMetrics: vi.fn() }
     const baseUrl = await startServer(repository)
 
     const response = await fetch(`${baseUrl}/api/sensor-history?page=2&pageSize=10&deviceNumber=202111&status=abnormal&startTime=2026-09-10%2008%3A00%3A00&endTime=2026-09-10%2010%3A00%3A00`)
@@ -68,7 +69,7 @@ describe('sensor history HTTP API', () => {
 
   it('rejects an inverted time range before querying the repository', async () => {
     const list = vi.fn()
-    const repository = { getOptions: vi.fn(), list, getTrend: vi.fn() }
+    const repository = { getOptions: vi.fn(), list, getTrend: vi.fn(), getOperationalMetrics: vi.fn() }
     const baseUrl = await startServer(repository)
 
     const response = await fetch(`${baseUrl}/api/sensor-history?startTime=2026-09-10%2011%3A00%3A00&endTime=2026-09-10%2010%3A00%3A00`)
@@ -79,7 +80,7 @@ describe('sensor history HTTP API', () => {
 
   it('limits trend points to the accepted range', async () => {
     const getTrend = vi.fn()
-    const repository = { getOptions: vi.fn(), list: vi.fn(), getTrend }
+    const repository = { getOptions: vi.fn(), list: vi.fn(), getTrend, getOperationalMetrics: vi.fn() }
     const baseUrl = await startServer(repository)
 
     const response = await fetch(`${baseUrl}/api/sensor-history/trend?limit=501`)
@@ -93,6 +94,7 @@ describe('sensor history HTTP API', () => {
       getOptions: vi.fn(),
       list: vi.fn().mockRejectedValue(new Error('database unavailable')),
       getTrend: vi.fn(),
+      getOperationalMetrics: vi.fn(),
     }
     const baseUrl = await startServer(repository)
 
@@ -100,5 +102,56 @@ describe('sensor history HTTP API', () => {
 
     expect(response.status).toBe(500)
     expect(await response.json()).toEqual({ code: 500, message: '服务器内部错误', data: null })
+  })
+
+  it('returns estimated operational metrics for one device and time range', async () => {
+    const getOperationalMetrics = vi.fn().mockResolvedValue({
+      deviceNumber: '202111',
+      pumpRuntimeSeconds: 12,
+      heaterRuntimeSeconds: 6,
+      outletTemperatureRate: { times: [], data: [] },
+    })
+    const repository = {
+      getOptions: vi.fn(),
+      list: vi.fn(),
+      getTrend: vi.fn(),
+      getOperationalMetrics,
+    }
+    const baseUrl = await startServer(repository)
+
+    const response = await fetch(`${baseUrl}/api/sensor-history/operational-metrics?deviceNumber=202111&startTime=2026-09-17%2010%3A00%3A00&endTime=2026-09-17%2011%3A00%3A00`)
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      code: 0,
+      message: '查询成功',
+      data: {
+        deviceNumber: '202111',
+        pumpRuntimeSeconds: 12,
+        heaterRuntimeSeconds: 6,
+        outletTemperatureRate: { times: [], data: [] },
+      },
+    })
+    expect(getOperationalMetrics).toHaveBeenCalledWith({
+      deviceNumber: '202111',
+      startTime: '2026-09-17 10:00:00',
+      endTime: '2026-09-17 11:00:00',
+    })
+  })
+
+  it('requires a device number for operational metrics', async () => {
+    const getOperationalMetrics = vi.fn()
+    const repository = {
+      getOptions: vi.fn(),
+      list: vi.fn(),
+      getTrend: vi.fn(),
+      getOperationalMetrics,
+    }
+    const baseUrl = await startServer(repository)
+
+    const response = await fetch(`${baseUrl}/api/sensor-history/operational-metrics`)
+
+    expect(response.status).toBe(400)
+    expect(getOperationalMetrics).not.toHaveBeenCalled()
   })
 })

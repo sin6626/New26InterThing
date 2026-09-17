@@ -25,6 +25,15 @@ const trendQuerySchema = z.object({
   limit: z.coerce.number().int().min(10).max(500).default(10),
   ...filters,
 }).refine((query) => !query.startTime || !query.endTime || query.startTime <= query.endTime)
+const operationalMetricsQuerySchema = z.object({
+  deviceNumber: z.string().trim().min(1),
+  startTime: dateTime.optional(),
+  endTime: dateTime.optional(),
+}).refine(
+  query => Boolean(query.startTime) === Boolean(query.endTime),
+).refine(
+  query => !query.startTime || !query.endTime || query.startTime <= query.endTime,
+)
 
 /**
  * 生成统一的查询参数错误响应，供 HTTP 路由直接返回。
@@ -57,6 +66,20 @@ export const createSensorHistoryRouter = (repository: SensorHistoryRepository): 
     if (!parsed.success) return invalidQuery(response)
     try {
       response.json({ code: 0, message: '查询成功', data: await repository.getTrend(parsed.data) })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  router.get('/operational-metrics', async (request, response, next) => {
+    const parsed = operationalMetricsQuerySchema.safeParse(request.query)
+    if (!parsed.success) return invalidQuery(response)
+    try {
+      response.json({
+        code: 0,
+        message: '查询成功',
+        data: await repository.getOperationalMetrics(parsed.data),
+      })
     } catch (error) {
       next(error)
     }

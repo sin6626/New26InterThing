@@ -5,7 +5,7 @@ import type { FaultRepository } from '../src/modules/fault/ports.js'
 
 const servers: Array<{ close: () => void }> = []
 const deviceRepository = { list: vi.fn() }
-const sensorHistoryRepository = { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn() }
+const sensorHistoryRepository = { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn(), getOperationalMetrics: vi.fn() }
 
 afterEach(() => servers.splice(0).forEach((server) => server.close()))
 

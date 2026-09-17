@@ -9,7 +9,7 @@ const start = async (recognize = vi.fn().mockResolvedValue({ saved: true, select
   const behaviorRepository = { getOptions: vi.fn().mockResolvedValue({ fields: [] }), list: vi.fn().mockResolvedValue({ items: [], total: 0 }), getRecognitionRows: vi.fn(), saveRecognitionResult: vi.fn() }
   const server = createApp({
     deviceRepository: { list: vi.fn() }, faultRepository: { findMappedMessage: vi.fn(), save: vi.fn(), getOptions: vi.fn(), list: vi.fn(), getStatistics: vi.fn() },
-    sensorHistoryRepository: { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn() }, behaviorRepository, recognitionService: { recognize },
+    sensorHistoryRepository: { getOptions: vi.fn(), list: vi.fn(), getTrend: vi.fn(), getOperationalMetrics: vi.fn() }, behaviorRepository, recognitionService: { recognize },
   }).listen(0)
   servers.push(server); await new Promise<void>(resolve => server.once('listening', resolve))
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('测试服务启动失败')

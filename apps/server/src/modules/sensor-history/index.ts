@@ -6,3 +6,4 @@
 export { createSensorHistoryRepository } from './mysql.js'
 export { createSensorHistoryRouter } from './http.js'
 export type { SensorHistoryRepository } from './types.js'
+export { calculateHistoricalOperationalMetrics } from './operational-metrics.js'
