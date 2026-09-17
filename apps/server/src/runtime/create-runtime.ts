@@ -34,6 +34,7 @@ import {
   getHydraulicFaultType,
   getSafetyFaultType,
 } from '../modules/safety/index.js'
+import type { SafetyFaultCode } from '../modules/safety/types.js'
 import {
   createPipeDiameterLoader,
   createWaterFlowRepository,
@@ -148,6 +149,14 @@ automationManager = createAutomationManager({
   loadConfig: loadAutomationConfig,
   waterFlow: waterFlowService,
   emit: message => realtimeWebSocket.broadcast(message),
+  loadEnabledFaultCodes: async () => {
+    const rules = await faultRuleService.list()
+    return new Set(
+      rules
+        .filter(rule => rule.protectionEnabled)
+        .map(rule => rule.faultCode as SafetyFaultCode),
+    )
+  },
   /**
    * 自动模式启动失败时把 master 保存为关闭，并记录失败原因。
    * @param deviceNumber 设备唯一编号，对应数据库和 MQTT 报文中的 d_no。

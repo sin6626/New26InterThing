@@ -185,8 +185,7 @@ await reporter.reportFault({
 
 - `GET /api/fault-rules`：返回全部规则及保护、记录、弹窗开关。
 - `PUT /api/fault-rules/:faultCode`：请求体为 `protectionEnabled`、`recordEnabled`、`notificationEnabled` 三个布尔值。
-- 核心安全规则的 `protectionLocked=true`，接口会强制保持保护开启；页面仍可独立关闭历史记录或右上角弹窗。
-- 未锁定的水力诊断和设备离线规则可整体停用。停用后不执行该规则的保护动作，也不入库、不弹窗。
+- 所有规则都可整体停用。停用后不再执行该规则的保护动作，也不入库、不弹窗；连接真实设备时关闭安全规则存在风险。
 - `recordEnabled=false` 但 `notificationEnabled=true` 时只即时弹窗，不写故障历史；反之则只保存记录。
 
 ## 智能识别与行为数据

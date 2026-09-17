@@ -6,6 +6,7 @@ import {
 } from 'vitest'
 
 import { createAutomationEngine } from '../src/modules/automation/flows/engine.js'
+import type { SafetyFaultCode } from '../src/modules/safety/types.js'
 
 const config = {
   strategy: 'hysteresis' as const,
@@ -285,6 +286,60 @@ describe('automation engine', () => {
       state: 'building-flow',
     })
     expect(execute).toHaveBeenCalledWith('pump', 'on')
+  })
+
+  it('does not apply a disabled safety rule', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const reportFault = vi.fn().mockResolvedValue(undefined)
+    const enabledCodes = new Set<SafetyFaultCode>([
+      'OVER_PRESSURE',
+      'LOW_FLOW',
+      'SENSOR_FLOW_TIMEOUT',
+      'SENSOR_PRESSURE_TIMEOUT',
+      'SENSOR_TEMPERATURE_TIMEOUT',
+      'TEMP_SENSOR_REVERSED',
+      'DRY_HEATING_NO_TEMP_RISE',
+      'BUILD_FLOW_TIMEOUT',
+      'PUMP_IDLING',
+      'COMMAND_PUBLISH_FAILED',
+      'CONTROL_CONFIG_INVALID',
+    ])
+    const engine = createAutomationEngine({
+      deviceNumber: 'device-1',
+      clock: () => 1_000,
+      loadConfig: vi.fn().mockResolvedValue(config),
+      loadEnabledFaultCodes: vi.fn().mockResolvedValue(enabledCodes),
+      execute,
+      reportFault,
+      getWaterFlow: vi.fn().mockResolvedValue({
+        deviceNumber: 'device-1',
+        flowRateLitersPerMinute: 1,
+        averageFlowOneMinute: 1,
+        flowVelocityMetersPerSecond: null,
+        velocityStatus: 'unconfigured',
+        pipeInnerDiameterMillimeters: null,
+        totalVolumeLiters: 0,
+        updatedAt: null,
+      }),
+      emit: vi.fn(),
+    })
+
+    await engine.handleReading({
+      recordedAt: 1_000,
+      flowRate: 1,
+      pressure: 60,
+      inletTemperature: 30,
+      outletTemperature: 45,
+      actualPump: 'on',
+      actualHeater: 'on',
+    })
+
+    expect(await engine.getSnapshot()).toMatchObject({
+      state: 'stopped',
+      safety: { locked: false, faultCode: null },
+    })
+    expect(execute).not.toHaveBeenCalled()
+    expect(reportFault).not.toHaveBeenCalled()
   })
 
   it('loads relaxed business values when automatic mode starts in debug mode', async () => {

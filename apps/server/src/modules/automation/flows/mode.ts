@@ -26,7 +26,7 @@ interface Dependencies {
   getLatestReading(): AutomationReading | null
   getSafetySnapshot(): SafetySnapshot
   evaluateReading(reading: AutomationReading): SafetyDecision | null
-  applySafetyDecision(decision: SafetyDecision): Promise<void>
+  applySafetyDecision(decision: SafetyDecision): Promise<boolean>
   desiredPump(): 'on' | 'off'
   runPump(value: 'on'): Promise<void>
   runHeater(value: 'off'): Promise<void>
@@ -89,8 +89,8 @@ export const createAutomationModeControl = (dependencies: Dependencies) => ({
           }
           const decision = dependencies.evaluateReading(reading)
           if (decision) {
-            await dependencies.applySafetyDecision(decision)
-            throw new AutomationError(decision.detail)
+            const applied = await dependencies.applySafetyDecision(decision)
+            if (applied) throw new AutomationError(decision.detail)
           }
         }
         dependencies.enterModeState(true, 'building-flow', '等待设备建流')

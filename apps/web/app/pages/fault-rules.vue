@@ -45,11 +45,11 @@ onMounted(() => void load())
     <div>
       <h1 class="m-0 text-2xl font-semibold">告警配置</h1>
       <p class="mt-2 text-sm text-slate-500">
-        比赛现场按故障码控制规则、记录和弹窗；核心安全保护不可关闭
+        比赛现场按故障码分别控制规则、记录和弹窗；所有规则都可以关闭
       </p>
     </div>
     <el-alert
-      title="关闭记录或弹窗不会关闭核心保护；未锁定规则关闭后不再触发保护、记录和弹窗。"
+      title="关闭规则/保护后，该故障不再触发保护、记录和弹窗；连接真实设备时请谨慎关闭安全规则。"
       type="warning"
       show-icon
       :closable="false"
@@ -67,10 +67,9 @@ onMounted(() => void load())
           <template #default="{ row }">
             <el-switch
               v-model="row.protectionEnabled"
-              :disabled="row.protectionLocked || saving === row.faultCode"
+              :disabled="saving === row.faultCode"
               @change="saveRow(row)"
             />
-            <span v-if="row.protectionLocked" class="ml-2 text-xs text-red-500">锁定</span>
           </template>
         </el-table-column>
         <el-table-column label="保存记录" width="110">

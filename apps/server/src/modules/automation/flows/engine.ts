@@ -45,6 +45,7 @@ interface Dependencies {
   emit(message: AutomationStatusMessage): void
   disableMaster?(reason: string): Promise<void>
   reportFault?(errorNumber: SafetyFaultCode, detail: string): Promise<void>
+  loadEnabledFaultCodes?(): Promise<Set<SafetyFaultCode>>
 }
 
 /**
@@ -62,13 +63,18 @@ export const createAutomationEngine = ({
   emit,
   disableMaster = async () => {},
   reportFault = async () => {},
+  loadEnabledFaultCodes,
 }: Dependencies) => {
   /**
    * 单台设备的自动水循环状态机。
    * 状态只在这里变化；执行器负责 MQTT，安全监督器负责判断，保护器负责落实停机。
    */
   const actuator = createAutomationActuator({ execute })
-  const safety = createSafetySupervisor(clock)
+  let enabledFaultCodes: Set<SafetyFaultCode> | null = null
+  const safety = createSafetySupervisor(
+    clock,
+    faultCode => enabledFaultCodes?.has(faultCode) ?? true,
+  )
   // enabled 表示“自动模式是否被请求”；state 表示“当前走到哪一步”。
   // 例如停止自动模式后，enabled=false 但 state 仍可能是 cooling，需要继续让泵散热。
   let enabled = false
@@ -205,6 +211,7 @@ export const createAutomationEngine = ({
     // 不应再次伪装为 MQTT 发布失败。
     const message = error instanceof Error ? error.message : String(error)
     if (actuator.lastAction?.status === 'blocked') return
+    await refreshFaultRules()
     await applySafetyDecision(safety.trip(
       'COMMAND_PUBLISH_FAILED',
       `控制指令发布失败：${message}`,
@@ -216,8 +223,24 @@ export const createAutomationEngine = ({
    * @param decision 安全监督器已经确认的故障与保护动作。
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
    */
-  const applySafetyDecision = async (decision: SafetyDecision) => {
+  const applySafetyDecision = async (decision: SafetyDecision | null) => {
+    if (!decision) return false
     await protection.apply(decision)
+    return true
+  }
+
+  const refreshFaultRules = async () => {
+    if (!loadEnabledFaultCodes) return
+    enabledFaultCodes = await loadEnabledFaultCodes()
+    const lockedFaultCode = safety.getSnapshot().faultCode
+    if (lockedFaultCode && !enabledFaultCodes.has(lockedFaultCode)) {
+      safety.reset()
+      protection.reset()
+      state = 'stopped'
+      enabled = false
+      limitationReason = null
+      enteredAt = clock()
+    }
   }
 
   /**
@@ -225,6 +248,7 @@ export const createAutomationEngine = ({
    * @returns 函数签名中声明的结果；异步函数失败时会抛出异常。
    */
   const loadCheckedConfig = async () => {
+    await refreshFaultRules()
     // 配置非法时不能继续自动运行，因此将其提升为可锁定的安全故障。
     try {
       const loaded = await loadConfig({
@@ -261,6 +285,7 @@ export const createAutomationEngine = ({
       if (!config) await loadCheckedConfig()
     },
     evaluateLatestSafety: async () => {
+      await refreshFaultRules()
       if (!latestReading || debugMode) return
       const decision = safetyBridge.evaluateReading(latestReading)
       if (decision) await applySafetyDecision(decision)
@@ -269,6 +294,7 @@ export const createAutomationEngine = ({
       ? { allowed: true, reason: null }
       : safetyBridge.authorize(action, 'manual'),
     failCommand: async (action, message) => {
+      await refreshFaultRules()
       await applySafetyDecision(safety.trip(
         'COMMAND_PUBLISH_FAILED',
         `${action.topic}=${action.value} 指令发布失败：${message}`,
@@ -351,6 +377,7 @@ export const createAutomationEngine = ({
       // readingGeneration 用于复位期间检查设备数据是否变化；复位前后的安全事实
       // 必须一致，不能在发关机命令的间隙忽略新来的异常读数。
       return serialize(async () => {
+        await refreshFaultRules()
         latestReading = reading
         actualPump = reading.actualPump
         actualHeater = reading.actualHeater
@@ -367,8 +394,7 @@ export const createAutomationEngine = ({
           }
         }
         const decision = debugMode ? null : safetyBridge.evaluateReading(reading)
-        if (decision) {
-          await applySafetyDecision(decision)
+        if (decision && await applySafetyDecision(decision)) {
           await notify()
           return
         }
@@ -396,6 +422,7 @@ export const createAutomationEngine = ({
     tick() {
       // 处理由时间经过触发的规则：数据超时、冷却延时和 PID 时间窗口。
       return serialize(async () => {
+        await refreshFaultRules()
         if (!config) {
           try {
             await loadCheckedConfig()
@@ -407,9 +434,7 @@ export const createAutomationEngine = ({
         }
         if (!config) return
         const safetyDecision = debugMode ? null : safetyBridge.tick()
-        if (safetyDecision) {
-          await applySafetyDecision(safetyDecision)
-        }
+        if (safetyDecision) await applySafetyDecision(safetyDecision)
         if (state === 'fault') {
           try {
             await protection.stopPumpAfterCooling()
@@ -466,6 +491,7 @@ export const createAutomationEngine = ({
      */
     authorizeAction(action: SafetyAction) {
       return serialize(async () => {
+        await refreshFaultRules()
         if (!config) await loadCheckedConfig()
         if (latestReading) {
           const decision = debugMode ? null : safetyBridge.evaluateReading(latestReading)
@@ -507,6 +533,7 @@ export const createAutomationEngine = ({
      */
     handleCommandFailure(action: SafetyAction, message: string) {
       return serialize(async () => {
+        await refreshFaultRules()
         const decision = safety.trip(
           'COMMAND_PUBLISH_FAILED',
           `${action.topic}=${action.value} 指令发布失败：${message}`,
@@ -524,6 +551,7 @@ export const createAutomationEngine = ({
      */
     tripFault(faultCode: SafetyFaultCode, detail: string) {
       return serialize(async () => {
+        await refreshFaultRules()
         await applySafetyDecision(safety.trip(faultCode, detail))
         await notify()
       })

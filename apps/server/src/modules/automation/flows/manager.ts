@@ -36,6 +36,7 @@ interface Dependencies {
     errorNumber: SafetyFaultCode,
     detail: string,
   ): Promise<void>
+  loadEnabledFaultCodes?(): Promise<Set<SafetyFaultCode>>
 }
 
 /** 按设备编号延迟创建并缓存状态机，对 HTTP、MQTT 和定时器提供统一入口。 */
@@ -47,6 +48,7 @@ export const createAutomationManager = ({
   emit,
   disableMaster,
   reportFault,
+  loadEnabledFaultCodes,
 }: Dependencies) => {
   let engine: AutomationEngine | undefined
   let debugMode = false
@@ -77,6 +79,7 @@ export const createAutomationManager = ({
         errorNumber,
         detail,
       ),
+      loadEnabledFaultCodes,
     })
     return engine
   }
