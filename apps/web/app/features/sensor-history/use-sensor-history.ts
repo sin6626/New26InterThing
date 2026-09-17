@@ -8,6 +8,7 @@ import type {
 import dayjs from 'dayjs'
 
 import { useSensorHistoryApi } from './api'
+import { resolveHistoryDeviceNumber } from './history-query'
 
 /** 封装历史页的筛选、分页、选择识别和趋势加载，页面模板只负责布局。 */
 export const useSensorHistory = () => {
@@ -36,6 +37,13 @@ export const useSensorHistory = () => {
     endTime: timeRange.value ? dayjs(timeRange.value[1]).format('YYYY-MM-DD HH:mm:ss') : undefined,
   }))
 
+  const ensureDeviceSelection = () => {
+    filters.deviceNumber = resolveHistoryDeviceNumber(
+      filters.deviceNumber,
+      options.value.deviceNumbers,
+    )
+  }
+
   const loadPage = async () => {
     const result = await api.getPage({
       ...requestFilters.value,
@@ -58,6 +66,7 @@ export const useSensorHistory = () => {
 
   const loadOperationalMetrics = async () => {
     operationalMetricsError.value = ''
+    ensureDeviceSelection()
     if (!filters.deviceNumber) {
       operationalMetrics.value = null
       return
@@ -78,6 +87,7 @@ export const useSensorHistory = () => {
   }
 
   const search = async () => {
+    ensureDeviceSelection()
     page.current = 1
     loading.value = true
     errorMessage.value = ''
@@ -117,7 +127,7 @@ export const useSensorHistory = () => {
   }
 
   const reset = () => {
-    filters.deviceNumber = ''
+    filters.deviceNumber = resolveHistoryDeviceNumber('', options.value.deviceNumbers)
     filters.status = 'all'
     timeRange.value = null
     void search()
@@ -144,7 +154,7 @@ export const useSensorHistory = () => {
     loading.value = true
     try {
       options.value = await api.getOptions()
-      filters.deviceNumber ||= options.value.deviceNumbers[0] ?? ''
+      ensureDeviceSelection()
       await Promise.all([loadPage(), loadTrend(), loadOperationalMetrics()])
     } catch {
       rows.value = []
