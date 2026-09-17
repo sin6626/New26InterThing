@@ -107,6 +107,8 @@ describe('sensor history HTTP API', () => {
   it('returns estimated operational metrics for one device and time range', async () => {
     const getOperationalMetrics = vi.fn().mockResolvedValue({
       deviceNumber: '202111',
+      startTime: '2026-09-17 10:00:00',
+      endTime: '2026-09-17 11:00:00',
       pumpRuntimeSeconds: 12,
       heaterRuntimeSeconds: 6,
       outletTemperatureRate: { times: [], data: [] },
@@ -127,6 +129,8 @@ describe('sensor history HTTP API', () => {
       message: '查询成功',
       data: {
         deviceNumber: '202111',
+        startTime: '2026-09-17 10:00:00',
+        endTime: '2026-09-17 11:00:00',
         pumpRuntimeSeconds: 12,
         heaterRuntimeSeconds: 6,
         outletTemperatureRate: { times: [], data: [] },

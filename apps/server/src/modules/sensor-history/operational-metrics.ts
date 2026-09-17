@@ -1,4 +1,5 @@
 import type { SensorHistoryOperationalMetrics } from '@new26interthing/shared'
+import { calculateTemperatureRatePerMinute } from '../operational-metrics/calculation.js'
 
 export interface HistoricalOperationalSample {
   recordedAt: number
@@ -19,6 +20,12 @@ const minuteLabel = (timestamp: number) => {
   const date = new Date(timestamp)
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`
+}
+
+const dateTimeLabel = (timestamp: number) => {
+  const date = new Date(timestamp)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 /** 根据历史采样估算查询区间内的设备运行时长和出口温度变化速度。 */
@@ -70,20 +77,22 @@ export const calculateHistoricalOperationalMetrics = ({
       && (endTime === undefined || sample.recordedAt <= endTime)
     ) {
       const oldest = temperatureWindow[0]
-      if (oldest) {
-        const elapsedSeconds = (sample.recordedAt - oldest.recordedAt) / 1_000
-        if (elapsedSeconds >= 5) {
-          rates.set(
-            minuteLabel(sample.recordedAt),
-            Number((((sample.outletTemperature - oldest.value) / elapsedSeconds) * 60).toFixed(2)),
-          )
-        }
-      }
+      const rate = calculateTemperatureRatePerMinute(oldest, {
+        recordedAt: sample.recordedAt,
+        value: sample.outletTemperature,
+      })
+      if (rate !== null) rates.set(minuteLabel(sample.recordedAt), rate)
     }
   }
 
   return {
     deviceNumber,
+    startTime: startTime === undefined
+      ? (ordered[0] ? dateTimeLabel(ordered[0].recordedAt) : null)
+      : dateTimeLabel(startTime),
+    endTime: endTime === undefined
+      ? (ordered.at(-1) ? dateTimeLabel(ordered.at(-1)!.recordedAt) : null)
+      : dateTimeLabel(endTime),
     pumpRuntimeSeconds: Number(pumpRuntimeSeconds.toFixed(1)),
     heaterRuntimeSeconds: Number(heaterRuntimeSeconds.toFixed(1)),
     outletTemperatureRate: {

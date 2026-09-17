@@ -2,6 +2,7 @@
 import type { SensorHistoryOperationalMetrics } from '@new26interthing/shared'
 
 import HistoryTrendChart from './HistoryTrendChart.vue'
+import { formatDuration } from '~/utils/format-duration'
 
 const props = defineProps<{
   loading: boolean
@@ -9,18 +10,6 @@ const props = defineProps<{
   metrics: SensorHistoryOperationalMetrics | null
   hasTimeRange: boolean
 }>()
-
-const formatDuration = (seconds?: number) => {
-  const total = Math.max(0, Math.floor(seconds ?? 0))
-  const hours = Math.floor(total / 3_600)
-  const minutes = Math.floor((total % 3_600) / 60)
-  const remainingSeconds = total % 60
-  const parts: string[] = []
-  if (hours) parts.push(`${hours}小时`)
-  if (minutes) parts.push(`${minutes}分`)
-  if (remainingSeconds || !parts.length) parts.push(`${remainingSeconds}秒`)
-  return parts.join('')
-}
 
 const temperatureSeries = computed(() => [{
   key: 'outlet_temperature_rate',
@@ -50,25 +39,28 @@ const temperatureSeries = computed(() => [{
       class="mb-4"
     />
 
-    <div class="mb-5 grid grid-cols-2 gap-4">
-      <div class="rounded-lg bg-slate-50 p-5">
-        <p class="m-0 text-sm text-slate-500">水泵估算运行时长</p>
-        <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-          {{ formatDuration(metrics?.pumpRuntimeSeconds) }}
-        </p>
+    <template v-if="metrics">
+      <div class="mb-5 grid grid-cols-2 gap-4">
+        <div class="rounded-lg bg-slate-50 p-5">
+          <p class="m-0 text-sm text-slate-500">水泵估算运行时长</p>
+          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
+            {{ formatDuration(metrics.pumpRuntimeSeconds) }}
+          </p>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-5">
+          <p class="m-0 text-sm text-slate-500">加热估算运行时长</p>
+          <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
+            {{ formatDuration(metrics.heaterRuntimeSeconds) }}
+          </p>
+        </div>
       </div>
-      <div class="rounded-lg bg-slate-50 p-5">
-        <p class="m-0 text-sm text-slate-500">加热估算运行时长</p>
-        <p class="mt-3 mb-0 text-2xl font-semibold text-slate-900">
-          {{ formatDuration(metrics?.heaterRuntimeSeconds) }}
-        </p>
-      </div>
-    </div>
 
-    <HistoryTrendChart
-      :times="metrics?.outletTemperatureRate.times ?? []"
-      :series="temperatureSeries"
-      chart-type="line"
-    />
+      <HistoryTrendChart
+        :times="metrics.outletTemperatureRate.times"
+        :series="temperatureSeries"
+        chart-type="line"
+        include-zero
+      />
+    </template>
   </el-card>
 </template>

@@ -31,9 +31,9 @@ interface DeviceNumberRow extends RowDataPacket { number: string }
 
 interface OperationalRow extends RowDataPacket {
   c_time: Date | string
-  field2: string | null
-  field6: string | null
-  field7: string | null
+  outlet_temperature: string | null
+  heater_state: string | null
+  pump_state: string | null
 }
 
 const allowedColumns = new Set(Array.from({ length: 10 }, (_, index) => `field${index + 1}`))
@@ -215,6 +215,18 @@ export const createSensorHistoryRepository = (
   },
 
   async getOperationalMetrics(query) {
+    const mappings = await getMappings(pool)
+    const column = (protocolName: string) => {
+      const mapping = mappings.find(item => item.p_name === protocolName)
+      if (!mapping || !allowedColumns.has(mapping.db_name)) {
+        throw new Error(`传感器字段未配置：${protocolName}`)
+      }
+      return mapping.db_name
+    }
+    const outletTemperatureColumn = column('temp_out')
+    const heaterColumn = column('heat_Y1')
+    const pumpColumn = column('water_Y2')
+    const dataTimeoutSeconds = await loadDataTimeoutSeconds()
     let startTime = query.startTime
     let endTime = query.endTime
     if (!startTime || !endTime) {
@@ -228,7 +240,7 @@ export const createSensorHistoryRepository = (
       if (!latest) {
         return calculateHistoricalOperationalMetrics({
           deviceNumber: query.deviceNumber,
-          dataTimeoutSeconds: await loadDataTimeoutSeconds(),
+          dataTimeoutSeconds,
           samples: [],
         })
       }
@@ -239,9 +251,14 @@ export const createSensorHistoryRepository = (
 
     const startTimestamp = new Date(startTime).getTime()
     const endTimestamp = new Date(endTime).getTime()
-    const historyStart = mysqlDateTime(startTimestamp - 60_000)
+    const historyStart = mysqlDateTime(
+      startTimestamp - Math.max(60, dataTimeoutSeconds) * 1_000,
+    )
     const [rows] = await pool.query<OperationalRow[]>(
-      `select field2, field6, field7, c_time
+      `select ${outletTemperatureColumn} as outlet_temperature,
+              ${heaterColumn} as heater_state,
+              ${pumpColumn} as pump_state,
+              c_time
        from t_sensor_data
        where d_no = ? and c_time >= ? and c_time <= ?
        order by c_time, id`,
@@ -249,13 +266,13 @@ export const createSensorHistoryRepository = (
     )
     const samples = rows.map((row): HistoricalOperationalSample => ({
       recordedAt: new Date(row.c_time).getTime(),
-      actualPump: actuator(row.field7),
-      actualHeater: actuator(row.field6),
-      outletTemperature: numeric(row.field2),
+      actualPump: actuator(row.pump_state),
+      actualHeater: actuator(row.heater_state),
+      outletTemperature: numeric(row.outlet_temperature),
     }))
     return calculateHistoricalOperationalMetrics({
       deviceNumber: query.deviceNumber,
-      dataTimeoutSeconds: await loadDataTimeoutSeconds(),
+      dataTimeoutSeconds,
       startTime: startTimestamp,
       endTime: endTimestamp,
       samples,

@@ -75,4 +75,37 @@ describe('sensor history repository', () => {
       series: [{ key: 'pressure', name: '压力', unit: 'kPa', data: [0, 2.5] }],
     })
   })
+
+  it('resolves operational metric columns through the sensor field mapper', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce([[
+        { f_name: '出水温度', db_name: 'field2', p_name: 'temp_out', unit: '℃', type: '1', visible: '1' },
+        { f_name: '加热开关', db_name: 'field6', p_name: 'heat_Y1', unit: '', type: '1', visible: '1' },
+        { f_name: '水泵开关', db_name: 'field7', p_name: 'water_Y2', unit: '', type: '1', visible: '1' },
+      ]])
+      .mockResolvedValueOnce([[
+        {
+          outlet_temperature: '21',
+          heater_state: '1',
+          pump_state: '1',
+          c_time: '2026-09-17 10:00:01',
+        },
+      ]])
+    const repository = createSensorHistoryRepository({ query } as never)
+
+    const result = await repository.getOperationalMetrics({
+      deviceNumber: '202111',
+      startTime: '2026-09-17 10:00:00',
+      endTime: '2026-09-17 10:01:00',
+    })
+
+    expect(query.mock.calls[1][0]).toContain('field2 as outlet_temperature')
+    expect(query.mock.calls[1][0]).toContain('field6 as heater_state')
+    expect(query.mock.calls[1][0]).toContain('field7 as pump_state')
+    expect(result).toMatchObject({
+      deviceNumber: '202111',
+      startTime: '2026-09-17 10:00:00',
+      endTime: '2026-09-17 10:01:00',
+    })
+  })
 })

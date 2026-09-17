@@ -3,6 +3,8 @@
  * 入口位置：modules/operational-metrics/runtime.ts
  */
 
+import { calculateTemperatureRatePerMinute } from './calculation.js'
+
 interface OperationalReading {
   recordedAt: number
   actualPump: 'on' | 'off' | 'unknown'
@@ -132,16 +134,13 @@ export const createOperationalMetricsService = ({
             sample => reading.recordedAt - sample.recordedAt <= windowMilliseconds,
           )
           const oldest = state.outletTemperatureSamples[0]
-          if (oldest) {
-            const sampleSeconds = (reading.recordedAt - oldest.recordedAt) / 1_000
-            state.outletHeatingRatePerMinute = sampleSeconds >= 5
-              ? Number((
-                  (reading.outletTemperature - oldest.value)
-                  / sampleSeconds
-                  * 60
-                ).toFixed(2))
-              : null
-          }
+          state.outletHeatingRatePerMinute = calculateTemperatureRatePerMinute(
+            oldest,
+            {
+              recordedAt: reading.recordedAt,
+              value: reading.outletTemperature,
+            },
+          )
         }
       }
 

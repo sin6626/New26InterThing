@@ -20,6 +20,7 @@ const props = defineProps<{
   times: string[]
   series: SensorHistoryTrendSeries[]
   chartType: 'line' | 'bar' | 'scatter'
+  includeZero?: boolean
 }>()
 
 const chartElement = ref<HTMLElement>()
@@ -40,7 +41,16 @@ const render = () => {
       data: props.times,
       axisLabel: { formatter: (value: string) => value.slice(5, 16) },
     },
-    yAxis: { type: 'value', scale: true },
+    yAxis: {
+      type: 'value',
+      scale: !props.includeZero,
+      min: props.includeZero
+        ? (value: { min: number }) => Math.min(0, value.min)
+        : undefined,
+      max: props.includeZero
+        ? (value: { max: number }) => Math.max(0, value.max)
+        : undefined,
+    },
     dataZoom: props.times.length > 20 ? [{ type: 'inside' }, { type: 'slider', height: 18 }] : [],
     series: props.series.map((series) => ({
       name: `${series.name}${series.unit ? ` (${series.unit})` : ''}`,

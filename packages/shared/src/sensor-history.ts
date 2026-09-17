@@ -56,6 +56,8 @@ export interface SensorHistoryOperationalMetricsQuery {
 
 export interface SensorHistoryOperationalMetrics {
   deviceNumber: string
+  startTime: string | null
+  endTime: string | null
   pumpRuntimeSeconds: number
   heaterRuntimeSeconds: number
   outletTemperatureRate: {
