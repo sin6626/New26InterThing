@@ -18,7 +18,7 @@
 apps/web          Nuxt 4 + Vue 3 前端
 apps/server       Express + MQTT + WebSocket + MySQL 后端
 packages/shared   前后端共享 TypeScript 类型
-docs              API、里程碑、现场手册和新旧对照
+docs              比赛现场手册、API、代码导航和本地模型指南
 ```
 
 `contest_admin` 是独立后台，只通过同一 MySQL 数据库维护设备、字段映射、控制参数和故障码，不调用本项目 HTTP API。
@@ -69,9 +69,9 @@ pnpm build        # 最终生产构建（按约定由用户统一执行）
 
 - [现场运行手册](./docs/比赛现场运行手册.md)
 - [HTTP API 与 WebSocket 协议](./docs/API.md)
-- [新旧项目对照](./docs/新旧项目对照.md)
-- [最终验收记录](./docs/最终验收记录.md)
-- [重构里程碑目录](./docs/重构计划.md)
+- [Qwen3.5 9B 比赛协作指南](./docs/Qwen3.5-9B比赛协作指南.md)
+- [后端代码阅读指南](./docs/后端代码阅读指南.md)
+- [后端模块目录](./docs/后端模块目录.md)
 
 ## 安全提醒
 
