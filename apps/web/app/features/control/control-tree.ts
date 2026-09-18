@@ -33,6 +33,24 @@ export const isControlFieldDisabled = (
   safetyLocked: boolean,
 ) => savingId !== undefined || (field.topic === 'master' && safetyLocked)
 
+/** 期望已经关闭但设备反馈尚未关闭时，允许人工再次发送安全停机指令。 */
+export const requiresForceOff = (
+  field: ControlField,
+  runtime: Pick<
+    AutomationSnapshot,
+    'desiredPump' | 'actualPump' | 'desiredHeater' | 'actualHeater'
+  > | undefined,
+) => {
+  if (!runtime) return false
+  if (field.topic === 'pump') {
+    return runtime.desiredPump === 'off' && runtime.actualPump !== 'off'
+  }
+  if (field.topic === 'heater') {
+    return runtime.desiredHeater === 'off' && runtime.actualHeater !== 'off'
+  }
+  return false
+}
+
 /** 按 id/ref_id 组装控制项层级，并根据父开关值隐藏当前无效的子项。 */
 export const buildVisibleControlTree = (
   fields: ControlField[],

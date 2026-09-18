@@ -56,6 +56,49 @@ describe('control service', () => {
     expect(repo.saveFailure).not.toHaveBeenCalled()
   })
 
+  it('force-publishes off when the expected value is already off', async () => {
+    const repo = repository()
+    const publish = vi.fn()
+    const safety = allowSafety()
+    const service = createControlService(repo, { publish }, safety)
+
+    await expect(service.forceOff({
+      deviceNumber: '202111',
+      configId: 23,
+    })).resolves.toEqual({ configId: 23, value: 'off', status: 'published' })
+
+    expect(publish).toHaveBeenCalledOnce()
+    expect(safety.executeAction).toHaveBeenCalledWith(
+      '202111',
+      { topic: 'pump', value: 'off' },
+      expect.any(Function),
+    )
+    expect(repo.saveSuccess).toHaveBeenCalledWith(
+      definition,
+      '202111',
+      'off',
+      '人工强制补发关闭；MQTT发布成功',
+      'manual',
+    )
+  })
+
+  it('rejects force-off for non-device controls', async () => {
+    const repo = repository()
+    vi.mocked(repo.getDefinition).mockResolvedValue({
+      ...definition,
+      configId: 1,
+      topic: 'master',
+    })
+    const publish = vi.fn()
+    const service = createControlService(repo, { publish }, allowSafety())
+
+    await expect(service.forceOff({
+      deviceNumber: '202111',
+      configId: 1,
+    })).rejects.toMatchObject({ status: 400 })
+    expect(publish).not.toHaveBeenCalled()
+  })
+
   it('ignores equivalent numeric and master values without saving or changing automation', async () => {
     const repo = repository()
     const setEnabled = vi.fn()

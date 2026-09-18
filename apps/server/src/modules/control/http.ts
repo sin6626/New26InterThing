@@ -23,6 +23,10 @@ const commandSchema = z.object({
   configId: z.number().int(),
   value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
 })
+const forceOffSchema = commandSchema.pick({
+  deviceNumber: true,
+  configId: true,
+})
 const timeSyncSchema = z.object({
   deviceNumber: z.string().trim().min(1),
   time: z.string().trim().min(1).optional(),
@@ -130,6 +134,28 @@ export const createControlRouter = (
   })
 
   // 修改配置项或者下发指令的接口
+  router.post('/commands/force-off', async (request, response, next) => {
+    const parsed = forceOffSchema.safeParse(request.body)
+    if (!parsed.success) return invalid(response)
+    try {
+      response.json({
+        code: 0,
+        message: '关闭指令已重新发布',
+        data: await service.forceOff(parsed.data),
+      })
+    }
+    catch (error) {
+      if (error instanceof ControlError) {
+        return response.status(error.status).json({
+          code: error.status,
+          message: error.message,
+          data: null,
+        })
+      }
+      next(error)
+    }
+  })
+
   router.post('/commands', async (request, response, next) => {
     const parsed = commandSchema.safeParse(request.body)
     if (!parsed.success) return invalid(response)

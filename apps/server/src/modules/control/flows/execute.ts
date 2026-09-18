@@ -6,6 +6,7 @@
 import type {
   ControlCommandIntent,
   ControlCommandResult,
+  ForceControlOffIntent,
 } from '@new26interthing/shared'
 
 import { buildCommandEnvelope } from '../adapters/command.js'
@@ -109,6 +110,7 @@ export const createControlService = (
   const executeCommand = async (
     intent: ControlCommandIntent,
     trustedAutomation = false,
+    forceDeviceOff = false,
   ): Promise<ControlCommandResult> => {
     // 前端只给设备编号、配置 ID 和新值；真正的控件类型、取值范围和 MQTT 模板
     // 必须从后台配置读取，不能直接相信页面传来的“这是一条泵指令”。
@@ -144,7 +146,11 @@ export const createControlService = (
         throw new ControlError('指令值不在配置选项中', 400)
       }
     }
-    if (isUnchangedValue(
+
+    if (forceDeviceOff && (!isDeviceCommand(definition.topic) || value !== 'off')) {
+      throw new ControlError('只能强制补发水泵或加热关闭指令', 400)
+    }
+    if (!forceDeviceOff && isUnchangedValue(
       definition.oldValue,
       value,
       definition.fieldType,
@@ -240,7 +246,11 @@ export const createControlService = (
         definition,
         intent.deviceNumber,
         value,
-        shouldPublish ? '应用层下发；MQTT发布成功' : '应用层配置保存（无需MQTT下发）',
+        forceDeviceOff
+          ? '人工强制补发关闭；MQTT发布成功'
+          : shouldPublish
+            ? '应用层下发；MQTT发布成功'
+            : '应用层配置保存（无需MQTT下发）',
         trustedAutomation ? 'automatic' : 'manual',
       )
     }
@@ -304,6 +314,10 @@ export const createControlService = (
     },
 
     execute: (intent: ControlCommandIntent) => executeCommand(intent),
+    forceOff: (intent: ForceControlOffIntent) => executeCommand({
+      ...intent,
+      value: 'off',
+    }, false, true),
     executeAutomation: (intent: ControlCommandIntent) => executeCommand(intent, true),
   }
 }

@@ -250,6 +250,20 @@ Content-Type: application/json
 
 提交值与当前值相同时返回 `status: "unchanged"`，不重复发布 MQTT、不重复切换自动状态机，也不写成功操作历史。数值控件按数值语义比较，例如 `20` 与 `20.0` 视为相同；失败操作和智能识别事件不受此规则影响。
 
+### 重新发送设备关闭指令
+
+```http
+POST /controls/commands/force-off
+Content-Type: application/json
+
+{
+  "deviceNumber": "e46488d793245429",
+  "configId": 23
+}
+```
+
+仅用于设备实际状态与后端关闭期望不一致时，再次发布水泵或加热的 `off`。该接口不接收调用方提供的开关值，只允许 `pump`、`heater` 两类执行器，并绕过普通指令的“值未变化”去重；告警锁定期间也允许安全停机。MQTT 发布成功或失败都会写入操作历史，便于现场追踪补发结果。
+
 ## 自动水循环
 
 ### 调试模式

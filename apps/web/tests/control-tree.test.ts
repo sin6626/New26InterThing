@@ -8,6 +8,7 @@ import type { ControlField } from '@new26interthing/shared'
 import {
   buildVisibleControlTree,
   isControlFieldDisabled,
+  requiresForceOff,
   syncRuntimeControlFields,
 } from '../app/features/control/control-tree'
 
@@ -77,5 +78,18 @@ describe('control tree', () => {
     })
 
     expect(fields.map(item => item.value)).toEqual(['on', 'on', 'off'])
+  })
+
+  it('offers force-off only when a device actuator is expected off but not actually off', () => {
+    const runtime = {
+      desiredPump: 'off' as const,
+      actualPump: 'on' as const,
+      desiredHeater: 'off' as const,
+      actualHeater: 'off' as const,
+    }
+
+    expect(requiresForceOff(field({ topic: 'pump' }), runtime)).toBe(true)
+    expect(requiresForceOff(field({ topic: 'heater' }), runtime)).toBe(false)
+    expect(requiresForceOff(field({ topic: 'master' }), runtime)).toBe(false)
   })
 })

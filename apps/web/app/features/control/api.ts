@@ -2,6 +2,7 @@ import type {
   ApiResponse,
   ControlCommandIntent,
   ControlCommandResult,
+  ForceControlOffIntent,
   ControlSnapshot,
   OperationLogOptions,
   OperationLogQuery,
@@ -79,6 +80,13 @@ export const useControlApi = () => {
     async execute(intent: ControlCommandIntent) {
       const response = await http.post<ApiResponse<ControlCommandResult>>(
         '/controls/commands',
+        intent,
+      )
+      return unwrap(response.data)
+    },
+    async forceOff(intent: ForceControlOffIntent) {
+      const response = await http.post<ApiResponse<ControlCommandResult>>(
+        '/controls/commands/force-off',
         intent,
       )
       return unwrap(response.data)

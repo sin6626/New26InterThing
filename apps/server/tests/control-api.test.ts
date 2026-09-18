@@ -51,6 +51,11 @@ const startServer = async () => {
       value: 'on',
       status: 'published',
     }),
+    forceOff: vi.fn().mockResolvedValue({
+      configId: 23,
+      value: 'off',
+      status: 'published',
+    }),
     syncTime: vi.fn(),
   } as unknown as ControlService
   const app = createApp({
@@ -127,6 +132,24 @@ describe('control HTTP API', () => {
 
     expect(response.status).toBe(400)
     expect(controlService.execute).not.toHaveBeenCalled()
+  })
+
+  it('accepts an explicit force-off request without a caller-provided value', async () => {
+    const { baseUrl, controlService } = await startServer()
+    const response = await fetch(`${baseUrl}/api/controls/commands/force-off`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deviceNumber: 'e46488d793245429',
+        configId: 23,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(controlService.forceOff).toHaveBeenCalledWith({
+      deviceNumber: 'e46488d793245429',
+      configId: 23,
+    })
   })
 
   it('returns filtered operation logs in the common envelope', async () => {

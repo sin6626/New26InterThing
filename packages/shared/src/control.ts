@@ -32,6 +32,11 @@ export interface ControlCommandIntent {
   value: string | number | boolean | string[]
 }
 
+export interface ForceControlOffIntent {
+  deviceNumber: string
+  configId: number
+}
+
 export interface ControlCommandResult {
   configId: number
   value: string

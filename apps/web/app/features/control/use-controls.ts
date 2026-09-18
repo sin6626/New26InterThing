@@ -8,6 +8,7 @@ import { useControlApi } from './api'
 import {
   buildVisibleControlTree,
   isControlFieldDisabled,
+  requiresForceOff,
   syncRuntimeControlFields,
   type ControlTreeNode,
 } from './control-tree'
@@ -22,6 +23,7 @@ export const useControls = () => {
   const selectedDevice = ref('')
   const loading = ref(false)
   const savingId = ref<number>()
+  const forcingOffId = ref<number>()
   const errorMessage = ref('')
   const syncingTime = ref(false)
 
@@ -36,8 +38,13 @@ export const useControls = () => {
 
   const fieldDisabled = (field: ControlField) => isControlFieldDisabled(
     field,
-    savingId.value,
+    savingId.value ?? forcingOffId.value,
     automationSnapshots.value[selectedDevice.value]?.safety.locked ?? false,
+  )
+
+  const forceOffRequired = (field: ControlField) => requiresForceOff(
+    field,
+    automationSnapshots.value[selectedDevice.value],
   )
 
   const load = async () => {
@@ -112,6 +119,24 @@ export const useControls = () => {
     }
   }
 
+  const forceOff = async (field: ControlField) => {
+    forcingOffId.value = field.configId
+    try {
+      await api.forceOff({
+        deviceNumber: selectedDevice.value,
+        configId: field.configId,
+      })
+      ElMessage.success('关闭指令已重新发送')
+    }
+    catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '关闭指令发送失败')
+    }
+    finally {
+      forcingOffId.value = undefined
+      await load()
+    }
+  }
+
   watch(selectedDevice, () => void load(), { immediate: false })
   watch(
     () => automationSnapshots.value[selectedDevice.value],
@@ -123,6 +148,9 @@ export const useControls = () => {
     deviceNumbers,
     errorMessage,
     fieldDisabled,
+    forceOff,
+    forceOffRequired,
+    forcingOffId,
     initialize,
     loading,
     savingId,

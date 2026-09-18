@@ -10,6 +10,9 @@ const {
   deviceNumbers,
   errorMessage,
   fieldDisabled,
+  forceOff,
+  forceOffRequired,
+  forcingOffId,
   initialize,
   loading,
   savingId,
@@ -306,6 +309,16 @@ onMounted(() => void initialize())
                 inactive-text="关闭"
                 @change="value => update(field, Boolean(value))"
               />
+              <el-button
+                v-if="field.type === 'switch' && forceOffRequired(field)"
+                type="danger"
+                plain
+                :loading="forcingOffId === field.configId"
+                :disabled="savingId !== undefined || forcingOffId !== undefined"
+                @click="forceOff(field)"
+              >
+                重新发送关闭
+              </el-button>
               <el-input
                 v-else-if="field.type === 'input'"
                 :model-value="getInputValue(field)"
