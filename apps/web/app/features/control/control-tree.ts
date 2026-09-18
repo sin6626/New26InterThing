@@ -1,16 +1,29 @@
-import type { ControlField } from '@new26interthing/shared'
+import type {
+  AutomationSnapshot,
+  ControlField,
+} from '@new26interthing/shared'
 
 export interface ControlTreeNode extends ControlField {
   children: ControlTreeNode[]
 }
 
-/** 用后端自动状态同步控制树中的 master，避免安全停机后仍显示为开启。 */
-export const syncAutomaticModeField = (
+/** 用后端期望状态同步运行开关，避免安全停机后控制树仍显示旧值。 */
+export const syncRuntimeControlFields = (
   fields: ControlField[],
-  enabled: boolean,
+  runtime: Pick<
+    AutomationSnapshot,
+    'enabled' | 'desiredPump' | 'desiredHeater'
+  >,
 ) => {
-  const master = fields.find(field => field.topic === 'master')
-  if (master) master.value = enabled ? 'on' : 'off'
+  const values = new Map<string, string>([
+    ['master', runtime.enabled ? 'on' : 'off'],
+    ['pump', runtime.desiredPump],
+    ['heater', runtime.desiredHeater],
+  ])
+  for (const field of fields) {
+    const value = values.get(field.topic)
+    if (value !== undefined) field.value = value
+  }
 }
 
 /** 保存期间禁用全部控件；故障锁定期间额外禁止重新开启自动模式。 */

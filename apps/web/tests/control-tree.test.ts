@@ -8,7 +8,7 @@ import type { ControlField } from '@new26interthing/shared'
 import {
   buildVisibleControlTree,
   isControlFieldDisabled,
-  syncAutomaticModeField,
+  syncRuntimeControlFields,
 } from '../app/features/control/control-tree'
 
 const field = (overrides: Partial<ControlField>): ControlField => ({
@@ -51,10 +51,31 @@ describe('control tree', () => {
       field({ configId: 4, name: '水泵开关', topic: 'pump', value: 'off' }),
     ]
 
-    syncAutomaticModeField(fields, false)
+    syncRuntimeControlFields(fields, {
+      enabled: false,
+      desiredPump: 'off',
+      desiredHeater: 'off',
+    })
 
     expect(fields[0]?.value).toBe('off')
+    expect(fields[1]?.value).toBe('off')
     expect(isControlFieldDisabled(fields[0]!, undefined, true)).toBe(true)
     expect(isControlFieldDisabled(fields[1]!, undefined, true)).toBe(false)
+  })
+
+  it('synchronizes all runtime switches from the automation snapshot', () => {
+    const fields = [
+      field({ configId: 0, topic: 'master', value: 'off' }),
+      field({ configId: 23, topic: 'pump', value: 'off' }),
+      field({ configId: 24, topic: 'heater', value: 'on' }),
+    ]
+
+    syncRuntimeControlFields(fields, {
+      enabled: true,
+      desiredPump: 'on',
+      desiredHeater: 'off',
+    })
+
+    expect(fields.map(item => item.value)).toEqual(['on', 'on', 'off'])
   })
 })

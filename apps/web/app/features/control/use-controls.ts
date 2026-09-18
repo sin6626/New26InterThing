@@ -8,7 +8,7 @@ import { useControlApi } from './api'
 import {
   buildVisibleControlTree,
   isControlFieldDisabled,
-  syncAutomaticModeField,
+  syncRuntimeControlFields,
   type ControlTreeNode,
 } from './control-tree'
 import { useRealtimeSocket } from '../realtime/use-realtime-socket'
@@ -29,9 +29,9 @@ export const useControls = () => {
     buildVisibleControlTree(snapshot.value.fields)
   ))
 
-  const syncAutomaticMode = () => {
+  const syncRuntimeControls = () => {
     const automation = automationSnapshots.value[selectedDevice.value]
-    if (automation) syncAutomaticModeField(snapshot.value.fields, automation.enabled)
+    if (automation) syncRuntimeControlFields(snapshot.value.fields, automation)
   }
 
   const fieldDisabled = (field: ControlField) => isControlFieldDisabled(
@@ -46,7 +46,7 @@ export const useControls = () => {
     errorMessage.value = ''
     try {
       snapshot.value = await api.getSnapshot(selectedDevice.value)
-      syncAutomaticMode()
+      syncRuntimeControls()
     }
     catch {
       snapshot.value = { deviceNumber: selectedDevice.value, fields: [] }
@@ -115,7 +115,7 @@ export const useControls = () => {
   watch(selectedDevice, () => void load(), { immediate: false })
   watch(
     () => automationSnapshots.value[selectedDevice.value],
-    () => syncAutomaticMode(),
+    () => syncRuntimeControls(),
   )
 
   return {
