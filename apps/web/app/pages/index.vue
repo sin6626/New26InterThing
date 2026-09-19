@@ -10,9 +10,11 @@ import { useRealtimeTrends } from '~/features/realtime/use-realtime-trends'
 
 const selectedDevice = ref('')
 const {
+  clearFaultAlert,
   connectionGeneration,
   devicePresence,
   hydraulicDiagnoses,
+  latestFaultAlerts,
   mqttConnected,
   readings,
   realtimeDetailPoints,
@@ -60,6 +62,16 @@ const currentReading = computed(() => (
   realtimeReading.value
   || latestReading.value
 ))
+const activeFault = computed(() => latestFaultAlerts.value[selectedDevice.value])
+
+watch(
+  () => automation.value?.safety.locked,
+  (locked, previousLocked) => {
+    if (previousLocked === true && locked === false && selectedDevice.value) {
+      clearFaultAlert(selectedDevice.value)
+    }
+  },
+)
 
 watch(deviceNumbers, (numbers) => {
   if (!numbers.includes(selectedDevice.value)) {
@@ -73,10 +85,36 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[1500px] space-y-5">
+  <div
+    class="mx-auto max-w-[1500px] space-y-5 rounded-xl transition-colors"
+    :class="activeFault ? 'bg-red-50/70 p-4 ring-1 ring-red-200' : ''"
+  >
+    <section
+      v-if="activeFault"
+      class="flex items-center justify-between gap-4 rounded-lg border border-red-300 bg-red-100 px-5 py-4 text-red-900"
+    >
+      <div>
+        <p class="m-0 font-semibold">
+          设备告警：{{ activeFault.message || activeFault.errorNumber || '未知故障' }}
+        </p>
+        <p class="mt-1 mb-0 text-sm text-red-700">
+          {{ activeFault.source === 'intelligence' ? '智能判定' : '系统判定' }}
+          · {{ activeFault.occurredAt ? new Date(activeFault.occurredAt).toLocaleString('zh-CN') : '刚刚' }}
+        </p>
+      </div>
+      <el-button type="danger" plain @click="clearFaultAlert(selectedDevice)">
+        已知晓
+      </el-button>
+    </section>
+
     <header class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="m-0 text-2xl font-semibold text-slate-900">实时监控</h1>
+        <h1
+          class="m-0 text-2xl font-semibold"
+          :class="activeFault ? 'text-red-700' : 'text-slate-900'"
+        >
+          实时监控
+        </h1>
         <p class="mt-2 mb-0 text-sm text-slate-500">
           查看 MQTT 设备最新上传的传感器数据
         </p>

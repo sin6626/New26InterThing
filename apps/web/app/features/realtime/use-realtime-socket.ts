@@ -1,6 +1,7 @@
 import type {
   AutomationSnapshot,
   DevicePresence,
+  FaultItem,
   HydraulicDiagnosis,
   OperationalMetricsSnapshot,
   RealtimeMessage,
@@ -48,6 +49,10 @@ export function useRealtimeSocket() {
   )
   const operationalMetricsSnapshots = useState<Record<string, OperationalMetricsSnapshot>>(
     'operational-metrics-snapshots',
+    () => ({}),
+  )
+  const latestFaultAlerts = useState<Record<string, FaultItem>>(
+    'latest-fault-alerts',
     () => ({}),
   )
   const trendPoints = useState<Record<string, RealtimeTrendPoint[]>>(
@@ -130,6 +135,12 @@ export function useRealtimeSocket() {
           }
         }
         if (message.type === 'fault.alert') {
+          if (message.data.deviceNumber) {
+            latestFaultAlerts.value = {
+              ...latestFaultAlerts.value,
+              [message.data.deviceNumber]: message.data,
+            }
+          }
           ElNotification.error({
             title: `设备 ${message.data.deviceNumber || '未知'} 发生故障`,
             message: `${message.data.source === 'intelligence' ? '智能判定' : '系统判定'}：${message.data.message || `故障编号 ${message.data.errorNumber || '未知'}`}`,
@@ -152,11 +163,19 @@ export function useRealtimeSocket() {
 
   onMounted(connect)
 
+  const clearFaultAlert = (deviceNumber: string) => {
+    const alerts = { ...latestFaultAlerts.value }
+    delete alerts[deviceNumber]
+    latestFaultAlerts.value = alerts
+  }
+
   return {
     automationSnapshots,
+    clearFaultAlert,
     connectionGeneration,
     devicePresence,
     hydraulicDiagnoses,
+    latestFaultAlerts,
     mqttConnected,
     operationalMetricsSnapshots,
     readings,
